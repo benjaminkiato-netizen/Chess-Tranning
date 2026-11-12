@@ -10,6 +10,21 @@
   <link rel="stylesheet" href="app.css?v=5a13d705">
 </head>
 <body>
+  <div id="err-banner" style="display:none;position:fixed;left:12px;right:12px;bottom:12px;z-index:100;background:#5c1a1a;color:#fff;border:1px solid #ff5e57;border-radius:10px;padding:10px 14px;font:13px/1.4 system-ui,sans-serif;white-space:pre-wrap"></div>
+  <script>
+    // Show script errors on the page (instead of a silent blank board) so they can be reported.
+    (function () {
+      var shown = 0;
+      function show(msg) {
+        if (shown++ > 4) return;
+        var b = document.getElementById('err-banner');
+        b.style.display = 'block';
+        b.textContent += (b.textContent ? '\n' : 'Something went wrong. Please send a screenshot of this box:\n') + msg + '\n[' + navigator.userAgent + ']';
+      }
+      window.addEventListener('error', function (e) { show((e.message || 'error') + (e.filename ? ' @ ' + e.filename.split('/').pop() + ':' + e.lineno + ':' + e.colno : '')); });
+      window.addEventListener('unhandledrejection', function (e) { var r = e.reason; if (r && r.message === 'stopped') return; show('Promise: ' + (r && (r.stack || r.message) || r)); });
+    })();
+  </script>
   <header class="top">
     <a class="home" href="../chess.html">← Chess</a>
     <h1>Chess Lab</h1>
