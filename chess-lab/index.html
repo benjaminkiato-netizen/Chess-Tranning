@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chess Lab · Spar &amp; Review</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="vendor/chessground.base.css">
+  <link rel="stylesheet" href="vendor/chessground.cburnett.css">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="top">
+    <a class="home" href="../chess.html">← Chess</a>
+    <h1>Chess Lab</h1>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="spar" role="tab">Spar vs Patricia</button>
+      <button class="tab" data-tab="review" role="tab">Game Review</button>
+    </nav>
+  </header>
+
+  <!-- SPARRING -->
+  <main id="spar" class="panel active">
+    <section class="board-col">
+      <div class="player-bar" id="spar-top"><span class="avatar">P</span><span class="pname">Patricia</span><span class="pmeta" id="spar-top-meta"></span></div>
+      <div class="board-wrap"><div id="spar-board" class="cg-wrap-host"></div></div>
+      <div class="player-bar" id="spar-bottom"><span class="avatar you">Y</span><span class="pname">You</span><span class="pmeta"></span></div>
+    </section>
+    <aside class="side">
+      <div class="card">
+        <h2>New game</h2>
+        <label class="field">Patricia's strength <output id="level-out"></output>
+          <input type="range" id="level" min="1" max="20" value="6">
+        </label>
+        <div class="field">You play
+          <div class="seg" id="color-seg">
+            <button data-v="w" class="on">White</button><button data-v="b">Black</button><button data-v="r">Random</button>
+          </div>
+        </div>
+        <div class="field">Patricia thinks for
+          <div class="seg" id="time-seg">
+            <button data-v="500">0.5s</button><button data-v="1000" class="on">1s</button><button data-v="2500">2.5s</button>
+          </div>
+        </div>
+        <button class="primary" id="spar-new">Start game</button>
+        <p class="hint">Patricia is the most aggressive engine around. At lower levels she plays like a human of that rating, but she still loves to sacrifice. Good practice for defending attacks.</p>
+      </div>
+      <div class="card">
+        <div class="status" id="spar-status">Engine loading…</div>
+        <ol class="movelist" id="spar-moves"></ol>
+        <div class="row">
+          <button id="spar-undo">Takeback</button>
+          <button id="spar-flip">Flip</button>
+          <button id="spar-resign">Resign</button>
+        </div>
+        <button class="primary ghost" id="spar-review" disabled>Review this game →</button>
+      </div>
+    </aside>
+  </main>
+
+  <!-- REVIEW -->
+  <main id="review" class="panel">
+    <section class="board-col">
+      <div class="player-bar"><span class="avatar" id="rv-top-av">B</span><span class="pname" id="rv-top-name">Black</span></div>
+      <div class="board-row">
+        <div class="evalbar" id="evalbar"><div class="evalfill" id="evalfill"></div><span id="evaltext">0.0</span></div>
+        <div class="board-wrap"><div id="review-board" class="cg-wrap-host"></div></div>
+      </div>
+      <div class="player-bar"><span class="avatar you" id="rv-bot-av">W</span><span class="pname" id="rv-bot-name">White</span></div>
+      <div class="navrow">
+        <button data-nav="start" title="Start">⏮</button>
+        <button data-nav="prev" title="Previous (←)">◀</button>
+        <button data-nav="next" title="Next (→)">▶</button>
+        <button data-nav="end" title="End">⏭</button>
+        <button data-nav="flip" title="Flip">⇅</button>
+      </div>
+      <svg id="graph" class="graph" viewBox="0 0 600 120" preserveAspectRatio="none"></svg>
+    </section>
+    <aside class="side">
+      <div class="card" id="source-card">
+        <h2>Pick a game</h2>
+        <div class="row">
+          <input id="lichess-user" placeholder="Lichess username" autocomplete="off">
+          <button id="lichess-load">Load games</button>
+        </div>
+        <ul class="gamelist" id="gamelist"></ul>
+        <details>
+          <summary>Or paste a PGN</summary>
+          <textarea id="pgn-input" rows="5" placeholder="[Event ...]&#10;1. e4 e5 2. Nf3 ..."></textarea>
+          <div class="row">
+            <span>I played</span>
+            <div class="seg" id="side-seg"><button data-v="w" class="on">White</button><button data-v="b">Black</button></div>
+            <button class="primary" id="pgn-go">Review</button>
+          </div>
+        </details>
+      </div>
+      <div class="card hidden" id="progress-card">
+        <div class="status" id="progress-text">Analysing…</div>
+        <div class="progress"><div id="progress-bar"></div></div>
+      </div>
+      <div class="card hidden" id="summary-card">
+        <h2>Game summary</h2>
+        <div class="stats" id="stats"></div>
+        <div id="summary-text" class="summary"></div>
+        <h3>Key moments</h3>
+        <ol class="keylist" id="keylist"></ol>
+      </div>
+      <div class="card hidden" id="move-card">
+        <div class="move-head"><span id="mv-title"></span><span class="tag" id="mv-tag"></span></div>
+        <p id="mv-text"></p>
+        <p id="mv-idea" class="idea"></p>
+        <button id="ask-patricia" class="ghost">🐰 What would Patricia play here?</button>
+        <p class="legend"><span class="sw green"></span>Stockfish's best <span class="sw red"></span>Your move <span class="sw orange"></span>Patricia's idea</p>
+      </div>
+      <div class="card hidden" id="moves-card">
+        <ol class="movelist review" id="rv-moves"></ol>
+      </div>
+    </aside>
+  </main>
+
+  <div class="modal hidden" id="promo"><div class="promo-box" id="promo-box"></div></div>
+  <footer>Engines: <a href="https://github.com/Adam-Kulju/Patricia" target="_blank" rel="noopener">Patricia</a> by Adam Kulju (GPL-3.0), compiled to WebAssembly · <a href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noopener">Stockfish.js</a> (GPL-3.0). Everything runs in your browser.</footer>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dede's Practice Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: centered greeting, two equal doors (Trading | Chess) that stack on phones. Dark to match both apps. */
+:root{
+  --bg:#0b0d10; --panel:#13171c; --line:#262d36; --fg:#e6e9ee; --muted:#8b95a3;
+  --trade:#22c55e; --trade-red:#ef4444; --chess:#eed5a4; --chess-dark:#355a31;
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:56px 48px}
+.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:36px}
+.hello{display:flex;flex-direction:column;gap:6px}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font-family:var(--display);font-size:clamp(30px,5vw,48px);line-height:1.08;margin:0;text-wrap:balance;font-weight:700}
+.doors{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+@media (max-width:700px){.doors{grid-template-columns:minmax(0,1fr)}}
+a.door{display:flex;flex-direction:column;gap:18px;text-decoration:none;color:inherit;background:var(--panel);border:1px solid var(--line);
+  border-radius:16px;padding:24px;min-width:0}
+@media (prefers-reduced-motion:no-preference){a.door{transition:transform .15s,border-color .15s}a.door:hover{transform:translateY(-3px)}}
+a.door.trade:hover,a.door.trade:focus-visible{border-color:var(--trade)}
+a.door.chess:hover,a.door.chess:focus-visible{border-color:var(--chess)}
+a.door:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
+.art{height:150px;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.trade .art{background:#0e1115;border:1px solid var(--line)}
+.trade .art svg{width:100%;height:100%}
+.chess .art{background:repeating-conic-gradient(var(--chess) 0 25%, var(--chess-dark) 0 50%) 0 0/50px 50px;position:relative}
+.chess .art img{width:120px;height:120px;filter:drop-shadow(0 4px 10px rgba(0,0,0,.45))}
+h2{font-family:var(--display);font-size:28px;margin:0;line-height:1.1}
+.door p{margin:0;color:var(--muted)}
+.stat{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
+.stat b{color:var(--fg);font-weight:500}
+.go{margin-top:auto;font-weight:600}
+.trade .go{color:var(--trade)} .chess .go{color:var(--chess)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hello">
+    <div class="eyebrow" id="date"></div>
+    <h1 id="greet">What would you like to work on today?</h1>
+  </div>
+
+  <div class="doors">
+    <a class="door trade" href="trading.html">
+      <div class="art" aria-hidden="true">
+        <svg viewBox="0 0 300 150" preserveAspectRatio="none">
+          <g stroke-width="2">
+            <!-- a ranging NQ session: wicks + bodies -->
+            <g id="candles"></g>
+          </g>
+        </svg>
+      </div>
+      <div><h2>Trading</h2><p>Trade journal: calendar, trades, stats, edge and discipline.</p></div>
+      <span class="go">Open journal →</span>
+    </a>
+
+    <a class="door chess" href="chess.html">
+      <div class="art" aria-hidden="true"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHN0eWxlPSJjb2xvci1zY2hlbWU6bGlnaHQgb25seSIgd2lkdGg9IjUwbW0iIGhlaWdodD0iNTBtbSIgZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGltYWdlLXJlbmRlcmluZz0ib3B0aW1pemVRdWFsaXR5IiBzaGFwZS1yZW5kZXJpbmc9Imdlb21ldHJpY1ByZWNpc2lvbiIgdGV4dC1yZW5kZXJpbmc9Imdlb21ldHJpY1ByZWNpc2lvbiIgdmlld0JveD0iMCAwIDUwIDUwIj48bGluZWFyR3JhZGllbnQgaWQ9ImEiIHgxPSIyMS40MDUiIHgyPSI3Ny42NDEiIHkxPSIzNy4zNDYiIHkyPSIzNy4zNDYiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNmZmYiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNmZmYiIHN0b3Atb3BhY2l0eT0iMCIvPjwvbGluZWFyR3JhZGllbnQ+PHBhdGggZmlsbD0iIzAwMCIgZD0iTTI2LjE3OCA5LjM5NWMyLjYuMTcgNS4wMDQuODM4IDcuMjIyIDIuMDE1IDIuMjEgMS4xNjkgNC4wOTggMi42NzYgNS42NTYgNC41MTMgMS4wOTIgMS4yODcgMi4xMTcgMi44NDUgMy4wODIgNC42NjVhMjguNjg0IDI4LjY4NCAwIDAgMSAyLjMyIDUuNzc0IDM2LjUxMSAzNi41MTEgMCAwIDEgMS4yNTMgNy40NmMuMTc3IDIuNTk5LjI2MiA1LjAxMi4yNjIgNy4yM3Y1LjQwMkgxNS40NjhjLS4xNTMgMC0uMjItLjQwNy0uMjEyLTEuMjEuMDA5LS44MTQuMDYtMS40NjYuMTYtMS45NjUuMDYtLjM5OC4yMjEtLjk1Ny40NjctMS42ODUuMjU0LS43MjguNjYtMS42MDkgMS4yNDQtMi42NS4yNjMtLjUzNC44OS0xLjMwNCAxLjg4LTIuMzIuOTk5LTEuMDE2IDIuMTMzLTIuMjAxIDMuNDI5LTMuNTM5Ljc0NS0uNzYyIDEuMzItMS43MTkgMS43NDQtMi44NzkuNDIzLTEuMTUxLjYwMS0yLjIwMS41MzMtMy4xNWE4LjM3IDguMzcgMCAwIDEtMi4wMDYgMS4yMmMtMy41MDUgMS4yNTMtNi4wNDUgMy4wNzMtNy42MTIgNS40NTItLjExOC4xNTMtLjQ5LjgyMi0xLjExNyAyLjAxNS0uMzMuNjI3LS42MTggMS4wNTktLjg0NyAxLjI4Ny0uMzEzLjMxNC0uNzcuNDkxLTEuMzYzLjUyNS0uOTIzLjA0My0xLjY0My0uMzk4LTIuMTYtMS4zNDYtLjY5My4yMDMtMS4zMTIuMjg4LTEuODYyLjI1NC0uOTIzLS4zNDctMS41OTItLjcyLTIuMDA2LTEuMTE3LS44NDctLjg0Ny0xLjM4OS0xLjY4NS0xLjY1MS0yLjUzMmE5LjQzIDkuNDMgMCAwIDEtLjM4MS0yLjcyNmMwLTEuMzg5Ljg1NS0zLjIyNiAyLjU4Mi01LjUxMiAyLjAxNS0yLjYyNSAzLjA5LTQuNjMxIDMuMjE3LTYuMDAzIDAtLjU5My4wNi0xLjI2MS4xNzgtMi4wMDdhNC4xOTggNC4xOTggMCAwIDEgLjYxOC0xLjQ5Yy4yMi0uMzMuMzY0LS41NTguNDMyLS42NzcuMDc2LS4xMjcuMjEyLS4zMTMuNDE1LS41NTkuMTQ0LS4yMDMuMjctLjM1NS4zNzItLjQ1Ny4wOTMtLjExLjIyLS4yNTQuMzczLS40NC4xNzgtLjIxMi40MDYtLjQ1Ny42OTQtLjc0NWExOC4wNiAxOC4wNiAwIDAgMS0xLjA2Ny03LjQ2YzMuMjg1IDEuMTY5IDYuMDU0IDMuMDE1IDguMjggNS41My41NTEtMS44NzIgMS42MjYtMy4zODcgMy4yMjYtNC41MzkgMS4zMjEuOTIzIDIuMzcxIDIuMTUgMy4xNSAzLjY2NiIvPjxwYXRoIGZpbGw9IiNmZmYiIGQ9Ik00Mi45NzYgNDQuNjkzYy0uMDE3IDAgMC0uNDQ5LjA0Mi0xLjM0Ni4wNTEtLjkwNi4wNzYtMS44OC4wNzYtMi45MjEuMDE3LTIuMDY2LjAxNy00LjIgMC02LjQxYTI2LjgzNyAyNi44MzcgMCAwIDAtLjg4OS02LjYxMmMtLjU2Ny0yLjExNy0xLjE4NS0zLjkyLTEuODYyLTUuNDE5LS42NzgtMS40OTgtMS40MTQtMi43ODUtMi4yMS0zLjg3OC0xLjE4NS0xLjc4Ni0yLjgxMS0zLjMwMi00Ljg2LTQuNTM4LTIuMDQ5LTEuMjQ0LTQuMTktMi4wNTctNi40MjYtMi40MzguMTUyLjgxMy4yMiAxLjYwOS4yMDMgMi4zODctLjAzNC41OTMtLjMxMy44OS0uODQ3Ljg5LS42MSAwLS44OC0uMjk3LS44Mi0uODkuMDUtMi4xODQtLjcyOS00LjA1NS0yLjMzLTUuNjA0LTEuMjUyIDEuMzItMS45MzggMi44NTMtMi4wMzEgNC42MDUtLjAzNC41ODUtLjMzLjgzOS0uODk4Ljc3LS41MjUtLjAxNi0uNzg3LS4zMi0uNzg3LS45MTQgMCAwIC4wMTctLjA2Ny4wNDItLjIwMy0uNjc3LjIyLTEuMzg4LjUyNS0yLjEzMy45MjMtLjQ3NC4zMy0uODY0LjI0Ni0xLjE2LS4yNDUtLjI5Ny0uNS0uMTctLjg5LjM5OC0xLjE2OS43MS0uMzY0IDEuMjQ0LS42MzUgMS42MDgtLjgyMWExNy42MzQgMTcuNjM0IDAgMCAwLTQuODYtMy41MjIgMTcuMzEgMTcuMzEgMCAwIDAgMS44ODkgNi41MjhjLjI3OS40MjMuMjExLjgwNC0uMjA0IDEuMTM0LS40NjUuMzY0LS44NTUuMzEzLTEuMTY4LS4xN2E4Ljg3IDguODcgMCAwIDEtLjQ5MS0uODk3Yy0uMzQ3LjM0Ny0uNTg0LjYxLS42OTQuNzctLjExOS4xNTMtLjMyMi40ODMtLjYxLjk5MS0uMjg4LjUxNy0uNS45NC0uNjM1IDEuMjctLjE0NC40MTUtLjIxMi43NDUtLjE4NiAxLjAwOC4wMjUuMjU0LjA1LjUzMy4wNjcuODU1YTcuNjEgNy42MSAwIDAgMS0xLjAwNyAyLjc1MiAxMzMuNzEgMTMzLjcxIDAgMCAxLTEuOTk4IDMuMTUgMTI3LjYwNyAxMjcuNjA3IDAgMCAxLTEuNzg3IDIuNjc1Yy0uNDE1LjYwMS0uNzI4IDEuMzU0LS45NCAyLjI4Ni0uMTUyLjU1OS0uMTUyIDEuMjQ0IDAgMi4wNC4xNDQuODA1LjQ3NSAxLjQzMS45NjYgMS44OC43NjIuNzcgMS40OTggMS4xMjYgMi4yMSAxLjA2Ny4yMjggMCAuNTQxLS4wOTMuOTMtLjI4LjM5LS4xNzguNjg3LS41MjUuOTA3LTEuMDQxLjQyMy0uOTQuNzc5LTEuNDE0IDEuMDY3LTEuNDE0LjQwNiAwIC42MzUuMjM3LjY2OC42OTQgMCAuMTAyLS4xMzUuNTE3LS4zOTcgMS4yNDUtLjE1My4zMy0uMzQ4LjY3Ny0uNTkzIDEuMDQxLS4zMjIuNDMyLS40NTcuNjEtLjQyMy41NDIuMjYyLjk0OC43MDIgMS4xMSAxLjMxMi41LjE3OC0uMTc4LjM5LS41MjUuNjE4LTEuMDE2cS4zNTU1LS43NSAxLjA5Mi0yLjAwN2MuNTg0LS45ODIgMS4yMDItMS43NyAxLjg2My0yLjM4OC42Ni0uNjEgMS4yNDQtMS4xMDkgMS43Ni0xLjQ4MS4yOTctLjIyLjY2MS0uNDY2IDEuMDkzLS43NDUuNDMyLS4yODggMS4wMDgtLjU3NiAxLjczNi0uODcyLjU3Ni0uMjI5IDEuMjE5LS41MTcgMS45MjItLjg1NnMxLjMyOS0uNzcgMS44Ny0xLjMwM2MuNzYzLS43NDUgMS4zNDctMS42NiAxLjc2Mi0yLjc1Mi4yMi0uNjEuMjk2LTEuMzYzLjI0NS0yLjI2LS4xNDQtLjU2LjEzNi0uODM5Ljg0Ny0uODM5LjUzMyAwIC44My4yNzEuODk4LjgyMSAwIDEuODYzLS41MzQgMy41NjUtMS41OTIgNS4xMDYuMzQ3IDEuMDU4LjQ0IDIuMjE4LjI3IDMuNDcxLS4xNDMgMS4wMDgtLjQ5OSAyLjA5MS0xLjA1IDMuMjQzLS41NTggMS4xNDMtMS42NzYgMi40MjEtMy4zNiAzLjgyNy0zLjQzIDIuODQ1LTUuMDQ2IDUuNzc0LTQuODYgOC43OGgxMi4xNzV6TTkuMzM4IDI5LjYxM2MtLjQ4My4yOTctLjc3LjY5NS0uODcyIDEuMTk0LjAxNy41NDItLjIzNy44MzktLjc2Mi44OS0uNTg0LjA2Ny0uODgtLjE3OC0uODk4LS43NDYuMDY4LTEuMDkyLjU1LTEuOTU1IDEuNDY1LTIuNTk5LjQzMi0uMzQ3LjgzLS4zMjIgMS4xOTQuMDkzLjM2NC40NDkuMzIyLjgzOC0uMTI3IDEuMTY5em03LjM2Ni0xMS44MjdjLjIxMi4zMy4yOTYuNjc3LjI0NSAxLjA0MS0uMTYgMS4wNTgtLjc1MyAxLjQ5OS0xLjc2IDEuMzM4YTEuNTk2IDEuNTk2IDAgMCAxLS43Mi0uMjk2Yy0uMDYuMDc2LS4xNjEuMjYyLS4yOTcuNTQxLS4xNzguNTM0LS41MjUuNzEyLTEuMDQxLjU1LS41MDgtLjIwMi0uNzExLS41NzUtLjU5My0xLjExNy43NDUtMS45MDUgMi4wOTEtMy4yMDkgNC4wMzktMy45Mi41NjctLjE3Ljk0IDAgMS4xMTcuNDkxLjIwNC41MzQuMDUxLjg5OC0uNDQ4IDEuMDkyYTIuNzQ1IDIuNzQ1IDAgMCAxLS4yNzEuMTM2Yy0uMDg1LjA0Mi0uMTcuMDkzLS4yNzEuMTQ0Ii8+PC9zdmc+" alt=""></div>
+      <div><h2>Chess</h2><p>Daily Lichess puzzles by theme, with failed-puzzle redos.</p></div>
+      <div class="stat" id="chessStat"></div>
+      <span class="go">Start puzzles →</span>
+    </a>
+  </div>
+</div>
+
+<script>
+document.getElementById("date").textContent = new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
+const h = new Date().getHours();
+document.getElementById("greet").textContent = (h<12?"Good morning, Dede.":h<18?"Good afternoon, Dede.":"Good evening, Dede.") + " What would you like to work on today?";
+
+// candlestick art: a seeded range-bound walk
+(function(){
+  const g = document.getElementById("candles"); let seed = 7, y = 75, out = "";
+  const rnd = () => (seed = (seed*9301+49297)%233280)/233280;
+  for(let i=0;i<22;i++){
+    const x = 10 + i*13.2, o = y, c = Math.max(30, Math.min(120, y + (rnd()-0.5)*34 + (75-y)*0.25));
+    const hi = Math.min(o,c) - rnd()*12, lo = Math.max(o,c) + rnd()*12, up = c < o;
+    const col = up ? "#22c55e" : "#ef4444";
+    out += `<line x1="${x+4}" x2="${x+4}" y1="${hi}" y2="${lo}" stroke="${col}"/>`;
+    out += `<rect x="${x}" y="${Math.min(o,c)}" width="8" height="${Math.max(2,Math.abs(c-o))}" fill="${col}"/>`;
+    y = c;
+  }
+  g.innerHTML = out;
+})();
+
+// today's chess progress, read from the puzzle trainer's saved data
+(function(){
+  const el = document.getElementById("chessStat");
+  let S = {};
+  try{ S = JSON.parse(localStorage.getItem("dailyPuzzleDrill.v1")) || {}; }catch(e){}
+  const d = new Date(), t = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  const sel0 = S.selected || ["rookEndgame","killBoxMate"], per = S.per || 20;
+  const sel = S.day && S.day.date === t && S.day.random && !sel0.includes(S.day.random) ? [...sel0, S.day.random] : sel0;
+  let done = 0, target = per * sel.length;
+  if(S.day && S.day.date === t) for(const th of sel) done += Math.min(S.day.progress?.[th]?.done || 0, per);
+  if(S.log && S.log[t]){ done = S.log[t].done; target = S.log[t].target; }   // the chess page's own count
+  let streak = 0; const hist = S.history || {}; const c = new Date();
+  const f = x => x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0");
+  if(!hist[f(c)]) c.setDate(c.getDate()-1);
+  while(hist[f(c)]){ streak++; c.setDate(c.getDate()-1); }
+  const failed = Object.values(S.failed || {}).reduce((a,b)=>a+b.length,0);
+  el.innerHTML = `<span>Today <b>${done}/${target}</b></span><span>Streak <b>${streak}</b></span>` + (failed ? `<span>To redo <b>${failed}</b></span>` : "");
+})();
+</script>
+</body>
+</html>
