@@ -2189,6 +2189,35 @@ function renderMoveList(){
   $("gpMoves").querySelectorAll(".mv[data-ply]").forEach(b => b.onclick = () => { positions = mainline.slice(); setView(+b.dataset.ply); });
 }
 const moveLabel = k => `${Math.ceil(k/2)}${k%2 ? "." : "…"} ${gSan[k-1]}`;
+/* One plain-language coaching sentence for a judged move, built only from the engine's facts
+   (best line, material it wins, and the reply that was actually played). */
+const PNAME = {p:"pawn", n:"knight", b:"bishop", r:"rook", q:"queen"};
+const PVAL = {p:1, n:3, b:3, r:5, q:9, k:0};
+function matOf(fen){ let s = 0; for(const ch of fen.split(" ")[0]){ const l = ch.toLowerCase(); if(PVAL[l] === undefined) continue; s += ch === l ? -PVAL[l] : PVAL[l]; } return s; }
+function coachLine(k, e){
+  if(!e?.judgment || !mainline[k] || !mainline[k-1]) return "";
+  const before = mainline[k-1].fen, mover = before.split(" ")[1], you = mover === color, sgn = mover === "w" ? 1 : -1;
+  const net = fen => (matOf(fen) - matOf(before)) * sgn;    // material change for the mover since before the move
+  const best = (e.variation || "").split(" ").filter(Boolean);
+  if(best.slice(0, 5).some(m => m.includes("#"))) return `${you ? "You" : "Your opponent"} had a forced mate starting with ${best[0]}.`;
+  const reply = gSan[k];
+  const afterReply = reply && mainline[k+1] ? mainline[k+1].fen : mainline[k].fen;
+  // the opponent's actual reply won material outright (not just a recapture)
+  if(reply && mainline[k+1]){
+    const m = new Chess(mainline[k].fen).move(reply, {sloppy:true});
+    if(m && m.captured && PVAL[m.captured] >= 3 && net(afterReply) <= -2)
+      return `${you ? "Your opponent answered" : "You answered"} ${reply}, winning ${you ? "your" : "their"} ${PNAME[m.captured]}.`;
+  }
+  // a capture the engine wanted that keeps the piece (its own line doesn't recapture), for mistakes and blunders only
+  if(best.length >= 2 && e.judgment.name !== "Inaccuracy"){
+    const c = new Chess(before), m1 = c.move(best[0], {sloppy:true}), m2 = m1 && c.move(best[1], {sloppy:true});
+    if(m1 && m2 && m1.captured && PVAL[m1.captured] >= 3 && net(c.fen()) >= 2 && net(c.fen()) - net(afterReply) >= 2)
+      return `${you ? "You" : "Your opponent"} missed ${m1.san}, which wins the ${PNAME[m1.captured]}.`;
+  }
+  if(reply && gAnalysis(curGame)?.evals?.[k]?.judgment) return `${you ? "Your opponent" : "You"} didn't punish it: ${reply} was an error too.`;
+  if(reply && reply.includes("+")) return `It allowed ${reply}, with check.`;
+  return "";
+}
 function gameSync(){
   if(mode !== "game" || !curGame) return;
   const onMain = positions[viewIdx] && mainline[viewIdx] && positions[viewIdx].fen === mainline[viewIdx].fen;
@@ -2215,6 +2244,8 @@ function gameSync(){
     if(e?.judgment){
       const s = SYM[e.judgment.name];
       com += `<br><span class="j ${s[1]}">${esc(e.judgment.comment)}</span>`;
+      const coach = coachLine(gPly, e);
+      if(coach) com += `<br>${esc(coach)}`;
       if(e.variation) com += `<br><span class="muted">Best line: ${esc(e.variation.split(" ").slice(0,8).join(" "))}</span>`;
     }
   } else com = '<span class="muted">Starting position. Press → to begin.</span>';

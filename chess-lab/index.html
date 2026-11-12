@@ -6,7 +6,7 @@
   <title>Chess Lab · Spar &amp; Review</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="vendor/chessground.base.css">
-  <link rel="stylesheet" href="vendor/chessground.cburnett.css">
+  <link rel="stylesheet" href="pieces.css">
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -16,6 +16,7 @@
     <nav class="tabs" role="tablist">
       <button class="tab active" data-tab="spar" role="tab">Spar vs Patricia</button>
       <button class="tab" data-tab="review" role="tab">Game Review</button>
+      <button class="tab" data-tab="study" role="tab">Study</button>
     </nav>
   </header>
 
@@ -103,15 +104,14 @@
         <h2>Game summary</h2>
         <div class="stats" id="stats"></div>
         <div id="summary-text" class="summary"></div>
+        <div class="row tight"><button id="rv-to-study" class="ghost">📖 Open this game in Study</button></div>
         <h3>Key moments</h3>
         <ol class="keylist" id="keylist"></ol>
       </div>
       <div class="card hidden" id="move-card">
         <div class="move-head"><span id="mv-title"></span><span class="tag" id="mv-tag"></span></div>
         <p id="mv-text"></p>
-        <p id="mv-idea" class="idea"></p>
-        <button id="ask-patricia" class="ghost">🐰 What would Patricia play here?</button>
-        <p class="legend"><span class="sw green"></span>Stockfish's best <span class="sw red"></span>Your move <span class="sw orange"></span>Patricia's idea</p>
+        <p class="legend"><span class="sw green"></span>Patricia's choice <span class="sw red"></span>The move played</p>
       </div>
       <div class="card hidden" id="moves-card">
         <ol class="movelist review" id="rv-moves"></ol>
@@ -119,7 +119,72 @@
     </aside>
   </main>
 
-  <footer>Engines: <a href="https://github.com/Adam-Kulju/Patricia" target="_blank" rel="noopener">Patricia</a> by Adam Kulju (GPL-3.0), compiled to WebAssembly · <a href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noopener">Stockfish.js</a> (GPL-3.0). Everything runs in your browser.</footer>
+  <!-- STUDY -->
+  <main id="study" class="panel">
+    <section class="board-col">
+      <div class="board-row">
+        <div class="evalbar" id="st-evalbar"><div class="evalfill" id="st-evalfill"></div><span id="st-evaltext"></span></div>
+        <div class="board-wrap"><div id="study-board" class="cg-wrap-host"></div></div>
+      </div>
+      <div class="navrow">
+        <button data-snav="start" title="Start (Home)">⏮</button>
+        <button data-snav="prev" title="Back (←)">◀</button>
+        <button data-snav="next" title="Forward (→)">▶</button>
+        <button data-snav="end" title="End of line (End)">⏭</button>
+        <button data-snav="flip" title="Flip board (f)">⇅</button>
+      </div>
+      <p class="hint center">Play moves for both sides to add lines. Right-click and drag to draw arrows, right-click a square to circle it. Alt or Shift changes the colour.</p>
+    </section>
+    <aside class="side">
+      <div class="card st-head">
+        <div class="row tight">
+          <select id="st-select" title="Your studies"></select>
+          <button id="st-new" title="New study">＋ Study</button>
+          <button id="st-more" title="Study options">⋯</button>
+        </div>
+        <div class="st-menu hidden" id="st-menu">
+          <button data-sm="rename">Rename study</button>
+          <button data-sm="export-study">Download study PGN</button>
+          <button data-sm="export-chapter">Download chapter PGN</button>
+          <button data-sm="copy-chapter">Copy chapter PGN</button>
+          <button data-sm="backup">Backup all studies (.json)</button>
+          <button data-sm="restore">Restore backup…</button>
+          <button data-sm="delete" class="danger">Delete study</button>
+        </div>
+        <div class="chapters" id="st-chapters"></div>
+        <form class="st-form hidden" id="st-chform">
+          <input id="st-chname" placeholder="Chapter name" autocomplete="off">
+          <div class="seg" id="st-chsrc"><button type="button" data-v="start" class="on">Start position</button><button type="button" data-v="fen">FEN</button><button type="button" data-v="pgn">PGN</button></div>
+          <textarea id="st-chdata" rows="3" class="hidden" placeholder=""></textarea>
+          <div class="row tight"><button type="submit" class="primary small">Add chapter</button><button type="button" id="st-chcancel">Cancel</button></div>
+          <p class="hint err" id="st-cherr"></p>
+        </form>
+        <form class="st-form hidden" id="st-nameform">
+          <input id="st-nameinput" autocomplete="off">
+          <div class="row tight"><button type="submit" class="primary small" id="st-namego">Save</button><button type="button" id="st-namecancel">Cancel</button></div>
+        </form>
+        <input type="file" id="st-file" accept=".json,.pgn,application/json" class="hidden">
+      </div>
+      <div class="card st-engine">
+        <div class="eng-head">
+          <label class="switch"><input type="checkbox" id="st-eng-on"> <b>Patricia</b></label>
+          <span class="muted small" id="st-eng-depth"></span>
+        </div>
+        <div class="eng-lines" id="st-eng-lines"></div>
+      </div>
+      <div class="card st-treecard">
+        <div class="tree" id="st-tree"></div>
+        <div class="row tight st-actions">
+          <button id="st-promote" title="Move this line up one level">Promote</button>
+          <button id="st-mainline" title="Make this the main line">Make main line</button>
+          <button id="st-delete" class="danger" title="Delete this move and everything after it">Delete from here</button>
+        </div>
+        <textarea id="st-comment" rows="2" placeholder="Comment on this move…"></textarea>
+      </div>
+    </aside>
+  </main>
+
+  <footer>Engine: <a href="https://github.com/Adam-Kulju/Patricia" target="_blank" rel="noopener">Patricia</a> by Adam Kulju (GPL-3.0), compiled to WebAssembly. Everything runs in your browser.</footer>
   <script type="module" src="app.js"></script>
 </body>
 </html>
