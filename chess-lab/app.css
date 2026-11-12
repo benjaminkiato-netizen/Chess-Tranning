@@ -19,20 +19,36 @@ html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.
 button, input, textarea { font: inherit; color: inherit; }
 a { color: var(--accent-2); }
 
-.top { display: flex; align-items: center; gap: 18px; padding: 14px 22px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-.top h1 { font-size: 20px; margin: 0; }
+.top { display: flex; align-items: center; gap: 16px; padding: 8px 16px; height: 52px; border-bottom: 1px solid var(--line); }
+.top h1 { font-size: 18px; margin: 0; white-space: nowrap; }
+.snd { background: none; border: 0; font-size: 18px; padding: 4px 6px; }
 .home { text-decoration: none; color: var(--muted); }
 .home:hover { color: var(--text); }
 .tabs { display: flex; gap: 6px; margin-left: auto; background: var(--panel); padding: 4px; border-radius: 10px; }
-.tab { background: none; border: 0; padding: 7px 14px; border-radius: 8px; cursor: pointer; color: var(--muted); }
+.tab { background: none; border: 0; padding: 5px 14px; border-radius: 8px; cursor: pointer; color: var(--muted); }
 .tab.active { background: var(--accent); color: #fff; }
 
-.panel { display: none; gap: 24px; padding: 22px; max-width: 1200px; margin: 0 auto; }
+/* Board as big as the puzzle trainer's: as tall as the window allows, up to 900px. */
+:root { --hdr: 52px; --side: 380px; --bsz: min(900px, calc(100vh - var(--hdr) - 36px), calc(100vw - var(--side) - 32px - 20px - var(--ev, 0px))); }
+.panel { display: none; gap: 20px; padding: 14px 16px; justify-content: center; align-items: flex-start; }
 .panel.active { display: flex; }
-.board-col { flex: 0 1 600px; min-width: 0; }
-.side { flex: 1 1 340px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+#review, #study { --ev: 34px; }
+.board-col { flex: none; width: calc(var(--bsz) + var(--ev, 0px)); }
+.side { flex: 0 1 var(--side); width: var(--side); display: flex; flex-direction: column; gap: 12px; min-width: 0;
+  max-height: calc(100vh - var(--hdr) - 36px); overflow-y: auto; padding-right: 2px; }
 
 .board-row { display: flex; gap: 8px; }
+.board-row .board-wrap { flex: 1; min-width: 0; }
+.card.compact { padding: 10px 12px; }
+.players .another { margin-left: 6px; font-size: 12px; padding: 4px 8px; }
+.players { display: flex; align-items: center; gap: 8px; justify-content: space-between; margin-bottom: 8px; }
+.players .pl { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.players .pname, .matchup b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vs { color: var(--muted); font-size: 12px; }
+.matchup { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.matchup .vs { margin: 0 4px; }
+.seg.mini { margin-top: 0; padding: 2px; }
+.seg.mini button { padding: 2px 8px; font-size: 12px; }
 .board-wrap { width: 100%; aspect-ratio: 1; position: relative; }
 .cg-wrap-host { width: 100%; height: 100%; }
 .player-bar { display: flex; align-items: center; gap: 10px; padding: 8px 2px; }
@@ -53,10 +69,16 @@ cg-board square.oc.move-dest { background: radial-gradient(transparent 0%, trans
 cg-board square.move-dest:hover { background: rgba(20, 30, 20, .2); }
 cg-board square.check { background: radial-gradient(ellipse at center, rgba(255, 0, 0, 1) 0%, rgba(231, 0, 0, 1) 25%, rgba(169, 0, 0, 0) 89%, rgba(158, 0, 0, 0) 100%); }
 .cg-wrap coords { font: 600 11px "IBM Plex Sans", system-ui, sans-serif; text-shadow: none; }
-.cg-wrap coords coord { color: #eed5a4; }
-.cg-wrap coords.ranks coord:nth-child(2n), .cg-wrap coords.files coord:nth-child(2n+1) { color: #355a31; }
-.cg-wrap.orientation-black coords.ranks coord:nth-child(2n) { color: #eed5a4; }
-.cg-wrap.orientation-black coords.ranks coord:nth-child(2n+1) { color: #355a31; }
+.cg-wrap coords coord { text-transform: lowercase !important; }
+/* each label takes the colour of the opposite square so it's always readable */
+.cg-wrap coords.ranks coord:nth-child(2n+1) { color: #eed5a4; }
+.cg-wrap coords.ranks coord:nth-child(2n) { color: #355a31; }
+.cg-wrap coords.files coord:nth-child(2n+1) { color: #eed5a4; }
+.cg-wrap coords.files coord:nth-child(2n) { color: #355a31; }
+.cg-wrap.orientation-black coords.ranks coord:nth-child(2n+1),
+.cg-wrap.orientation-black coords.files coord:nth-child(2n+1) { color: #355a31; }
+.cg-wrap.orientation-black coords.ranks coord:nth-child(2n),
+.cg-wrap.orientation-black coords.files coord:nth-child(2n) { color: #eed5a4; }
 
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
 .card h2 { margin: 0 0 12px; font-size: 17px; }
@@ -127,9 +149,9 @@ details summary { cursor: pointer; color: var(--muted); margin-top: 12px; }
 .evalfill { position: absolute; bottom: 0; left: 0; right: 0; height: 50%; background: #f2f2f2; transition: height .3s; }
 #evaltext, #st-evaltext { position: absolute; left: 0; right: 0; text-align: center; font-size: 9px; letter-spacing: -.3px; font-weight: 700; color: #888; top: 4px; z-index: 1; }
 .evalbar.flipped .evalfill { bottom: auto; top: 0; }
-.navrow { display: flex; gap: 6px; justify-content: center; margin-top: 6px; }
+.navrow { display: flex; gap: 6px; justify-content: center; }
 .navrow button { flex: 1; max-width: 70px; }
-.graph { width: 100%; height: 110px; margin-top: 10px; background: var(--panel); border-radius: 8px; cursor: pointer; }
+.graph { width: 100%; height: 80px; margin-top: 8px; background: var(--panel); border-radius: 8px; cursor: pointer; }
 
 .promo-overlay { position: absolute; inset: 0; z-index: 20; background: rgba(0, 0, 0, .45); border-radius: 4px; }
 .promo-choice { position: absolute; width: 12.5%; height: 12.5%; padding: 0; border: 0; border-radius: 50%;
@@ -177,12 +199,14 @@ button.small, .primary.small { width: auto; padding: 6px 14px; margin: 0; }
 .tree .empty { color: var(--muted); }
 .st-actions button { font-size: 12.5px; padding: 6px 9px; }
 #st-comment { margin-top: 0; font-size: 13px; }
-footer { color: var(--muted); font-size: 12px; text-align: center; padding: 20px; }
+footer { color: var(--muted); font-size: 11px; position: fixed; right: 12px; bottom: 4px; opacity: .7; }
+@media (max-width: 860px) { footer { position: static; text-align: center; padding: 16px; } }
 
 @media (max-width: 860px) {
   .panel.active { flex-direction: column; padding: 12px; }
   .board-col { flex: none; width: 100%; }
-  .top { padding: 10px 12px; }
-  .tabs { margin-left: 0; width: 100%; }
+  .side { width: 100%; max-height: none; overflow: visible; }
+  .top { padding: 8px 12px; height: auto; flex-wrap: wrap; }
+  .tabs { margin-left: 0; width: 100%; order: 3; }
   .tab { flex: 1; }
 }
