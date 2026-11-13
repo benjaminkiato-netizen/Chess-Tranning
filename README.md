@@ -9,3 +9,4 @@ Trading journal and chess training, hosted on GitHub Pages.
 - `engine/`: Stockfish 19 lite (stockfish.js by Nathan Rugg, GPL-3.0)
 - `patricia-wasm-source/`: Patricia 5.1 (Adam Kulju, GPL-3.0) source and build script for `chess-lab/engines/patricia.wasm`
 - `chess-lab/engines/maia/`: Maia 3 model, ONNX Runtime and worker from the Maia platform (CSSLab/maia-platform-frontend, GPL-3.0)
+- `sync.js`: optional sync between browsers via two private GitHub gists, encrypted in the browser (AES-GCM) with your sync password. Turn on from ☁ Sync on the home page.

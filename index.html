@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script src="sync.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dede's Practice Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -42,12 +43,18 @@ h2{font-family:var(--display);font-size:28px;margin:0;line-height:1.1}
 .stat{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
 .stat b{color:var(--fg);font-weight:500}
 .go{margin-top:auto;font-weight:600}
+.hello{position:relative}
+.syncbtn{position:absolute;right:0;top:-6px;font:600 13px var(--body);color:var(--fg);background:var(--panel);border:1px solid var(--line);
+  border-radius:999px;padding:7px 14px;cursor:pointer}
+.syncbtn:hover{border-color:var(--muted)}
+.syncbtn.on{border-color:#2f7d4f}
 .trade .go{color:var(--trade)} .chess .go{color:var(--chess)}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="hello">
+    <button class="syncbtn" id="syncBtn" onclick="window.HubSync && HubSync.openPanel()">☁ Sync</button>
     <div class="eyebrow" id="date"></div>
     <h1 id="greet">What would you like to work on today?</h1>
   </div>
@@ -113,6 +120,10 @@ document.getElementById("greet").textContent = (h<12?"Good morning, Dede.":h<18?
   const failed = Object.values(S.failed || {}).reduce((a,b)=>a+b.length,0);
   el.innerHTML = `<span>Today <b>${done}/${target}</b></span><span>Streak <b>${streak}</b></span>` + (failed ? `<span>To redo <b>${failed}</b></span>` : "");
 })();
+</script>
+<script>
+  // show whether sync is on
+  (function(){ var b=document.getElementById('syncBtn'); if (window.HubSync && HubSync.connected()) { b.textContent='☁ Sync on'; b.classList.add('on'); } })();
 </script>
 </body>
 </html>

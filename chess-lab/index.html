@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <script src="../sync.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Chess Lab · Spar &amp; Review</title>
   <link rel="icon" href="data:,">
@@ -35,6 +36,7 @@
       <button class="tab" data-tab="review" role="tab">Game Review</button>
       <button class="tab" data-tab="study" role="tab">Study</button>
     </nav>
+    <button class="snd" id="sync-btn" title="Sync between browsers" onclick="window.HubSync && HubSync.openPanel()">☁</button>
     <button class="snd" id="snd-toggle" title="Sound on/off">🔊</button>
   </header>
 
