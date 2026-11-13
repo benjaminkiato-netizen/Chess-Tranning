@@ -695,6 +695,8 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
       <div class="gp-actions">
         <button id="gpLog">Add this move to mistake log</button>
         <button id="gpStudy" title="Open this game in Chess Lab's Study for deeper analysis">📖 Send to Study</button>
+        <button id="gpCopyPgn" title="Copy the whole game as PGN">📋 Copy PGN</button>
+        <button id="gpCopyFen" title="Copy the position on the board as FEN">📋 Copy FEN</button>
         <a id="gpLink" href="#" target="_blank" rel="noopener">Open on Lichess</a>
       </div>
     </div>
@@ -2301,6 +2303,19 @@ function sendToStudy(info){
   location.href = "chess-lab/";
 }
 const pgnDate = t => new Date(t || Date.now()).toISOString().slice(0, 10).replace(/-/g, ".");
+function gameInfo(){
+  const g = curGame, opp = color === "w" ? g.players.black : g.players.white;
+  return {
+    sans: gSan, startFen: g.initialFen || null,
+    white: playerName(g.players.white), black: playerName(g.players.black),
+    result: g.winner ? (g.winner === "white" ? "1-0" : "0-1") : (g.status === "started" ? "*" : "1/2-1/2"),
+    site: `https://lichess.org/${g.id}`, date: pgnDate(g.createdAt),
+    name: `vs ${playerName(opp)} · ${new Date(g.createdAt || Date.now()).toLocaleDateString()}`,
+  };
+}
+$("gpCopyPgn").onclick = e => { if(curGame) copyText(buildGame(gameInfo()).pgn(), e.currentTarget); };
+// FEN of the position currently shown (including any moves you tried on the board)
+$("gpCopyFen").onclick = e => { if(curGame) copyText(positions[viewIdx]?.fen || buildGame(gameInfo()).fen(), e.currentTarget); };
 $("gpStudy").onclick = () => {
   const g = curGame; if(!g) return;
   const opp = color === "w" ? g.players.black : g.players.white;
