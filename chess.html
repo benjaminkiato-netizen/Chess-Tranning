@@ -424,6 +424,14 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
   .tiles{grid-template-columns:repeat(4,minmax(0,1fr))}
   .tile b{font-size:20px}
 }
+.logdlg{border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--fg);padding:20px;width:min(440px,92vw);box-shadow:0 12px 40px rgba(0,0,0,.45)}
+.logdlg::backdrop{background:rgba(0,0,0,.45)}
+.logdlg h3{margin:0 0 12px;font-family:var(--display);font-size:18px}
+.logdlg form{display:flex;flex-direction:column;gap:10px}
+.logdlg label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+.logdlg input,.logdlg select,.logdlg textarea{font:inherit;font-size:14px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.logdlg textarea{resize:vertical}
+.dlg-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
 </style>
 </head>
 <body>
@@ -711,6 +719,19 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
   </section>
 </div>
 
+<dialog id="logDlg" class="logdlg">
+  <form id="dlgForm" method="dialog">
+    <h3>Add to mistake log</h3>
+    <label>Date<input id="dDate" type="date"></label>
+    <label>What went wrong<select id="dCat"></select></label>
+    <label>Game link<input id="dLink" type="url" placeholder="https://lichess.org/..."></label>
+    <label>What happened<textarea id="dNote" rows="3" required placeholder="e.g. Missed his Bxh7+ because I didn't check his captures"></textarea></label>
+    <div class="dlg-btns">
+      <button type="button" id="dCancel">Cancel</button>
+      <button class="primary" type="submit" id="dSave">Add to log</button>
+    </div>
+  </form>
+</dialog>
 <script>
 const THEMES = {
   "Mates":[["mateIn1","Mate in 1"],["mateIn2","Mate in 2"],["mateIn3","Mate in 3"],["mateIn4","Mate in 4"],["backRankMate","Back rank mate"],["smotheredMate","Smothered mate"],["killBoxMate","Kill box mate"],["anastasiaMate","Anastasia's mate"],["arabianMate","Arabian mate"],["bodenMate","Boden's mate"],["hookMate","Hook mate"],["dovetailMate","Dovetail mate"],["doubleBishopMate","Double bishop mate"],["vukovicMate","Vukovic mate"]],
@@ -2328,15 +2349,29 @@ $("gpStudy").onclick = () => {
     orientation: color === "b" ? "black" : "white", ply: gPly,
   });
 };
+/* "Add this move to mistake log" opens a pop-up over the game instead of leaving it. */
+$("dCat").innerHTML = Object.entries(CATS).map(([k,v]) => `<option value="${k}">${v.name}</option>`).join("");
 $("gpLog").onclick = () => {
   const k = gPly, g = curGame; if(k < 1) return;
-  show("train"); renderTrain();
-  $("mDate").value = dkey(new Date(g.createdAt));
-  $("mLink").value = `${LI}/${g.id}${color==="b"?"/black":""}#${k}`;
+  $("dDate").value = dkey(new Date(g.createdAt));
+  $("dLink").value = `${LI}/${g.id}${color==="b"?"/black":""}#${k}`;
   const j = gAnalysis(g)?.evals?.[k-1]?.judgment;
-  $("mNote").value = `${moveLabel(k)}: ` + (j ? j.comment + " " : "");
-  if(j && j.name === "Blunder") $("mCat").value = "blunder";
-  $("log").scrollIntoView({block:"start"}); $("mNote").focus();
+  $("dNote").value = `${moveLabel(k)}: ` + (j ? j.comment + " " : "");
+  $("dCat").value = j && j.name === "Blunder" && CATS.blunder ? "blunder" : $("dCat").options[0].value;
+  $("logDlg").showModal();
+  const n = $("dNote"); n.focus(); n.setSelectionRange(n.value.length, n.value.length);
+};
+$("dCancel").onclick = () => $("logDlg").close();
+$("dlgForm").onsubmit = e => {
+  e.preventDefault();
+  const note = $("dNote").value.trim(); if(!note){ $("dNote").focus(); return; }
+  T.mistakes.push({date: $("dDate").value || todayStr(), cat: $("dCat").value, link: $("dLink").value.trim(), note});
+  if(T.mistakes.length > 1000) T.mistakes.shift();
+  save(); renderLog();
+  $("logDlg").close();
+  const b = $("gpLog"), old = b.textContent;
+  b.textContent = "✓ Added to mistake log"; b.disabled = true;
+  setTimeout(() => { b.textContent = old; b.disabled = false; }, 1800);
 };
 
 /* full-game analysis with a second Stockfish in the browser */
