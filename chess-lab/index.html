@@ -7,7 +7,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="vendor/chessground.base.css">
   <link rel="stylesheet" href="pieces.css?v=e1ff53eb">
-  <link rel="stylesheet" href="app.css?v=5a13d705">
+  <link rel="stylesheet" href="app.css?v=95ca08a2">
 </head>
 <body>
   <div id="err-banner" style="display:none;position:fixed;left:12px;right:12px;bottom:12px;z-index:100;background:#5c1a1a;color:#fff;border:1px solid #ff5e57;border-radius:10px;padding:10px 14px;font:13px/1.4 system-ui,sans-serif;white-space:pre-wrap"></div>
@@ -31,7 +31,7 @@
     <a class="home" href="../chess.html">← Chess</a>
     <h1>Chess Lab</h1>
     <nav class="tabs" role="tablist">
-      <button class="tab active" data-tab="spar" role="tab">Spar vs Patricia</button>
+      <button class="tab active" data-tab="spar" role="tab">Spar</button>
       <button class="tab" data-tab="review" role="tab">Game Review</button>
       <button class="tab" data-tab="study" role="tab">Study</button>
     </nav>
@@ -46,7 +46,12 @@
     <aside class="side">
       <div class="card">
         <h2>New game</h2>
-        <label class="field">Patricia's strength <output id="level-out"></output>
+        <div class="field">Opponent
+          <div class="seg" id="opp-seg">
+            <button data-v="patricia" class="on" title="Aggressive engine that loves to sacrifice">Patricia</button><button data-v="maia" title="Neural network trained to play like humans of a given rating">Maia</button>
+          </div>
+        </div>
+        <label class="field"><span id="level-label">Patricia's strength</span> <output id="level-out"></output>
           <input type="range" id="level" min="1" max="20" value="6">
         </label>
         <div class="field">You play
@@ -54,16 +59,16 @@
             <button data-v="w" class="on">White</button><button data-v="b">Black</button><button data-v="r">Random</button>
           </div>
         </div>
-        <div class="field">Patricia thinks for
+        <div class="field" id="time-field">Patricia thinks for
           <div class="seg" id="time-seg">
             <button data-v="500">0.5s</button><button data-v="1000" class="on">1s</button><button data-v="2500">2.5s</button>
           </div>
         </div>
         <button class="primary" id="spar-new">Start game</button>
-        <p class="hint">Patricia is the most aggressive engine around. At lower levels she plays like a human of that rating, but she still loves to sacrifice. Good practice for defending attacks.</p>
+        <p class="hint" id="spar-hint"></p>
       </div>
       <div class="card">
-        <div class="matchup"><span class="avatar">P</span><b>Patricia</b><span class="pmeta" id="spar-top-meta"></span><span class="vs">vs</span><span class="avatar you">Y</span><b>You</b></div>
+        <div class="matchup"><span class="avatar" id="spar-opp-av">P</span><b id="spar-opp-name">Patricia</b><span class="pmeta" id="spar-top-meta"></span><span class="vs">vs</span><span class="avatar you">Y</span><b>You</b></div>
         <div class="status" id="spar-status">Engine loading…</div>
         <ol class="movelist" id="spar-moves"></ol>
         <div class="row">
@@ -71,7 +76,9 @@
           <button id="spar-flip">Flip</button>
           <button id="spar-resign">Resign</button>
         </div>
+        <div class="progress hidden" id="maia-progress"><div id="maia-progress-bar"></div></div>
         <button class="primary ghost" id="spar-review" disabled>Review this game →</button>
+        <button class="ghost wide" id="spar-to-study" disabled>📖 Save to Study</button>
       </div>
     </aside>
   </main>
@@ -210,7 +217,7 @@
     </aside>
   </main>
 
-  <footer>Engine: <a href="https://github.com/Adam-Kulju/Patricia" target="_blank" rel="noopener">Patricia</a> by Adam Kulju (GPL-3.0), compiled to WebAssembly. Everything runs in your browser.</footer>
-  <script type="module" src="app.js?v=adee6e5d"></script>
+  <footer>Engines: <a href="https://github.com/Adam-Kulju/Patricia" target="_blank" rel="noopener">Patricia</a> by Adam Kulju (GPL-3.0) · <a href="https://github.com/CSSLab/maia-platform-frontend" target="_blank" rel="noopener">Maia 3</a> by the CSSLab, University of Toronto (GPL-3.0). Everything runs in your browser.</footer>
+  <script type="module" src="app.js?v=bdaa3e01"></script>
 </body>
 </html>

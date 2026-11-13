@@ -96,6 +96,8 @@ button:disabled { opacity: .45; cursor: default; }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; width: 100%; font-weight: 600; margin-top: 4px; }
 button.primary.ghost { background: transparent; color: var(--accent-2); margin-top: 10px; }
 button.ghost { background: transparent; }
+button.wide { width: 100%; margin-top: 8px; }
+#maia-progress { margin-top: 10px; }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
 .row input { flex: 1; min-width: 120px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
 textarea { width: 100%; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin-top: 8px; resize: vertical; }

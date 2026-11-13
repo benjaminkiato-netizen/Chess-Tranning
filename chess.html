@@ -694,6 +694,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
       <textarea id="gpNote" rows="5" placeholder="Your plan, where it turned, what to study…"></textarea>
       <div class="gp-actions">
         <button id="gpLog">Add this move to mistake log</button>
+        <button id="gpStudy" title="Open this game in Chess Lab's Study for deeper analysis">📖 Send to Study</button>
         <a id="gpLink" href="#" target="_blank" rel="noopener">Open on Lichess</a>
       </div>
     </div>
@@ -2268,6 +2269,34 @@ $("gpMoveNote").oninput = e => {
   saveSoon();
   if(had !== !!n.moves[gPly]){ renderMoveList(); gameSync(); }
 };
+/* Hand a game to Chess Lab's Study (same site, so it goes through localStorage), opened at `ply`. */
+function sendToStudy({sans, startFen, white, black, result, site, date, name, orientation, ply}){
+  const g = startFen ? new Chess(startFen) : new Chess();
+  const hdr = ["Event", name, "White", white, "Black", black, "Result", result || "*"];
+  if(site) hdr.push("Site", site);
+  if(date) hdr.push("Date", date);
+  if(startFen) hdr.push("SetUp", "1", "FEN", startFen);
+  g.header(...hdr);
+  for(const san of sans) if(!g.move(san, {sloppy:true})) break;
+  let inbox = [];
+  try { inbox = JSON.parse(localStorage.getItem("chesslab.inbox") || "[]"); } catch(e){}
+  inbox.push({pgn: g.pgn(), name, orientation, ply});
+  localStorage.setItem("chesslab.inbox", JSON.stringify(inbox));
+  location.href = "chess-lab/";
+}
+const pgnDate = t => new Date(t || Date.now()).toISOString().slice(0, 10).replace(/-/g, ".");
+$("gpStudy").onclick = () => {
+  const g = curGame; if(!g) return;
+  const opp = color === "w" ? g.players.black : g.players.white;
+  sendToStudy({
+    sans: gSan, startFen: g.initialFen || null,
+    white: playerName(g.players.white), black: playerName(g.players.black),
+    result: g.winner ? (g.winner === "white" ? "1-0" : "0-1") : (g.status === "started" ? "*" : "1/2-1/2"),
+    site: `https://lichess.org/${g.id}`, date: pgnDate(g.createdAt),
+    name: `vs ${playerName(opp)} · ${new Date(g.createdAt || Date.now()).toLocaleDateString()}`,
+    orientation: color === "b" ? "black" : "white", ply: gPly,
+  });
+};
 $("gpLog").onclick = () => {
   const k = gPly, g = curGame; if(k < 1) return;
   show("train"); renderTrain();
@@ -2682,8 +2711,21 @@ function renderLiveActions(){
   if(!st){ box.innerHTML = ""; return; }
   if(live.over){
     box.innerHTML = `<button class="primary" id="lvReview">Review this game</button>
+      <button id="lvStudy" title="Open this game in Chess Lab's Study">📖 Send to Study</button>
       ${S.lastPlay ? `<button id="lvAgain">Play again</button>` : ""}<button id="lvBack">New game</button>`;
     $("lvReview").onclick = reviewLive;
+    $("lvStudy").onclick = () => {
+      const f = live.full || {}, opp = live.myColor === "w" ? f.black : f.white;
+      const w = st.winner;
+      sendToStudy({
+        sans: live.hist.slice(1).map(h => h.san), startFen: live.initialFen,
+        white: pname(f.white), black: pname(f.black),
+        result: w ? (w === "white" ? "1-0" : "0-1") : "1/2-1/2",
+        site: `https://lichess.org/${live.id}`, date: pgnDate(),
+        name: `vs ${pname(opp)} · ${new Date().toLocaleDateString()}`,
+        orientation: live.myColor === "b" ? "black" : "white", ply: live.hist.length - 1,
+      });
+    };
     $("lvAgain") && ($("lvAgain").onclick = () => { const p = S.lastPlay; S.playOpp = p.opp; save(); playTab().then(() => startPlay(p.t, p.inc)); });
     $("lvBack").onclick = () => { mode = "daily"; playTab(); };
     return;
