@@ -40,7 +40,8 @@ a { color: var(--accent-2); }
 .board-row { display: flex; gap: 8px; }
 .board-row .board-wrap { flex: 1; min-width: 0; }
 .card.compact { padding: 10px 12px; }
-.players .another { margin-left: 6px; font-size: 12px; padding: 4px 8px; }
+.players .another { margin-left: 4px; font-size: 12px; padding: 4px 8px; white-space: nowrap; flex: none; }
+.players .pl { flex: 1 1 0; }
 .players { display: flex; align-items: center; gap: 8px; justify-content: space-between; margin-bottom: 8px; }
 .players .pl { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .players .pname, .matchup b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -113,7 +114,10 @@ details summary { cursor: pointer; color: var(--muted); margin-top: 12px; }
 .movelist .mv:hover:not(.cur) { background: var(--panel-2); }
 .movelist.review { max-height: 340px; }
 .mv .b { font-weight: 700; margin-left: 3px; }
-.mv.blunder .b { color: var(--red); } .mv.mistake .b { color: var(--orange); } .mv.inaccuracy .b { color: var(--yellow); }
+.mv.blunder .b { color: #e0453e; } .mv.mistake .b { color: #e5862a; } .mv.inaccuracy .b { color: #d4a017; }
+.mv.cur .b { color: inherit; }
+.mini { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; color: #fff; font: 800 10px/1 system-ui, sans-serif; margin-left: 4px; vertical-align: -2px; }
+.mini svg { width: 72%; height: 72%; fill: #fff; }
 
 .gamelist { list-style: none; padding: 0; margin: 10px 0 0; max-height: 260px; overflow: auto; }
 .gamelist li { padding: 8px 10px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
