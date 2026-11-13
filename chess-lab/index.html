@@ -7,7 +7,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="vendor/chessground.base.css">
   <link rel="stylesheet" href="pieces.css?v=e1ff53eb">
-  <link rel="stylesheet" href="app.css?v=b5e3e936">
+  <link rel="stylesheet" href="app.css?v=2c5b0c3a">
 </head>
 <body>
   <div id="err-banner" style="display:none;position:fixed;left:12px;right:12px;bottom:12px;z-index:100;background:#5c1a1a;color:#fff;border:1px solid #ff5e57;border-radius:10px;padding:10px 14px;font:13px/1.4 system-ui,sans-serif;white-space:pre-wrap"></div>
@@ -170,9 +170,11 @@
           <button data-sm="export-chapter">Download chapter PGN</button>
           <button data-sm="copy-chapter">Copy chapter PGN</button>
           <button data-sm="backup">Backup all studies (.json)</button>
+          <button data-sm="versions">Earlier versions…</button>
           <button data-sm="restore">Restore backup…</button>
           <button data-sm="delete" class="danger">Delete study</button>
         </div>
+        <div class="st-versions hidden" id="st-versions"></div>
         <div class="chapters" id="st-chapters"></div>
         <form class="st-form hidden" id="st-chform">
           <input id="st-chname" placeholder="Chapter name" autocomplete="off">
@@ -218,6 +220,6 @@
   </main>
 
   <footer>Engines: <a href="https://github.com/Adam-Kulju/Patricia" target="_blank" rel="noopener">Patricia</a> by Adam Kulju (GPL-3.0) · <a href="https://github.com/CSSLab/maia-platform-frontend" target="_blank" rel="noopener">Maia 3</a> by the CSSLab, University of Toronto (GPL-3.0). Everything runs in your browser.</footer>
-  <script type="module" src="app.js?v=c4fcd080"></script>
+  <script type="module" src="app.js?v=843e59e5"></script>
 </body>
 </html>

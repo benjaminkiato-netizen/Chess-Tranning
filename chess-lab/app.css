@@ -162,6 +162,10 @@ details summary { cursor: pointer; color: var(--muted); margin-top: 12px; }
 .promo-choice:hover { background: radial-gradient(#fff 30%, var(--accent-2) 90%); border-radius: 8px; }
 .promo-choice piece { position: absolute; inset: 6%; width: 88%; height: 88%; background-size: cover; pointer-events: none; }
 /* study */
+.st-versions { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; max-height: 260px; overflow: auto; }
+.st-versions .ver { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 2px; font-size: 13px; }
+.st-versions .ver span { color: var(--muted); font-size: 12px; }
+.st-versions .small { align-self: flex-start; }
 .center { text-align: center; }
 .small { font-size: 12px; }
 .muted { color: var(--muted); }
