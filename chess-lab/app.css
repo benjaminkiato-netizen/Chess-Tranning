@@ -139,8 +139,9 @@ details summary { cursor: pointer; color: var(--muted); margin-top: 12px; }
 .k-idea { color: var(--orange); font-size: 14px; margin-top: 3px; }
 .move-head { display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
 .tag { font-size: 12px; padding: 2px 8px; border-radius: 10px; background: var(--panel-2); text-transform: capitalize; }
-.tag.blunder { background: var(--red); color: #fff; } .tag.mistake { background: var(--orange); color: #111; }
-.tag.inaccuracy { background: var(--yellow); color: #111; } .tag.best { background: var(--green); color: #111; }
+.tag.blunder { background: #cc3a33; color: #fff; } .tag.mistake { background: #e4892b; color: #111; }
+.tag.inaccuracy { background: #e2b42b; color: #111; } .tag.best { background: #3f9b4f; color: #fff; }
+.tag.excellent { background: #5f9e5a; color: #fff; } .tag.good { background: #8a9f72; color: #fff; }
 .idea { color: var(--orange); }
 .legend { font-size: 12px; color: var(--muted); margin: 10px 0 0; }
 .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 4px 0 10px; vertical-align: -1px; }
