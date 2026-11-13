@@ -7,7 +7,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="vendor/chessground.base.css">
   <link rel="stylesheet" href="pieces.css?v=e1ff53eb">
-  <link rel="stylesheet" href="app.css?v=ce4aa830">
+  <link rel="stylesheet" href="app.css?v=8899b998">
 </head>
 <body>
   <div id="err-banner" style="display:none;position:fixed;left:12px;right:12px;bottom:12px;z-index:100;background:#5c1a1a;color:#fff;border:1px solid #ff5e57;border-radius:10px;padding:10px 14px;font:13px/1.4 system-ui,sans-serif;white-space:pre-wrap"></div>
@@ -79,6 +79,10 @@
         <div class="progress hidden" id="maia-progress"><div id="maia-progress-bar"></div></div>
         <button class="primary ghost" id="spar-review" disabled>Review this game →</button>
         <button class="ghost wide" id="spar-to-study" disabled>📖 Save to Study</button>
+        <div class="row tight copyrow">
+          <button id="spar-copy-pgn" disabled title="Copy the whole game as PGN">📋 Copy PGN</button>
+          <button id="spar-copy-fen" title="Copy the current position as FEN">📋 Copy FEN</button>
+        </div>
       </div>
     </aside>
   </main>
@@ -220,6 +224,6 @@
   </main>
 
   <footer>Engines: <a href="https://github.com/Adam-Kulju/Patricia" target="_blank" rel="noopener">Patricia</a> by Adam Kulju (GPL-3.0) · <a href="https://github.com/CSSLab/maia-platform-frontend" target="_blank" rel="noopener">Maia 3</a> by the CSSLab, University of Toronto (GPL-3.0). Everything runs in your browser.</footer>
-  <script type="module" src="app.js?v=07167ab3"></script>
+  <script type="module" src="app.js?v=3e4d3b8b"></script>
 </body>
 </html>

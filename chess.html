@@ -2269,8 +2269,8 @@ $("gpMoveNote").oninput = e => {
   saveSoon();
   if(had !== !!n.moves[gPly]){ renderMoveList(); gameSync(); }
 };
-/* Hand a game to Chess Lab's Study (same site, so it goes through localStorage), opened at `ply`. */
-function sendToStudy({sans, startFen, white, black, result, site, date, name, orientation, ply}){
+/* Build a PGN (chess.js game) from SAN moves plus headers. */
+function buildGame({sans, startFen, white, black, result, site, date, name}){
   const g = startFen ? new Chess(startFen) : new Chess();
   const hdr = ["Event", name, "White", white, "Black", black, "Result", result || "*"];
   if(site) hdr.push("Site", site);
@@ -2278,6 +2278,22 @@ function sendToStudy({sans, startFen, white, black, result, site, date, name, or
   if(startFen) hdr.push("SetUp", "1", "FEN", startFen);
   g.header(...hdr);
   for(const san of sans) if(!g.move(san, {sloppy:true})) break;
+  return g;
+}
+/* Copy to the clipboard (with a fallback), briefly showing "Copied" on the button. */
+async function copyText(text, btn){
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch(e){
+    const ta = document.createElement("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select(); try { ok = document.execCommand("copy"); } catch(e2){} ta.remove();
+  }
+  const old = btn.textContent; btn.textContent = ok ? "✓ Copied" : "Copy failed";
+  setTimeout(() => { btn.textContent = old; }, 1500);
+}
+/* Hand a game to Chess Lab's Study (same site, so it goes through localStorage), opened at `ply`. */
+function sendToStudy(info){
+  const {name, orientation, ply} = info;
+  const g = buildGame(info);
   let inbox = [];
   try { inbox = JSON.parse(localStorage.getItem("chesslab.inbox") || "[]"); } catch(e){}
   inbox.push({pgn: g.pgn(), name, orientation, ply});
@@ -2712,8 +2728,24 @@ function renderLiveActions(){
   if(live.over){
     box.innerHTML = `<button class="primary" id="lvReview">Review this game</button>
       <button id="lvStudy" title="Open this game in Chess Lab's Study">📖 Send to Study</button>
+      <button id="lvCopyPgn" title="Copy the whole game as PGN">📋 Copy PGN</button>
+      <button id="lvCopyFen" title="Copy the final position as FEN">📋 Copy FEN</button>
       ${S.lastPlay ? `<button id="lvAgain">Play again</button>` : ""}<button id="lvBack">New game</button>`;
     $("lvReview").onclick = reviewLive;
+    const liveInfo = () => {
+      const f = live.full || {}, opp = live.myColor === "w" ? f.black : f.white;
+      const w = st.winner;
+      return {
+        sans: live.hist.slice(1).map(h => h.san), startFen: live.initialFen,
+        white: pname(f.white), black: pname(f.black),
+        result: w ? (w === "white" ? "1-0" : "0-1") : "1/2-1/2",
+        site: `https://lichess.org/${live.id}`, date: pgnDate(),
+        name: `vs ${pname(opp)} · ${new Date().toLocaleDateString()}`,
+        orientation: live.myColor === "b" ? "black" : "white", ply: live.hist.length - 1,
+      };
+    };
+    $("lvCopyPgn").onclick = e => copyText(buildGame(liveInfo()).pgn(), e.currentTarget);
+    $("lvCopyFen").onclick = e => copyText(buildGame(liveInfo()).fen(), e.currentTarget);
     $("lvStudy").onclick = () => {
       const f = live.full || {}, opp = live.myColor === "w" ? f.black : f.white;
       const w = st.winner;
