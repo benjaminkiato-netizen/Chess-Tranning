@@ -433,6 +433,19 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
 .logdlg input,.logdlg select,.logdlg textarea{font:inherit;font-size:14px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
 .logdlg textarea{resize:vertical}
 .dlg-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
+.playlab{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.playlab button{flex:1 1 auto;font-size:13px}
+.later-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;margin-top:16px}
+.later-empty{grid-column:1/-1}
+.later-card{display:flex;flex-direction:column;gap:10px}
+.mb{display:grid;grid-template-columns:repeat(8,1fr);aspect-ratio:1;border-radius:4px;overflow:hidden;box-shadow:0 0 0 2px #1d2b1b}
+.mb i{display:block;position:relative}.mb i.l{background:#eed5a4}.mb i.d{background:#355a31}
+.mb img{position:absolute;inset:4%;width:92%;height:92%}
+.later-info{display:flex;flex-direction:column;gap:2px}
+.later-btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.later-btns .link{margin-left:auto}
+.radar-card{display:flex;justify-content:center;padding:12px 8px}
+.radar-card svg{display:block;width:100%;max-width:560px;height:auto;margin:0 auto}
 </style>
 </head>
 <body>
@@ -503,10 +516,36 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
       <span class="summary" id="gmCount"></span>
     </div>
     <div class="gm-list" id="gmList"></div>
+    <div class="card" id="log">
+      <div class="log-head">
+        <div><h2>Mistake log</h2><p class="summary" style="margin:0">Review each game yourself first, then with the engine. Log the moment the game turned.</p></div>
+      </div>
+      <form id="mForm" class="mform">
+        <label for="mDate">Date<input id="mDate" type="date"></label>
+        <label for="mCat">What went wrong
+          <select id="mCat"></select></label>
+        <label for="mLink" class="wide">Game link (optional)<input id="mLink" type="url" placeholder="https://lichess.org/..."></label>
+        <label for="mNote" class="full">What happened<input id="mNote" type="text" placeholder="e.g. Missed his Bxh7+ because I didn't check his captures" required></label>
+        <button class="primary" type="submit">Add to log</button>
+      </form>
+      <div class="verdict" id="verdict"></div>
+      <div class="tally" id="tally"></div>
+      <div class="mlist" id="mList"></div>
+    </div>
   </section>
 
   <!-- TRAINING -->
   <section id="train" hidden>
+    <div class="tr-head">
+      <div>
+        <div class="eyebrow">Play these later</div>
+        <h1>Train against the engine</h1>
+        <p class="summary">Positions you saved from puzzles. Play each one out against Patricia (aggressive engine) or Maia (plays like a human of your chosen rating).</p>
+      </div>
+      <div class="tr-score"><b class="num" id="laterCount">0</b><span class="summary">saved</span></div>
+    </div>
+    <div class="later-grid" id="laterList"></div>
+    <div id="trOld" hidden>
     <div class="tr-head">
       <div>
         <div class="eyebrow">Road to 2000</div>
@@ -539,21 +578,6 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
       </div>
     </div>
 
-    <div class="card" id="log">
-      <div class="log-head">
-        <div><h2>Mistake log</h2><p class="summary" style="margin:0">Review each game yourself first, then with the engine. Log the moment the game turned.</p></div>
-      </div>
-      <form id="mForm" class="mform">
-        <label for="mDate">Date<input id="mDate" type="date"></label>
-        <label for="mCat">What went wrong
-          <select id="mCat"></select></label>
-        <label for="mLink" class="wide">Game link (optional)<input id="mLink" type="url" placeholder="https://lichess.org/..."></label>
-        <label for="mNote" class="full">What happened<input id="mNote" type="text" placeholder="e.g. Missed his Bxh7+ because I didn't check his captures" required></label>
-        <button class="primary" type="submit">Add to log</button>
-      </form>
-      <div class="verdict" id="verdict"></div>
-      <div class="tally" id="tally"></div>
-      <div class="mlist" id="mList"></div>
     </div>
   </section>
 
@@ -694,6 +718,11 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
       <div class="nav-info"><span id="navInfo" class="num"></span>
         <button id="navReset" class="link" hidden>Back to the solution</button></div>
       <a class="playon" id="playOn" href="https://lichess.org/" target="_blank" rel="noopener" hidden>Play on vs Stockfish on Lichess ↗</a>
+      <div class="playlab" id="playLab" hidden>
+        <button id="vsPatricia" title="Opens Chess Lab in a new tab and plays this position out">▶ Continue vs Patricia</button>
+        <button id="vsMaia" title="Opens Chess Lab in a new tab and plays this position out">▶ Continue vs Maia</button>
+        <button id="saveLater" title="Save this position to the Training tab to play later">⏱ Train vs engine later</button>
+      </div>
       <p class="nav-tip">Explore freely: move any piece for either side. Use ← → to step through moves.</p>
     </div>
     <div class="gp" id="gpBottom" hidden>
@@ -981,6 +1010,73 @@ function show(view){
   $("tabs").hidden = view==="drill";
   $("tabToday").classList.toggle("on", view==="home"); $("tabDash").classList.toggle("on", view==="dash");
   if(view !== "drill") window.scrollTo(0,0);
+}
+
+/* ---------- play a position against Patricia / Maia (Chess Lab), save positions for later ---------- */
+S.later ??= [];   // [{id, fen, you, themes, puzzleId, rating, date}]
+function playInLab(fen, you, opp){
+  localStorage.setItem("chesslab.sparStart", JSON.stringify({fen, you, opp}));
+  window.open("chess-lab/", "_blank");   // new tab, so your puzzle session stays open here
+}
+function puzzleInfo(){
+  const pz = cur && cur.puzzle || {};
+  const names = (pz.themes || []).map(t => LABEL[t] || t).filter(n => n && !/^(short|long|oneMove|veryLong|middlegame|endgame|opening|master|crushing|advantage|equality)$/i.test(n)).slice(0, 3);
+  return {puzzleId: pz.id || "", rating: pz.rating || null, themes: names.join(", ") || (theme && (LABEL[theme] || theme)) || "Puzzle"};
+}
+$("vsPatricia").onclick = () => playInLab(game.fen(), color, "patricia");
+$("vsMaia").onclick = () => playInLab(game.fen(), color, "maia");
+$("saveLater").onclick = () => {
+  const fen = game.fen();
+  if(S.later.some(x => x.fen === fen)) return;
+  S.later.unshift({id: Math.random().toString(36).slice(2, 10), fen, you: color, ...puzzleInfo(), date: todayStr()});
+  save(); updateNav();
+};
+function miniBoard(fen, you){
+  const rows = fen.split(" ")[0].split("/");
+  const cells = [];
+  for(let r = 0; r < 8; r++){
+    let f = 0;
+    for(const ch of rows[r]){
+      if(/\d/.test(ch)){ for(let i = 0; i < +ch; i++) cells.push({r, f: f++, p: null}); }
+      else cells.push({r, f: f++, p: (ch === ch.toUpperCase() ? "w" : "b") + ch.toLowerCase()});
+    }
+  }
+  if(you === "b") cells.reverse();
+  return `<div class="mb">${cells.map(c => `<i class="${(c.r + c.f) % 2 ? "d" : "l"}">${c.p ? `<img src="${PIECES[c.p]}" alt="">` : ""}</i>`).join("")}</div>`;
+}
+function escH(v){ return String(v ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function renderLater(){
+  const list = S.later || [];
+  $("laterCount").textContent = list.length;
+  if(!list.length){
+    $("laterList").innerHTML = `<div class="card later-empty"><p class="summary" style="margin:0">No positions saved yet. After you finish a puzzle, click <b>⏱ Train vs engine later</b> under the board and it shows up here.</p></div>`;
+    return;
+  }
+  $("laterList").innerHTML = list.map(x => {
+    const stm = x.fen.split(" ")[1];
+    return `<div class="card later-card">
+      ${miniBoard(x.fen, x.you)}
+      <div class="later-info">
+        <b>${escH(x.themes || "Position")}</b>
+        <span class="summary">You play ${x.you === "w" ? "White" : "Black"} · ${stm === x.you ? "your move" : "engine moves first"}</span>
+        <span class="summary">${x.date ? new Date(x.date + "T12:00").toLocaleDateString() : ""}${x.rating ? " · puzzle " + x.rating : ""}${x.puzzleId ? ` · <a href="https://lichess.org/training/${x.puzzleId}" target="_blank" rel="noopener">puzzle</a>` : ""}</span>
+      </div>
+      <div class="later-btns">
+        <button class="primary" data-play="patricia" data-id="${x.id}">▶ vs Patricia</button>
+        <button data-play="maia" data-id="${x.id}">▶ vs Maia</button>
+        <button class="link" data-rm="${x.id}">Remove</button>
+      </div></div>`;
+  }).join("");
+  $("laterList").querySelectorAll("[data-play]").forEach(b => b.onclick = () => {
+    const x = S.later.find(y => y.id === b.dataset.id); if(x) playInLab(x.fen, x.you, b.dataset.play);
+  });
+  $("laterList").querySelectorAll("[data-rm]").forEach(b => {
+    let armed = false;
+    b.onclick = () => {
+      if(!armed){ armed = true; b.textContent = "Tap again to remove"; setTimeout(() => { armed = false; b.textContent = "Remove"; }, 3000); return; }
+      S.later = S.later.filter(y => y.id !== b.dataset.rm); save(); renderLater();
+    };
+  });
 }
 
 /* ---------- sending results to Lichess ---------- */
@@ -1443,6 +1539,8 @@ function updateNav(){
   const po = $("playOn");
   po.hidden = !analysis || game.game_over();
   if(!po.hidden) po.href = "https://lichess.org/?fen=" + encodeURIComponent(game.fen()) + "#ai";
+  $("playLab").hidden = po.hidden;
+  if(!po.hidden){ const sv = $("saveLater"), have = (S.later || []).some(x => x.fen === game.fen()); sv.disabled = have; sv.textContent = have ? "✓ Saved for later" : "⏱ Train vs engine later"; }
   if(!analysis) return;
   const offLine = mainline && (positions.length !== mainline.length || positions.some((p,i) => p.fen !== mainline[i].fen));
   $("navInfo").textContent = `Move ${viewIdx} of ${positions.length-1}` + (offLine ? " · your own line" : "");
@@ -1690,6 +1788,38 @@ function solvedBar(r){
     <div class="fill"><i class="f" style="width:${first}%"></i><i class="r" style="width:${replay}%"></i></div>
     <b class="num">${Math.round(first)}%</b><span>Solved</span></div>`;
 }
+/* Radar of puzzle performance by theme (most played themes), like Lichess's puzzle dashboard. */
+function radarSvg(d){
+  const all = Object.entries(d.themes || {}).filter(([k]) => !SKIP.has(k))
+    .map(([k,v]) => ({name: v.theme || LABEL[k] || k, nb: v.results.nb, perf: v.results.performance}))
+    .filter(t => t.nb >= 3).sort((a,b) => b.nb - a.nb).slice(0, 9);
+  if(all.length < 3) return "";
+  const vals = all.map(t => t.perf);
+  // scale in round steps of 50 (like Lichess: 1800, 1850, 1900 …)
+  const lo = Math.floor((Math.min(...vals) - 25) / 50) * 50;
+  let step = 50, steps = Math.ceil((Math.max(...vals) + 25 - lo) / step);
+  while(steps > 6){ step *= 2; steps = Math.ceil((Math.max(...vals) + 25 - lo) / step); }
+  steps = Math.max(steps, 3);
+  const hi = lo + steps * step;
+  const W = 560, H = 470, cx = W/2, cy = H/2 + 6, R = 165, n = all.length;
+  const ang = i => -Math.PI/2 + i * 2*Math.PI/n;
+  const pt = (i, r) => [cx + r*Math.cos(ang(i)), cy + r*Math.sin(ang(i))];
+  const rOf = v => Math.max(0, (v - lo) / (hi - lo)) * R;
+  const ring = k => all.map((_, i) => pt(i, R*k/steps).map(x => x.toFixed(1)).join(",")).join(" ");
+  let g = "";
+  for(let k = 1; k <= steps; k++) g += `<polygon points="${ring(k)}" fill="none" stroke="var(--line)" stroke-width="1"/>`;
+  all.forEach((_, i) => { const [x,y] = pt(i, R); g += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--line)"/>`; });
+  for(let k = 1; k <= steps; k++){ const v = lo + (hi-lo)*k/steps; g += `<text x="${cx}" y="${(cy - R*k/steps + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="var(--muted)" paint-order="stroke" stroke="var(--surface)" stroke-width="3">${Math.round(v)}</text>`; }
+  const shape = all.map((t, i) => pt(i, rOf(t.perf)).map(x => x.toFixed(1)).join(",")).join(" ");
+  g += `<polygon points="${shape}" fill="rgba(213,145,32,.18)" stroke="#d59120" stroke-width="2.5" stroke-linejoin="round"/>`;
+  all.forEach((t, i) => {
+    const [x,y] = pt(i, rOf(t.perf)); g += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="#d59120"><title>${escH(t.name)}: ${t.perf} performance, ${t.nb} played</title></circle>`;
+    const [lx, ly] = pt(i, R + 22), c = Math.cos(ang(i));
+    const anchor = Math.abs(c) < 0.2 ? "middle" : c > 0 ? "start" : "end";
+    g += `<text x="${lx.toFixed(1)}" y="${(ly + 4).toFixed(1)}" text-anchor="${anchor}" font-size="13" fill="var(--fg)">${escH(t.name)}</text>`;
+  });
+  return `<div class="card radar-card"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Puzzle performance by theme">${g}</svg></div>`;
+}
 function renderDash(){
   const d = dashData, g = d.global;
   $("dashTitle").textContent = dashMode==="weak" ? "Improvement areas" : "Strengths";
@@ -1701,7 +1831,7 @@ function renderDash(){
         <div class="tile perf"><b class="num">${g.performance}</b><span>Performance</span></div>
         ${solvedBar(g)}
         <div class="tile ghost"><b class="num">${g.puzzleRatingAvg}</b><span>Avg puzzle</span></div>
-      </div></div>` : "";
+      </div></div>` + radarSvg(d) : "";
   const all = Object.entries(d.themes || {})
     .filter(([k]) => !SKIP.has(k))
     .map(([k,v]) => Object.assign({key:k, name:v.theme || LABEL[k] || k}, v.results));
@@ -1804,6 +1934,7 @@ function dayScore(d){
 }
 
 function renderTrain(){
+  renderLater();
   const now = new Date(), ds = dkey(now), plan = PLAN[now.getDay()];
   $("trTitle").textContent = now.toLocaleDateString(undefined,{weekday:"long"}) + ": " + plan.label;
   const sc = dayScore(now);
@@ -2021,6 +2152,7 @@ async function loadGames(){
   }
 }
 function renderGames(){
+  try { renderLog(); } catch(e){ console.warn(e); }
   const list = $("gmList");
   if(!S.lichessUser){
     $("gmSummary").textContent = "Enter your Lichess username and press Load games.";
