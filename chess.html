@@ -525,6 +525,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
       <form id="gmForm" class="gm-form">
         <label for="gmUser">Lichess username<input id="gmUser" type="text" autocomplete="off" spellcheck="false" placeholder="your username"></label>
         <fieldset class="gm-speeds"><legend class="sr">Time controls</legend>
+          <label for="sp-bullet"><input type="checkbox" id="sp-bullet" value="bullet"> Bullet</label>
           <label for="sp-rapid"><input type="checkbox" id="sp-rapid" value="rapid"> Rapid</label>
           <label for="sp-blitz"><input type="checkbox" id="sp-blitz" value="blitz"> Blitz</label>
           <label for="sp-classical"><input type="checkbox" id="sp-classical" value="classical"> Classical</label>
@@ -2187,7 +2188,7 @@ function myAccuracy(g){ const A = gAnalysis(g); return A?.players?.[myColor(g)]?
 async function gamesTab(){
   show("games");
   $("gmUser").value = S.lichessUser || "";
-  for(const s of ["rapid","blitz","classical"]) $("sp-"+s).checked = S.gameSpeeds.includes(s);
+  for(const s of ["bullet","rapid","blitz","classical"]) $("sp-"+s).checked = S.gameSpeeds.includes(s);
   $("gmMax").value = String(S.gameMax);
   if(!S.lichessUser && S.token){
     try{
@@ -2197,6 +2198,21 @@ async function gamesTab(){
   }
   if(!gList && S.lichessUser) loadGames(); else renderGames();
 }
+let gEmptyWhy = "";
+// When nothing comes back, look at your latest games of any kind so the message says why.
+async function explainNoGames(user, raw){
+  if(raw.length) return `Lichess sent ${raw.length} game${raw.length>1?"s":""}, but none were finished standard-chess games with moves.`;
+  try{
+    const r = await fetch(`${LI}/api/games/user/${encodeURIComponent(user)}?max=10&moves=false&tags=false`, {headers: authHeaders({Accept:"application/x-ndjson"}), cache:"no-store"});
+    if(!r.ok) return `Lichess sent no games (check returned ${r.status}). Try Load games again in a minute.`;
+    const any = (await r.text()).split("\n").filter(Boolean).map(l => { try{ return JSON.parse(l); }catch(e){ return null; } }).filter(Boolean);
+    if(!any.length) return "Lichess sent no games at all for this account just now. That's usually a brief Lichess hiccup: press Load games again in a minute.";
+    const by = {};
+    for(const g of any){ const k = g.variant !== "standard" ? g.variant : g.speed; by[k] = (by[k]||0) + 1; }
+    const kinds = Object.entries(by).map(([k,n]) => `${n} ${k}`).join(", ");
+    return `None of your last ${any.length} games are ${S.gameSpeeds.join(" / ")}: they're ${kinds}. Tick that time control above and press Load games.`;
+  }catch(e){ return "Couldn't reach Lichess just now. Check your connection and press Load games again."; }
+}
 async function loadGames(){
   const user = S.lichessUser;
   if(!user){ renderGames(); return; }
@@ -2205,14 +2221,16 @@ async function loadGames(){
   const q = new URLSearchParams({max:S.gameMax, perfType:S.gameSpeeds.join(","), clocks:"true", evals:"true",
     accuracy:"true", opening:"true", division:"true", finished:"true"});
   try{
-    const res = await fetch(`${LI}/api/games/user/${encodeURIComponent(user)}?${q}`, {headers: authHeaders({Accept:"application/x-ndjson"})});
+    const res = await fetch(`${LI}/api/games/user/${encodeURIComponent(user)}?${q}`, {headers: authHeaders({Accept:"application/x-ndjson"}), cache:"no-store"});
     if(res.status === 404) throw new Error(`Lichess has no player called "${esc(user)}". Check the spelling.`);
     if(res.status === 429) throw new Error("Lichess is rate-limiting requests. Wait a minute and try again.");
     if(res.status === 401) throw new Error("Lichess rejected your token. Paste a new one on the Today tab, or clear it.");
     if(!res.ok) throw new Error(`Lichess returned an error (${res.status}).`);
     const text = await res.text();
-    gList = text.split("\n").filter(Boolean).map(l => { try{ return JSON.parse(l); }catch(e){ return null; } })
-      .filter(g => g && g.variant === "standard" && g.moves && !["aborted","noStart","created","started"].includes(g.status));
+    const raw = text.split("\n").filter(Boolean).map(l => { try{ return JSON.parse(l); }catch(e){ return null; } }).filter(Boolean);
+    gList = raw.filter(g => g.variant === "standard" && g.moves && !["aborted","noStart","created","started"].includes(g.status));
+    gEmptyWhy = "";
+    if(!gList.length) gEmptyWhy = await explainNoGames(user, raw);
     gLoading = false; renderGames();
   }catch(e){
     gLoading = false; $("gmList").innerHTML = `<p class="err">${e.message}</p>`;
@@ -2235,7 +2253,7 @@ function renderGames(){
   $("gmSummary").innerHTML = gList.length
     ? `${gList.length} games: <b class="num">${w}</b> won, <b class="num">${d}</b> drawn, <b class="num">${l}</b> lost` +
       (accN ? ` · average accuracy <b class="num">${Math.round(accSum/accN)}%</b> over ${accN} analysed` : "")
-    : "No games found for those time controls.";
+    : (gEmptyWhy || "No games found for those time controls.");
   const shown = gList.filter(g => gFilter === "all" ? true
     : gFilter === "notes" ? !!(S.gnotes[g.id]?.note || Object.keys(S.gnotes[g.id]?.moves||{}).length)
     : outcome(g, myColor(g)) === gFilter);
@@ -2717,7 +2735,7 @@ $("gmForm").onsubmit = e => {
   const u = $("gmUser").value.trim();
   if(u.toLowerCase() !== (S.lichessUser||"").toLowerCase()) gList = null;
   S.lichessUser = u;
-  S.gameSpeeds = ["rapid","blitz","classical"].filter(s => $("sp-"+s).checked);
+  S.gameSpeeds = ["bullet","rapid","blitz","classical"].filter(s => $("sp-"+s).checked);
   S.gameMax = +$("gmMax").value; save();
   loadGames();
 };
