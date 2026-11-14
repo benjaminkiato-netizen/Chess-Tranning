@@ -249,3 +249,5 @@ footer { color: var(--muted); font-size: 11px; position: fixed; right: 12px; bot
 .line-info { display: block; margin-top: 5px; font-size: 12.5px; color: var(--muted); min-height: 1em; }
 .line-info.bad { color: var(--red); }
 .line-info b { color: var(--accent-2); font-weight: 600; }
+
+.matchup .flip-mini { margin-left: auto; padding: 4px 10px; font-size: 15px; line-height: 1; }
