@@ -251,3 +251,12 @@ footer { color: var(--muted); font-size: 11px; position: fixed; right: 12px; bot
 .line-info b { color: var(--accent-2); font-weight: 600; }
 
 .matchup .flip-mini { margin-left: auto; padding: 4px 10px; font-size: 15px; line-height: 1; }
+
+/* study move colours: main line green, losing lines red, side lines stay pale */
+.tree .m.main { color: #6fcf7a; }
+.tree .m.losing, .tree .var.losing { color: #ef6b62; }
+.tree .var.losing { border-left-color: rgba(239,107,98,.45); }
+.tree .m.losing-start::before { content: '✗ '; font-size: 11px; opacity: .8; }
+.tree .m.cur, .tree .m.cur.losing { color: #fff; }
+.tree .m.cur.losing { background: #c9483f; }
+.losing-btn.on { border-color: #ef6b62; color: #ef6b62; }
