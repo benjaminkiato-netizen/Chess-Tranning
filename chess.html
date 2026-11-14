@@ -470,6 +470,10 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
 .stars .star:hover ~ .star{color:var(--line)}
 .radar-card{display:flex;justify-content:center;padding:12px 8px}
 .radar-card svg{display:block;width:100%;max-width:660px;height:auto;margin:0 auto}
+.gm-site{align-self:flex-end}
+.gm-site button{padding:9px 12px}
+.gm-src{font-size:11px;font-weight:700;letter-spacing:.04em;padding:1px 5px;border-radius:4px;margin-right:6px;vertical-align:1px}
+.gm-src.cc{background:#81b64c;color:#10140c}
 </style>
 </head>
 <body>
@@ -518,12 +522,15 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
   <section id="games" hidden>
     <div class="gm-head">
       <div>
-        <div class="eyebrow">Your Lichess games</div>
+        <div class="eyebrow" id="gmEyebrow">Your Lichess games</div>
         <h1>Games</h1>
         <p class="summary" id="gmSummary">Pull your games, then open one to go through it move by move.</p>
       </div>
       <form id="gmForm" class="gm-form">
-        <label for="gmUser">Lichess username<input id="gmUser" type="text" autocomplete="off" spellcheck="false" placeholder="your username"></label>
+        <div class="seg gm-site" id="gmSite" role="group" aria-label="Which site">
+          <button type="button" data-site="lichess">Lichess</button><button type="button" data-site="chesscom">Chess.com</button>
+        </div>
+        <label for="gmUser"><span id="gmUserLbl">Lichess username</span><input id="gmUser" type="text" autocomplete="off" spellcheck="false" placeholder="your username"></label>
         <fieldset class="gm-speeds"><legend class="sr">Time controls</legend>
           <label for="sp-bullet"><input type="checkbox" id="sp-bullet" value="bullet"> Bullet</label>
           <label for="sp-rapid"><input type="checkbox" id="sp-rapid" value="rapid"> Rapid</label>
@@ -2138,8 +2145,15 @@ function setDrillMode(m){
     : "Explore freely: move any piece for either side. Use ← → to step through moves.";
 }
 const playerName = p => p?.user?.name || (p?.aiLevel ? `Stockfish level ${p.aiLevel}` : "Anonymous");
+const isCC = g => g?.site === "chesscom";
+const siteName = () => S.gameSite === "chesscom" ? "Chess.com" : "Lichess";
+// Link to the game on the site it was played on (Lichess links can open from Black's side and jump to a move).
+function gameUrl(g, color, ply){
+  if(isCC(g)) return g.url + (ply != null ? `?move=${ply}` : "");
+  return `${LI}/${g.id}${color === "b" ? "/black" : ""}${ply != null ? "#" + ply : ""}`;
+}
 function myColor(g){
-  const me = (S.lichessUser||"").toLowerCase();
+  const me = ((isCC(g) ? S.chesscomUser : S.lichessUser) || "").toLowerCase();
   return g.players.black?.user?.id === me ? "b" : "w";
 }
 function outcome(g, me){
@@ -2187,7 +2201,7 @@ function myAccuracy(g){ const A = gAnalysis(g); return A?.players?.[myColor(g)]?
 
 async function gamesTab(){
   show("games");
-  $("gmUser").value = S.lichessUser || "";
+  setSiteUi();
   for(const s of ["bullet","rapid","blitz","classical"]) $("sp-"+s).checked = S.gameSpeeds.includes(s);
   $("gmMax").value = String(S.gameMax);
   if(!S.lichessUser && S.token){
@@ -2196,8 +2210,22 @@ async function gamesTab(){
       if(r.ok){ const a = await r.json(); S.lichessUser = a.username; save(); $("gmUser").value = a.username; }
     }catch(e){}
   }
-  if(!gList && S.lichessUser) loadGames(); else renderGames();
+  if(!gList && (S.gameSite === "chesscom" ? S.chesscomUser : S.lichessUser)) loadGames(); else renderGames();
 }
+function setSiteUi(){
+  const cc = S.gameSite === "chesscom";
+  $("gmSite").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.site === (cc ? "chesscom" : "lichess")));
+  $("gmUserLbl").textContent = `${siteName()} username`;
+  $("gmEyebrow").textContent = `Your ${siteName()} games`;
+  $("gmUser").value = (cc ? S.chesscomUser : S.lichessUser) || "";
+  $("sp-classical").closest("label").hidden = cc;   // Chess.com has no classical pool
+}
+$("gmSite").querySelectorAll("button").forEach(b => b.onclick = () => {
+  if((S.gameSite || "lichess") === b.dataset.site) return;
+  S.gameSite = b.dataset.site; save();
+  gList = null; gEmptyWhy = ""; setSiteUi();
+  if(S.gameSite === "chesscom" ? S.chesscomUser : S.lichessUser) loadGames(); else renderGames();
+});
 let gEmptyWhy = "";
 // When nothing comes back, look at your latest games of any kind so the message says why.
 async function explainNoGames(user, raw){
@@ -2213,11 +2241,91 @@ async function explainNoGames(user, raw){
     return `None of your last ${any.length} games are ${S.gameSpeeds.join(" / ")}: they're ${kinds}. Tick that time control above and press Load games.`;
   }catch(e){ return "Couldn't reach Lichess just now. Check your connection and press Load games again."; }
 }
+// ---------- Chess.com (public data API, no login needed) ----------
+const CC = "https://api.chess.com/pub";
+const CC_STATUS = {checkmated:"mate", resigned:"resign", timeout:"outoftime", abandoned:"timeout", stalemate:"stalemate",
+  agreed:"draw", repetition:"draw", insufficient:"draw", "50move":"draw", timevsinsufficient:"draw"};
+const CC_DRAW = {repetition:"repetition", insufficient:"insufficient material", "50move":"the 50-move rule", timevsinsufficient:"time vs insufficient material", agreed:"agreement", stalemate:"stalemate"};
+let OPENINGS = null;
+async function openingsList(){
+  if(OPENINGS) return OPENINGS;
+  try{ OPENINGS = await (await fetch("chess-lab/openings.json")).json(); }catch(e){ OPENINGS = {}; }
+  return OPENINGS;
+}
+function ccToGame(c, open){
+  if(c.rules !== "chess" || !c.pgn || c.initial_setup && !c.initial_setup.startsWith("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")) return null;
+  const head = {}; c.pgn.replace(/\[(\w+) "([^"]*)"\]/g, (_, k, v) => { head[k] = v; });
+  const body = c.pgn.replace(/\[[^\]]*\]\s*/g, (m) => m.includes("%") ? m : "");
+  const clocks = [...body.matchAll(/\[%clk (\d+):(\d+):(\d+(?:\.\d+)?)\]/g)].map(m => Math.round(((+m[1])*3600 + (+m[2])*60 + (+m[3])) * 100));
+  const toks = body.replace(/\{[^}]*\}/g, " ").replace(/\d+\.(\.\.)?/g, " ").replace(/(1-0|0-1|1\/2-1\/2|\*)\s*$/, " ").split(/\s+/).filter(Boolean);
+  const ch = new Chess(), moves = []; let opening = null;
+  for(const t of toks){
+    const m = ch.move(t, {sloppy: true}); if(!m) return null;
+    moves.push(m.san);
+    const hit = open[ch.fen().split(" ").slice(0,3).join(" ")];
+    if(hit){ const [eco, name] = hit.split("|"); opening = {eco, name}; }
+  }
+  if(moves.length < 2) return null;
+  if(!opening && head.ECOUrl) opening = {eco: head.ECO || "", name: decodeURIComponent(head.ECOUrl.split("/").pop()).replace(/-/g, " ")};
+  const w = c.white, b = c.black;
+  const winner = w.result === "win" ? "white" : b.result === "win" ? "black" : null;
+  const loserRes = winner === "white" ? b.result : winner === "black" ? w.result : w.result;
+  const [ini, inc] = String(c.time_control || "").split("+");
+  const speed = c.time_class === "daily" ? "correspondence" : c.time_class;
+  return {
+    id: "cc" + (c.url || "").split("/").pop(), site: "chesscom", url: c.url, variant: "standard", speed,
+    status: CC_STATUS[loserRes] || loserRes, drawWhy: winner ? null : CC_DRAW[w.result] || null,
+    winner, moves: moves.join(" "), clocks: clocks.length === moves.length ? clocks : undefined,
+    clock: c.time_class !== "daily" && ini && !ini.includes("/") ? {initial: +ini, increment: +(inc || 0)} : undefined,
+    createdAt: (c.end_time || 0) * 1000, rated: c.rated, opening,
+    players: {
+      white: {user:{name:w.username, id:w.username.toLowerCase()}, rating:w.rating},
+      black: {user:{name:b.username, id:b.username.toLowerCase()}, rating:b.rating},
+    },
+  };
+}
+async function loadChessCom(user){
+  const r = await fetch(`${CC}/player/${encodeURIComponent(user.toLowerCase())}/games/archives`);
+  if(r.status === 404) throw new Error(`Chess.com has no player called "${esc(user)}". Check the spelling.`);
+  if(r.status === 429) throw new Error("Chess.com is rate-limiting requests. Wait a minute and try again.");
+  if(!r.ok) throw new Error(`Chess.com returned an error (${r.status}).`);
+  const months = ((await r.json()).archives || []).slice().reverse();
+  const open = await openingsList();
+  const out = [], seenKinds = {};
+  // newest month first, until there are enough games (looks back at most a year)
+  for(const url of months.slice(0, 12)){
+    const m = await fetch(url);
+    if(!m.ok) continue;
+    const games = ((await m.json()).games || []).slice().reverse();
+    for(const c of games){
+      const k = c.rules !== "chess" ? c.rules : c.time_class; seenKinds[k] = (seenKinds[k] || 0) + 1;
+      const sp = c.time_class === "daily" ? "correspondence" : c.time_class;
+      if(c.rules !== "chess" || !S.gameSpeeds.includes(sp)) continue;
+      const g = ccToGame(c, open);
+      if(g) out.push(g);
+      if(out.length >= S.gameMax) break;
+    }
+    if(out.length >= S.gameMax) break;
+  }
+  if(!out.length){
+    const kinds = Object.entries(seenKinds).map(([k,n]) => `${n} ${k}`).join(", ");
+    gEmptyWhy = !months.length ? "This Chess.com account has no games yet."
+      : kinds ? `No ${S.gameSpeeds.join(" / ")} games in the last year on Chess.com: found ${kinds}. Tick that time control above and press Load games.`
+      : "No finished games found on Chess.com in the last year.";
+  }
+  return out;
+}
+
 async function loadGames(){
-  const user = S.lichessUser;
+  const user = S.gameSite === "chesscom" ? S.chesscomUser : S.lichessUser;
   if(!user){ renderGames(); return; }
   if(!S.gameSpeeds.length){ $("gmList").innerHTML = '<p class="err">Tick at least one time control.</p>'; return; }
   gLoading = true; renderGames();
+  if(S.gameSite === "chesscom"){
+    try{ gEmptyWhy = ""; gList = await loadChessCom(user); gLoading = false; renderGames(); }
+    catch(e){ gLoading = false; $("gmList").innerHTML = `<p class="err">${/fetch/i.test(e.message) ? "Couldn't reach Chess.com. Check your connection and try again." : e.message}</p>`; }
+    return;
+  }
   const q = new URLSearchParams({max:S.gameMax, perfType:S.gameSpeeds.join(","), clocks:"true", evals:"true",
     accuracy:"true", opening:"true", division:"true", finished:"true"});
   try{
@@ -2249,11 +2357,11 @@ async function loadGames(){
 function renderGames(){
   try { renderLog(); } catch(e){ console.warn(e); }
   const list = $("gmList");
-  if(!S.lichessUser){
-    $("gmSummary").textContent = "Enter your Lichess username and press Load games.";
+  if(!(S.gameSite === "chesscom" ? S.chesscomUser : S.lichessUser)){
+    $("gmSummary").textContent = `Enter your ${siteName()} username and press Load games.`;
     list.innerHTML = ""; $("gmCount").textContent = ""; return;
   }
-  if(gLoading){ list.innerHTML = '<p class="summary">Loading your games from Lichess…</p>'; return; }
+  if(gLoading){ list.innerHTML = `<p class="summary">Loading your games from ${siteName()}…</p>`; return; }
   if(!gList){ list.innerHTML = ""; return; }
   let w=0,d=0,l=0,accSum=0,accN=0;
   for(const g of gList){
@@ -2278,7 +2386,7 @@ function renderGames(){
       <span class="res ${o}">${o==="win"?"W":o==="loss"?"L":"½"}</span>
       <span class="gm-main">
         <span class="gm-opp"><i class="dot ${me}" title="You played ${me==="w"?"White":"Black"}"></i>vs ${esc(playerName(opp))} <span class="num muted">${opp.rating ?? ""}</span></span>
-        <span class="gm-open">${esc(g.opening?.name || "Unknown opening")} · ${o==="draw" ? "draw" : (o==="win"?"won":"lost")} by ${STATUS[g.status] || g.status}</span>
+        <span class="gm-open">${isCC(g) ? '<span class="gm-src cc" title="Played on Chess.com">C</span>' : ""}${esc(g.opening?.name || "Unknown opening")} · ${o==="draw" ? "draw" : (o==="win"?"won":"lost")} by ${g.drawWhy || STATUS[g.status] || g.status}</span>
       </span>
       <span class="gm-meta"><span>${SPEED[g.speed]||g.speed} ${tcText(g)}</span><span>${date}</span></span>
       <span class="gm-badges">
@@ -2305,13 +2413,14 @@ function openGame(g){
   setDrillMode("game");
   $("d-theme").textContent = `${playerName(g.players.white)} vs ${playerName(g.players.black)}`;
   $("d-count").textContent = `${SPEED[g.speed]||g.speed} ${tcText(g)} · ${new Date(g.createdAt).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"})}`;
-  $("gpLink").href = `${LI}/${g.id}${color==="b"?"/black":""}`;
+  $("gpLink").href = gameUrl(g, color);
+  $("gpLink").textContent = isCC(g) ? "Open on Chess.com" : "Open on Lichess";
   $("gpNote").value = S.gnotes[g.id]?.note || "";
   show("drill");
   renderGameTop(); renderMoveList();
   setView(0);
   if(!S.ganalysis[g.id]?.cls && !gLocal) analyzeLocal(g);
-  if(!(g.analysis && g.analysis.length)) checkLichessAnalysis(g, true);
+  if(!isCC(g) && !(g.analysis && g.analysis.length)) checkLichessAnalysis(g, true);
 }
 
 function renderGameTop(){
@@ -2327,7 +2436,7 @@ function renderGameTop(){
         <span class="j blun num" title="Blunders">${st.blunder}??</span><span class="muted num" title="Average centipawn loss">ACPL ${st.acpl}</span></div>` : ""}
     </div>`;
   };
-  const res = g.winner ? `${g.winner === "white" ? "1-0" : "0-1"} · ${g.winner === "white" ? "White" : "Black"} won by ${STATUS[g.status]||g.status}` : `½-½ · draw by ${STATUS[g.status]||g.status}`;
+  const res = g.winner ? `${g.winner === "white" ? "1-0" : "0-1"} · ${g.winner === "white" ? "White" : "Black"} won by ${STATUS[g.status]||g.status}` : `½-½ · draw by ${g.drawWhy || STATUS[g.status]||g.status}`;
   $("gpPlayers").innerHTML = row("w") + row("b") +
     `<div class="gp-res"><b>${res}</b>${g.opening ? `<br><span class="muted">${esc(g.opening.eco)} · ${esc(g.opening.name)}</span>` : ""}</div>`;
   renderGraph(); renderAnalyzeBox();
@@ -2382,6 +2491,7 @@ function renderAnalyzeBox(){
   if(A){
     box.innerHTML = `<p class="muted">${A.source === "lichess"
       ? `Mistakes and accuracy from Lichess's computer analysis. ${A.cls ? "Move ratings by Stockfish 19 in your browser." : `<button class="link" id="gpRedo">Rate every move with Stockfish</button>`}`
+      : isCC(g) ? `Analysed by Stockfish 19 in your browser (depth ${A.depth}). <button class="link" id="gpRedo">Run again</button>`
       : `Analysed by Stockfish 19 in your browser (depth ${A.depth}). Lichess's own analysis is deeper and replaces this when it exists.
          <button class="link" id="gpCheck">Check Lichess for analysis</button> · <button class="link" id="gpRedo">Run again</button>`}</p>
       <p class="muted" id="gpCheckMsg"></p>`;
@@ -2390,9 +2500,9 @@ function renderAnalyzeBox(){
     return;
   }
   box.innerHTML = `<button class="primary" id="gpRun">Analyse with Stockfish</button>
-    <p class="muted">Finds inaccuracies, mistakes and blunders in your browser. Or <a href="${LI}/${g.id}" target="_blank" rel="noopener">request it on Lichess</a>, then <button class="link" id="gpCheck">check Lichess for analysis</button>.</p>
+    <p class="muted">Finds inaccuracies, mistakes and blunders in your browser.${isCC(g) ? "" : ` Or <a href="${LI}/${g.id}" target="_blank" rel="noopener">request it on Lichess</a>, then <button class="link" id="gpCheck">check Lichess for analysis</button>.`}</p>
     <p class="muted" id="gpCheckMsg"></p>`;
-  $("gpCheck").onclick = () => checkLichessAnalysis(g, false);
+  $("gpCheck")?.addEventListener("click", () => checkLichessAnalysis(g, false));
   if(gLocal) { $("gpRun").disabled = true; $("gpRun").textContent = "Another game is being analysed…"; }
   else $("gpRun").onclick = () => analyzeLocal(g);
 }
@@ -2604,7 +2714,7 @@ function gameInfo(){
     sans: gSan, startFen: g.initialFen || null,
     white: playerName(g.players.white), black: playerName(g.players.black),
     result: g.winner ? (g.winner === "white" ? "1-0" : "0-1") : (g.status === "started" ? "*" : "1/2-1/2"),
-    site: `https://lichess.org/${g.id}`, date: pgnDate(g.createdAt),
+    site: gameUrl(g), date: pgnDate(g.createdAt),
     name: `vs ${playerName(opp)} · ${new Date(g.createdAt || Date.now()).toLocaleDateString()}`,
   };
 }
@@ -2618,7 +2728,7 @@ $("gpStudy").onclick = () => {
     sans: gSan, startFen: g.initialFen || null,
     white: playerName(g.players.white), black: playerName(g.players.black),
     result: g.winner ? (g.winner === "white" ? "1-0" : "0-1") : (g.status === "started" ? "*" : "1/2-1/2"),
-    site: `https://lichess.org/${g.id}`, date: pgnDate(g.createdAt),
+    site: gameUrl(g), date: pgnDate(g.createdAt),
     name: `vs ${playerName(opp)} · ${new Date(g.createdAt || Date.now()).toLocaleDateString()}`,
     orientation: color === "b" ? "black" : "white", ply: gPly,
   });
@@ -2628,7 +2738,7 @@ $("dCat").innerHTML = Object.entries(CATS).map(([k,v]) => `<option value="${k}">
 $("gpLog").onclick = () => {
   const k = gPly, g = curGame; if(k < 1) return;
   $("dDate").value = dkey(new Date(g.createdAt));
-  $("dLink").value = `${LI}/${g.id}${color==="b"?"/black":""}#${k}`;
+  $("dLink").value = gameUrl(g, color, k);
   const j = gAnalysis(g)?.evals?.[k-1]?.judgment;
   $("dNote").value = `${moveLabel(k)}: ` + (j ? j.comment + " " : "");
   $("dCat").value = j && j.name === "Blunder" && CATS.blunder ? "blunder" : $("dCat").options[0].value;
@@ -2743,8 +2853,9 @@ $("tabGames").onclick = gamesTab;
 $("gmForm").onsubmit = e => {
   e.preventDefault();
   const u = $("gmUser").value.trim();
-  if(u.toLowerCase() !== (S.lichessUser||"").toLowerCase()) gList = null;
-  S.lichessUser = u;
+  const key = S.gameSite === "chesscom" ? "chesscomUser" : "lichessUser";
+  if(u.toLowerCase() !== (S[key]||"").toLowerCase()) gList = null;
+  S[key] = u;
   S.gameSpeeds = ["bullet","rapid","blitz","classical"].filter(s => $("sp-"+s).checked);
   S.gameMax = +$("gmMax").value; save();
   loadGames();
