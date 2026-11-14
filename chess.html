@@ -444,6 +444,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
 .later-info{display:flex;flex-direction:column;gap:2px}
 .later-btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .later-btns .link{margin-left:auto}
+.later-btns .sf-link{font-size:13px;font-weight:600;flex-basis:100%}
 .radar-card{display:flex;justify-content:center;padding:12px 8px}
 .radar-card svg{display:block;width:100%;max-width:660px;height:auto;margin:0 auto}
 </style>
@@ -1064,6 +1065,7 @@ function renderLater(){
       <div class="later-btns">
         <button class="primary" data-play="patricia" data-id="${x.id}">▶ vs Patricia</button>
         <button data-play="maia" data-id="${x.id}">▶ vs Maia</button>
+        <a class="sf-link" href="https://lichess.org/?fen=${encodeURIComponent(x.fen)}#ai" target="_blank" rel="noopener" title="Play this position against Stockfish on Lichess">vs Stockfish on Lichess ↗</a>
         <button class="link" data-rm="${x.id}">Remove</button>
       </div></div>`;
   }).join("");
