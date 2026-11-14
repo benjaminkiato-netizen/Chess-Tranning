@@ -231,3 +231,13 @@ footer { color: var(--muted); font-size: 11px; position: fixed; right: 12px; bot
 .st-otag { display: block; width: 100%; margin-top: 8px; text-align: left; background: none; border: 1px dashed var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; color: var(--muted, #aaa); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .st-otag b { color: var(--accent-2); margin-right: 4px; }
 .st-otag:hover { border-color: var(--accent); color: var(--text); }
+
+/* typed "yes" confirmation */
+.typed-confirm { background: var(--panel, #1c1c22); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; width: min(400px, 90vw); }
+.typed-confirm::backdrop { background: rgba(0,0,0,.55); }
+.typed-confirm h3 { margin: 0 0 6px; font-size: 16px; }
+.typed-confirm p { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+.typed-confirm label { display: block; font-size: 13px; color: var(--muted); }
+.typed-confirm input { display: block; width: 100%; box-sizing: border-box; margin: 6px 0 14px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; color: var(--text); font: inherit; }
+.typed-confirm .row { justify-content: flex-end; }
+.typed-confirm .tc-ok:disabled { opacity: .4; cursor: not-allowed; }
