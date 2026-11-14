@@ -223,3 +223,11 @@ footer { color: var(--muted); font-size: 11px; position: fixed; right: 12px; bot
   .tabs { margin-left: 0; width: 100%; order: 3; }
   .tab { flex: 1; }
 }
+
+/* opening filter + tag */
+.st-open { margin-top: 8px; }
+.st-open select { flex: 1; min-width: 0; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; color: var(--text); font: inherit; font-size: 13px; }
+.st-open select.on { border-color: var(--accent); }
+.st-otag { display: block; width: 100%; margin-top: 8px; text-align: left; background: none; border: 1px dashed var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; color: var(--muted, #aaa); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-otag b { color: var(--accent-2); margin-right: 4px; }
+.st-otag:hover { border-color: var(--accent); color: var(--text); }
