@@ -278,14 +278,26 @@ button.gm-row:hover{background:var(--bg)}
 /* game review panel */
 .side.gm #gpTop{order:1} .side.gm #engine{order:2} .side.gm #gpBottom{order:3}
 .gleft{display:flex;flex-direction:column;gap:14px;min-width:0}
+.bcol{display:flex;flex-direction:column;gap:14px;min-width:0}
+.gp-report{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.gp-report .rp-h{display:flex;align-items:baseline;gap:8px;margin-bottom:8px;min-width:0}
+.gp-report .rp-h .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gp-report .rp-rate{display:flex;align-items:baseline;gap:8px;margin-bottom:10px}
+.gp-report .rp-rate b{font-size:26px;line-height:1}
+.gp-report .rp-rows{display:grid;grid-template-columns:20px max-content 3ch;gap:5px 10px;align-items:center;font-size:14px}
+.gp-report .rp-rows .n{font-weight:700;text-align:right}
+.gp-report .rp-rows .bdg{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;color:#fff;font:800 11px/1 var(--body)}
+.gp-report .rp-rows .bdg svg{width:72%;height:72%;fill:#fff}
+.gp-report .rp-note{grid-column:1/-1;margin:0;font-size:12px}
+@media (max-width:600px){.gp-report{grid-template-columns:1fr}}
 .gp-movebox .gp-moves{max-height:min(62vh,600px)}
 button.mv{white-space:nowrap;overflow:hidden}
 .drill-grid.gm{grid-template-columns:minmax(0,1fr)}
-.drill-grid.gm .bw{order:1} .drill-grid.gm .gleft{order:2} .drill-grid.gm .side{order:3}
+.drill-grid.gm .bcol{order:1} .drill-grid.gm .gleft{order:2} .drill-grid.gm .side{order:3}
 @media (min-width:1100px){
   .wrap.wide{max-width:1720px}
   .drill-grid.gm{grid-template-columns:290px auto 300px}
-  .drill-grid.gm .gleft{order:1} .drill-grid.gm .bw{order:2}
+  .drill-grid.gm .gleft{order:1} .drill-grid.gm .bcol{order:2}
   .drill-grid.gm .board{width:min(900px, calc(100vw - 32px - 48px - 290px - 300px - 22px), calc(100vh - 48px))}
 }
 .gp{display:flex;flex-direction:column;gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
@@ -685,9 +697,12 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
         <div class="gp-comment" id="gpComment"></div>
       </div>
     </div>
+    <div class="bcol">
     <div class="bw">
       <div class="evalbar" id="evalbar" aria-hidden="true"><i id="evalFill"></i><span id="evalTxt"></span></div>
       <div class="board" id="board"></div>
+    </div>
+    <div class="gp-report" id="gpReport" hidden></div>
     </div>
     <div class="side">
     <div class="drill-top">
@@ -1244,6 +1259,7 @@ async function loadNext(){
 }
 
 function setup(p){
+  $("gpReport").hidden = true;
   setDrillMode("puzzle");
   $("next").textContent = "Next puzzle";
   game = new Chess();
@@ -2367,6 +2383,51 @@ const BADGE = {
   mist:{bg:"#e5862a", html:"?", t:"Mistake"},
   blun:{bg:"#cc3333", html:"??", t:"Blunder"}
 };
+/* Game report under the board: how many moves of each kind per player, plus a rough
+   "game rating" estimated from average centipawn loss (lower loss = stronger play). */
+// Rough "game rating": the average of two common rules of thumb, one from accuracy % and one from
+// average centipawn loss, rounded to 50. Only a guide: one game says little about real strength.
+function estRating(acpl, accuracy){
+  const fromAcpl = acpl != null ? 3100 * Math.exp(-0.0125 * acpl) : null;
+  const pts = [[50,600],[60,900],[70,1200],[75,1400],[80,1650],[85,1900],[90,2200],[95,2600],[98,2850],[100,2950]];
+  let fromAcc = null;
+  if(accuracy != null){
+    const a = Math.max(50, Math.min(100, accuracy));
+    for(let i = 1; i < pts.length; i++) if(a <= pts[i][0]){ const [x0,y0] = pts[i-1], [x1,y1] = pts[i]; fromAcc = y0 + (y1-y0) * (a-x0)/(x1-x0); break; }
+  }
+  const vals = [fromAcpl, fromAcc].filter(v => v != null);
+  if(!vals.length) return null;
+  return Math.max(400, Math.min(2900, Math.round(vals.reduce((x,y) => x+y, 0) / vals.length / 50) * 50));
+}
+function renderReport(){
+  const box = $("gpReport");
+  const g = curGame, A = g && gAnalysis(g);
+  if(mode !== "game" || !A){ box.hidden = true; return; }
+  const n = mainline.length - 1;
+  const order = ["best", "good", "ok", "only", "inacc", "mist", "blun"];
+  const names = {best:"Best", good:"Good", ok:"OK", only:"Only move", inacc:"Inaccuracy", mist:"Mistake", blun:"Blunder"};
+  const cnt = {w:{}, b:{}}, moves = {w:0, b:0};
+  for(let k = 1; k <= n; k++){
+    const side = mainline[k-1].fen.split(" ")[1], kind = moveKind(k);
+    moves[side]++;
+    if(kind) cnt[side][kind] = (cnt[side][kind] || 0) + 1;
+  }
+  const me = myColor(g);
+  const col = c => {
+    const p = c === "w" ? g.players.white : g.players.black, st = A.players?.[c] || {};
+    const acpl = st.acpl, rating = moves[c] >= 10 ? estRating(acpl, st.accuracy) : null;
+    const rows = order.filter(kd => cnt[c][kd] || ["best", "inacc", "mist", "blun"].includes(kd)).map(kd =>
+      `<span class="bdg" style="background:${BADGE[kd].bg}" title="${BADGE[kd].t}">${BADGE[kd].html}</span><span>${names[kd]}</span><span class="n num">${cnt[c][kd] || 0}</span>`).join("");
+    return `<div>
+      <div class="rp-h"><i class="dot ${c}"></i><span class="nm">${esc(playerName(p))}</span>${c === me ? '<span class="tt">You</span>' : ""}</div>
+      <div class="rp-rate" title="Estimated from this game's accuracy (${st.accuracy ?? "?"}%) and average centipawn loss (ACPL ${acpl ?? "?"}). A rough guide, not an official rating.">
+        <b class="num">${rating ? "≈" + rating : "–"}</b><span class="summary">${rating ? "game rating" : "too few moves to estimate"}</span></div>
+      <div class="rp-rows">${rows}</div></div>`;
+  };
+  const hasCls = !!A.cls;
+  box.innerHTML = col("w") + col("b") + (hasCls ? "" : `<p class="summary rp-note">Best / good / OK counts appear once the game is analysed in your browser (Run again). Lichess's own analysis only marks mistakes.</p>`);
+  box.hidden = false;
+}
 function moveKind(k){
   const A = curGame && gAnalysis(curGame), j = A?.evals?.[k-1]?.judgment;
   if(j) return SYM[j.name][1];          // Lichess's (or the engine's) error label always wins
@@ -2427,6 +2488,7 @@ function coachLine(k, e){
   return "";
 }
 function gameSync(){
+  try { renderReport(); } catch(e){ console.warn("report", e); }
   if(mode !== "game" || !curGame) return;
   const onMain = positions[viewIdx] && mainline[viewIdx] && positions[viewIdx].fen === mainline[viewIdx].fen;
   gPly = onMain ? viewIdx : -1;
