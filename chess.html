@@ -2227,7 +2227,17 @@ async function loadGames(){
     if(res.status === 401) throw new Error("Lichess rejected your token. Paste a new one on the Today tab, or clear it.");
     if(!res.ok) throw new Error(`Lichess returned an error (${res.status}).`);
     const text = await res.text();
-    const raw = text.split("\n").filter(Boolean).map(l => { try{ return JSON.parse(l); }catch(e){ return null; } }).filter(Boolean);
+    let raw = text.split("\n").filter(Boolean).map(l => { try{ return JSON.parse(l); }catch(e){ return null; } }).filter(Boolean);
+    if(!raw.length){
+      // Lichess's time-control filter sometimes returns nothing even when matching games exist.
+      // Fall back to your latest games of every kind and pick the time controls out here.
+      const q2 = new URLSearchParams(q); q2.delete("perfType"); q2.set("max", String(Math.min(300, S.gameMax * 4)));
+      const r2 = await fetch(`${LI}/api/games/user/${encodeURIComponent(user)}?${q2}`, {headers: authHeaders({Accept:"application/x-ndjson"}), cache:"no-store"});
+      if(r2.ok){
+        raw = (await r2.text()).split("\n").filter(Boolean).map(l => { try{ return JSON.parse(l); }catch(e){ return null; } })
+          .filter(g => g && S.gameSpeeds.includes(g.speed)).slice(0, S.gameMax);
+      }
+    }
     gList = raw.filter(g => g.variant === "standard" && g.moves && !["aborted","noStart","created","started"].includes(g.status));
     gEmptyWhy = "";
     if(!gList.length) gEmptyWhy = await explainNoGames(user, raw);
