@@ -50,7 +50,7 @@ export default {
       if (env.LICHESS_TOKEN) {
         // live test: ask Lichess about the starting position
         try {
-          const t = await fetch('https://explorer.lichess.ovh/lichess?variant=standard&fen=rnbqkbnr%2Fpppppppp%2F8%2F8%2F8%2F8%2FPPPPPPPP%2FRNBQKBNR%20w%20KQkq%20-%200%201&moves=3&topGames=0&recentGames=0',
+          const t = await fetch('https://explorer.lichess.org/lichess?variant=standard&fen=rnbqkbnr%2Fpppppppp%2F8%2F8%2F8%2F8%2FPPPPPPPP%2FRNBQKBNR%20w%20KQkq%20-%200%201&moves=3&topGames=0&recentGames=0',
             { headers: { Authorization: 'Bearer ' + env.LICHESS_TOKEN, 'User-Agent': 'chess-practice-site explorer relay' }, signal: AbortSignal.timeout(20000) });
           status.lichess = t.ok ? 'OK: Lichess answered, the relay is working'
             : t.status === 401 ? 'Lichess rejected the token (401): make a new token and update the secret'
@@ -65,7 +65,7 @@ export default {
     if (!env.LICHESS_TOKEN) return reply(500, { error: 'The relay has no LICHESS_TOKEN secret yet' }, allowed);
 
     // Same question for everyone -> answer from Cloudflare's cache when we can.
-    const target = 'https://explorer.lichess.ovh' + url.pathname + url.search;
+    const target = 'https://explorer.lichess.org' + url.pathname + url.search;
     const cache = typeof caches !== 'undefined' ? caches.default : null;
     const cacheKey = new Request(target, { method: 'GET' });
     if (cache) {
