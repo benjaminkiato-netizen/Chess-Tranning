@@ -46,7 +46,18 @@ export default {
     }
     // a quick check page: open the relay's address in a browser tab to see whether it's set up
     if (url.pathname === '/' || url.pathname === '') {
-      return reply(200, { relay: 'Lichess opening explorer relay', token: env.LICHESS_TOKEN ? 'set' : 'MISSING: add a LICHESS_TOKEN secret' }, allowed);
+      const status = { relay: 'Lichess opening explorer relay', token: env.LICHESS_TOKEN ? 'set' : 'MISSING: add a LICHESS_TOKEN secret' };
+      if (env.LICHESS_TOKEN) {
+        // live test: ask Lichess about the starting position
+        try {
+          const t = await fetch('https://explorer.lichess.ovh/lichess?variant=standard&fen=rnbqkbnr%2Fpppppppp%2F8%2F8%2F8%2F8%2FPPPPPPPP%2FRNBQKBNR%20w%20KQkq%20-%200%201&moves=3&topGames=0&recentGames=0',
+            { headers: { Authorization: 'Bearer ' + env.LICHESS_TOKEN, 'User-Agent': 'chess-practice-site explorer relay' }, signal: AbortSignal.timeout(20000) });
+          status.lichess = t.ok ? 'OK: Lichess answered, the relay is working'
+            : t.status === 401 ? 'Lichess rejected the token (401): make a new token and update the secret'
+            : `Lichess answered with error ${t.status}`;
+        } catch (e) { status.lichess = 'Lichess did not answer the relay (timed out)'; }
+      }
+      return reply(200, status, allowed);
     }
     if (request.method !== 'GET') return reply(405, { error: 'Only GET is allowed' }, allowed);
     if (!allowed) return reply(403, { error: 'This relay only works for its own site' }, '');
