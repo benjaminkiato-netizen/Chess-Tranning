@@ -263,7 +263,7 @@ footer { color: var(--muted); font-size: 11px; position: fixed; right: 12px; bot
 
 /* ① ② ③ most-played marks */
 .tree .rk { margin-left: 3px; font-size: 14px; font-weight: 700; }
-.tree .rk1 { color: #f2c94c; } .tree .rk2 { color: #c9d1dc; } .tree .rk3 { color: #d8955a; }
+.tree .rk1 { color: #f2c94c; } .tree .rk2 { color: #c9d1dc; } .tree .rk3 { color: #d8955a; } .tree .rk4, .tree .rk5 { color: #8a8a98; font-weight: 600; }
 .tree .m.cur .rk { color: #fff; }
 .rk-note { margin: 6px 0 0; font-size: 12px; }
 .rk-note:empty { display: none; }
