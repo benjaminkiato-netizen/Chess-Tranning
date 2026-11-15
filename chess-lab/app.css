@@ -267,3 +267,11 @@ footer { color: var(--muted); font-size: 11px; position: fixed; right: 12px; bot
 .tree .m.cur .rk { color: #fff; }
 .rk-note { margin: 6px 0 0; font-size: 12px; }
 .rk-note:empty { display: none; }
+
+/* key-moment notes from Game Review */
+.tree .cm.key { display: inline-block; font-size: 11.5px; font-style: normal; line-height: 1.3; padding: 1px 7px; margin: 0 4px 0 2px; border-radius: 10px; border: 1px solid; white-space: nowrap; vertical-align: 1px; }
+.tree .cm.key-blunder { color: #ff8a80; border-color: rgba(255,138,128,.45); background: rgba(255,138,128,.08); }
+.tree .cm.key-mistake { color: #ffb86b; border-color: rgba(255,184,107,.45); background: rgba(255,184,107,.08); }
+.tree .cm.key-inaccuracy { color: #f2d36b; border-color: rgba(242,211,107,.45); background: rgba(242,211,107,.08); }
+.tree .cm.key-missed { color: #c9b6ff; border-color: rgba(201,182,255,.45); background: rgba(201,182,255,.08); }
+.tree .cm.key-punished { color: #7fd99a; border-color: rgba(127,217,154,.45); background: rgba(127,217,154,.08); }
