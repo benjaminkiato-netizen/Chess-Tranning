@@ -474,6 +474,11 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
 .gm-site button{padding:9px 12px}
 .gm-src{font-size:11px;font-weight:700;letter-spacing:.04em;padding:1px 5px;border-radius:4px;margin-right:6px;vertical-align:1px}
 .gm-src.cc{background:#81b64c;color:#10140c}
+.seg.tr-tabs{margin-bottom:14px;display:inline-flex}
+.tr-head > div:first-child{flex:1 1 320px;min-width:0}
+.tr-tabs button{padding:8px 14px}
+.hold-stat{font-size:14px;margin-top:2px}
+.hold-stat b{color:var(--accent,#6fcf97)}
 </style>
 </head>
 <body>
@@ -568,11 +573,14 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
 
   <!-- TRAINING -->
   <section id="train" hidden>
+    <div class="seg tr-tabs" id="trTabs" role="tablist">
+      <button data-t="later" role="tab">From puzzles</button><button data-t="hold" role="tab">🤝 Hold to a draw</button>
+    </div>
     <div class="tr-head">
       <div>
-        <div class="eyebrow">Play these later</div>
-        <h1>Train against the engine</h1>
-        <p class="summary">Positions you saved from puzzles. Play each one out against Patricia (aggressive engine) or Maia (plays like a human of your chosen rating).</p>
+        <div class="eyebrow" id="trEyebrow">Play these later</div>
+        <h1 id="trH1">Train against the engine</h1>
+        <p class="summary" id="trDesc">Positions you saved from puzzles. Play each one out against Patricia (aggressive engine) or Maia (plays like a human of your chosen rating).</p>
       </div>
       <div class="tr-score"><b class="num" id="laterCount">0</b><span class="summary">saved</span></div>
     </div>
@@ -1053,8 +1061,8 @@ function show(view){
 
 /* ---------- play a position against Patricia / Maia (Chess Lab), save positions for later ---------- */
 S.later ??= [];   // [{id, fen, you, themes, puzzleId, rating, date}]
-function playInLab(fen, you, opp){
-  localStorage.setItem("chesslab.sparStart", JSON.stringify({fen, you, opp}));
+function playInLab(fen, you, opp, hold){
+  localStorage.setItem("chesslab.sparStart", JSON.stringify({fen, you, opp, hold: hold || null}));
   window.open("chess-lab/", "_blank");   // new tab, so your puzzle session stays open here
 }
 function puzzleInfo(){
@@ -1085,7 +1093,65 @@ function miniBoard(fen, you){
 }
 function escH(v){ return String(v ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 S.laterF ??= {days: "all", stars: "all"};
+S.trainTab ??= "later";
+/* ---------- Hold to a draw: drawn positions sent from Chess Lab's Study (kept in localStorage "chesslab.holds") ---------- */
+function readHolds(){ try{ return JSON.parse(localStorage.getItem("chesslab.holds") || "[]"); }catch(e){ return []; } }
+function writeHolds(list){ try{ localStorage.setItem("chesslab.holds", JSON.stringify(list)); }catch(e){} }
+window.addEventListener("storage", e => { if(e.key === "chesslab.holds" && !$("train").hidden && S.trainTab === "hold") renderLater(); });
+function trainHeader(){
+  const hold = S.trainTab === "hold";
+  $("trTabs").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.t === S.trainTab));
+  $("trEyebrow").textContent = hold ? "Defend" : "Play these later";
+  $("trH1").textContent = hold ? "Hold to a draw" : "Train against the engine";
+  $("trDesc").textContent = hold
+    ? "Drawn positions you sent from a Study. Defend each one against Patricia or Maia for as long as you can: a draw is a win here, and every attempt records how many moves you held."
+    : "Positions you saved from puzzles. Play each one out against Patricia (aggressive engine) or Maia (plays like a human of your chosen rating).";
+}
+$("trTabs").querySelectorAll("button").forEach(b => b.onclick = () => { S.trainTab = b.dataset.t; save(); renderLater(); });
+function renderHolds(){
+  const all = readHolds();
+  $("laterCount").textContent = all.length;
+  $("laterFilters").innerHTML = "";
+  if(!all.length){
+    $("laterList").innerHTML = `<div class="card later-empty"><p class="summary" style="margin:0">No positions yet. In <b>Chess Lab → Study</b>, go to a drawn position (flip the board so your side is at the bottom) and click <b>🤝 Hold a draw</b>. It shows up here.</p></div>`;
+    return;
+  }
+  $("laterList").innerHTML = all.map(x => {
+    const stm = x.fen.split(" ")[1];
+    const tries = x.attempts || 0;
+    const last = x.last ? ({draw: "drew", win: "won", loss: "lost"}[x.last.result] || x.last.result) + ` after ${x.last.moves} move${x.last.moves === 1 ? "" : "s"}` : "";
+    const stat = tries
+      ? `<span class="hold-stat"><b>${x.held || 0}</b> of ${tries} held · best <b>${x.best || 0}</b> move${(x.best || 0) === 1 ? "" : "s"}</span><span class="summary">Last try: ${escH(last)}</span>`
+      : `<span class="summary">Not tried yet</span>`;
+    return `<div class="card later-card">
+      ${miniBoard(x.fen, x.you)}
+      <div class="later-info">
+        <b>${escH(x.opening ? x.opening.split(":")[0] : "Drawn position")}</b>
+        <span class="summary">You play ${x.you === "w" ? "White" : "Black"}, ${stm === x.you ? "you move first" : "engine moves first"}</span>
+        <span class="summary">${escH(x.name || "")}${x.at && x.at !== "start" ? ` · after ${escH(x.at)}` : ""}</span>
+        ${stat}
+      </div>
+      <div class="later-btns">
+        <button class="primary" data-hplay="patricia" data-id="${x.id}">▶ vs Patricia</button>
+        <button data-hplay="maia" data-id="${x.id}">▶ vs Maia</button>
+        <a class="sf-link" href="https://lichess.org/?fen=${encodeURIComponent(x.fen)}#ai" target="_blank" rel="noopener" title="Play this position against Stockfish on Lichess">vs Stockfish on Lichess ↗</a>
+        <button class="link" data-hrm="${x.id}">Remove</button>
+      </div></div>`;
+  }).join("");
+  $("laterList").querySelectorAll("[data-hplay]").forEach(b => b.onclick = () => {
+    const x = readHolds().find(y => y.id === b.dataset.id); if(x) playInLab(x.fen, x.you, b.dataset.hplay, x.id);
+  });
+  $("laterList").querySelectorAll("[data-hrm]").forEach(b => {
+    let armed = false;
+    b.onclick = () => {
+      if(!armed){ armed = true; b.textContent = "Tap again to remove"; setTimeout(() => { armed = false; b.textContent = "Remove"; }, 3000); return; }
+      writeHolds(readHolds().filter(y => y.id !== b.dataset.hrm)); renderLater();
+    };
+  });
+}
 function renderLater(){
+  trainHeader();
+  if(S.trainTab === "hold") return renderHolds();
   const all = S.later || [];
   const F = S.laterF;
   const cutoff = F.days === "all" ? null : (() => { const d = new Date(); d.setDate(d.getDate() - (+F.days - 1)); return dkey(d); })();

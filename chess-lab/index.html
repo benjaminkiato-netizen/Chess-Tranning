@@ -8,7 +8,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="vendor/chessground.base.css">
   <link rel="stylesheet" href="pieces.css?v=e1ff53eb">
-  <link rel="stylesheet" href="app.css?v=bab8a871">
+  <link rel="stylesheet" href="app.css?v=c04d8f6a">
 </head>
 <body>
   <div id="err-banner" style="display:none;position:fixed;left:12px;right:12px;bottom:12px;z-index:100;background:#5c1a1a;color:#fff;border:1px solid #ff5e57;border-radius:10px;padding:10px 14px;font:13px/1.4 system-ui,sans-serif;white-space:pre-wrap"></div>
@@ -76,6 +76,7 @@
       </div>
       <div class="card">
         <div class="matchup"><span class="avatar" id="spar-opp-av">P</span><b id="spar-opp-name">Patricia</b><span class="pmeta" id="spar-top-meta"></span><span class="vs">vs</span><span class="avatar you">Y</span><b>You</b><button class="flip-mini" id="spar-flip2" title="Flip board (F)">⇅</button></div>
+        <div class="hold-bar" id="spar-hold" hidden></div>
         <div class="status" id="spar-status">Engine loading…</div>
         <ol class="movelist" id="spar-moves"></ol>
         <div class="row">
@@ -252,6 +253,7 @@
           <button id="st-promote" title="Move this line up one level">Promote</button>
           <button id="st-mainline" title="Make this the main line">Make main line</button>
           <button id="st-losing" class="losing-btn">Mark losing</button>
+          <button id="st-hold" title="Save this position to the chess page's Training tab, to practise holding the draw against the engine">🤝 Hold a draw</button>
           <button id="st-delete" class="danger" title="Delete this move and everything after it">Delete from here</button>
         </div>
         <textarea id="st-comment" rows="2" placeholder="Comment on this move…"></textarea>
@@ -261,6 +263,6 @@
   </main>
 
   <footer>Engines: <a href="https://github.com/Adam-Kulju/Patricia" target="_blank" rel="noopener">Patricia</a> by Adam Kulju (GPL-3.0) · <a href="https://github.com/CSSLab/maia-platform-frontend" target="_blank" rel="noopener">Maia 3</a> by the CSSLab, University of Toronto (GPL-3.0). Everything runs in your browser.</footer>
-  <script type="module" src="app.js?v=e177bcd8"></script>
+  <script type="module" src="app.js?v=486d0a34"></script>
 </body>
 </html>
