@@ -275,3 +275,33 @@ footer { color: var(--muted); font-size: 11px; position: fixed; right: 12px; bot
 .tree .cm.key-inaccuracy { color: #f2d36b; border-color: rgba(242,211,107,.45); background: rgba(242,211,107,.08); }
 .tree .cm.key-missed { color: #c9b6ff; border-color: rgba(201,182,255,.45); background: rgba(201,182,255,.08); }
 .tree .cm.key-punished { color: #7fd99a; border-color: rgba(127,217,154,.45); background: rgba(127,217,154,.08); }
+
+/* ---------- Openings page (same layout as the chess page's "Train against the engine") ---------- */
+#openings.panel.active { display: block; }
+.op-page { max-width: 1120px; margin: 24px auto; padding: 0 20px 40px; }
+.op-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 22px; }
+.op-head h1 { margin: 2px 0 6px; font-size: 30px; }
+.op-head p { margin: 0; }
+.op-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.op-total { text-align: center; flex: none; }
+.op-total b { display: block; font-size: 30px; color: var(--accent-2); line-height: 1.1; }
+.op-total span { color: var(--muted); font-size: 14px; }
+.op-filters { display: flex; flex-wrap: wrap; gap: 10px 26px; align-items: center; margin: 18px 0 4px; }
+.op-f { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
+.op-seg button { font-size: 13px; padding: 5px 11px; }
+.op-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-top: 16px; }
+.op-card { display: flex; flex-direction: column; gap: 10px; text-align: left; padding: 16px; cursor: pointer; color: var(--text); font: inherit; border: 1px solid var(--line); transition: border-color .15s, transform .15s; }
+.op-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.op-board { position: relative; width: 100%; aspect-ratio: 1; border-radius: 3px; overflow: hidden; background-color: #eed5a4;
+  background-image: conic-gradient(#355a31 0 25%, transparent 0 50%, #355a31 0 75%, transparent 0); background-size: 25% 25%; }
+.op-board piece { position: absolute; top: 0; left: 0; width: 12.5%; height: 12.5%; }
+.op-info { display: flex; flex-direction: column; gap: 3px; }
+.op-name { font-weight: 700; font-size: 16px; }
+.op-eco { font-size: 12px; font-weight: 700; color: var(--accent-2); margin-left: 4px; }
+.op-vars { color: var(--muted); font-size: 13px; }
+.op-counts { font-size: 14px; margin-top: 2px; }
+.op-counts b { color: var(--accent-2); }
+.op-meta { color: var(--muted); font-size: 12.5px; }
+.op-go { margin-top: auto; align-self: flex-start; font-size: 13px; font-weight: 600; color: var(--accent-2); }
+.op-empty { grid-column: 1 / -1; color: var(--muted); }
+@media (max-width: 600px) { .op-head h1 { font-size: 24px; } .op-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); } }

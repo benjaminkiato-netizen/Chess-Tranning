@@ -8,7 +8,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="vendor/chessground.base.css">
   <link rel="stylesheet" href="pieces.css?v=e1ff53eb">
-  <link rel="stylesheet" href="app.css?v=59613ad8">
+  <link rel="stylesheet" href="app.css?v=bab8a871">
 </head>
 <body>
   <div id="err-banner" style="display:none;position:fixed;left:12px;right:12px;bottom:12px;z-index:100;background:#5c1a1a;color:#fff;border:1px solid #ff5e57;border-radius:10px;padding:10px 14px;font:13px/1.4 system-ui,sans-serif;white-space:pre-wrap"></div>
@@ -34,6 +34,7 @@
     <nav class="tabs" role="tablist">
       <button class="tab active" data-tab="spar" role="tab">Spar</button>
       <button class="tab" data-tab="review" role="tab">Game Review</button>
+      <button class="tab" data-tab="openings" role="tab">Openings</button>
       <button class="tab" data-tab="study" role="tab">Study</button>
     </nav>
     <button class="snd" id="sync-btn" title="Sync between browsers" onclick="window.HubSync && HubSync.openPanel()">☁</button>
@@ -160,6 +161,29 @@
   </main>
 
   <!-- STUDY -->
+  <!-- OPENINGS: your studies grouped by opening -->
+  <main id="openings" class="panel">
+    <div class="op-page">
+      <div class="card op-head">
+        <div>
+          <div class="op-eyebrow">Your studies by opening</div>
+          <h1>Openings</h1>
+          <p class="muted" id="op-sub">Every game in your studies, sorted by opening. Click one to study it.</p>
+        </div>
+        <div class="op-total"><b id="op-count">0</b><span>openings</span></div>
+      </div>
+      <div class="op-filters">
+        <div class="op-f"><span>You played</span>
+          <div class="seg op-seg" id="op-side"><button data-v="">All</button><button data-v="white">White</button><button data-v="black">Black</button></div>
+        </div>
+        <div class="op-f"><span>Updated</span>
+          <div class="seg op-seg" id="op-days"><button data-v="7">7 days</button><button data-v="14">14 days</button><button data-v="30">30 days</button><button data-v="">All</button></div>
+        </div>
+      </div>
+      <div class="op-grid" id="op-grid"></div>
+    </div>
+  </main>
+
   <main id="study" class="panel">
     <section class="board-col">
       <div class="board-row">
@@ -237,6 +261,6 @@
   </main>
 
   <footer>Engines: <a href="https://github.com/Adam-Kulju/Patricia" target="_blank" rel="noopener">Patricia</a> by Adam Kulju (GPL-3.0) · <a href="https://github.com/CSSLab/maia-platform-frontend" target="_blank" rel="noopener">Maia 3</a> by the CSSLab, University of Toronto (GPL-3.0). Everything runs in your browser.</footer>
-  <script type="module" src="app.js?v=77bab78b"></script>
+  <script type="module" src="app.js?v=e177bcd8"></script>
 </body>
 </html>
