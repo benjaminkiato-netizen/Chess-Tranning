@@ -479,6 +479,57 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
 .tr-tabs button{padding:8px 14px}
 .hold-stat{font-size:14px;margin-top:2px}
 .hold-stat b{color:var(--accent,#6fcf97)}
+
+/* ---------- Puzzle Rush ---------- */
+.rush-grid{display:grid;gap:24px;justify-content:center;grid-template-columns:auto;align-items:start}
+@media (min-width: 980px){ .rush-grid{grid-template-columns:auto 320px} }
+.rush-boardwrap{position:relative}
+#rushBoard{width:min(760px, calc(100vw - 32px - 22px), calc(100vh - 200px));max-width:none;min-width:260px}
+.rush-flash{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%) scale(.8);font-size:54px;font-weight:800;opacity:0;pointer-events:none;transition:opacity .15s, transform .15s;text-shadow:0 2px 12px rgba(0,0,0,.6);z-index:5}
+.rush-flash.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.rush-flash.good{color:#7fe3a0} .rush-flash.bad{color:#ff7a70}
+.rush-ghost{position:fixed;z-index:50;pointer-events:none}
+.rush-panel{padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.rush-panel h1{margin:2px 0 0;font-size:24px}
+.rush-rules{margin:0;padding-left:18px;color:var(--muted,#9aa);font-size:14px;line-height:1.6}
+.rush-rules b{color:var(--text,#eee)}
+.rush-best{font-size:14px}
+.rush-best b{color:var(--accent)}
+.rush-go{font-size:17px;padding:12px}
+.rush-note{margin:0}
+.rush-top{display:flex;justify-content:space-between;align-items:center}
+.rush-clock{font-size:46px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.rush-clock.low{color:#ff7a70}
+.rush-score{text-align:right}
+.rush-score b{display:block;font-size:46px;line-height:1;color:var(--accent)}
+.rush-score span{font-size:13px;color:var(--muted,#9aa)}
+.rush-combo-lbl{display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px}
+.rush-combo-lbl span:last-child{color:var(--muted,#9aa)}
+.rush-bar{height:8px;border-radius:5px;background:rgba(255,255,255,.08);overflow:hidden}
+.rush-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.rush-status{font-weight:600}
+.rush-pz b{color:var(--text,#eee)}
+#rushStop{align-self:flex-start}
+.rush-final{display:flex;align-items:baseline;gap:10px}
+.rush-final b{font-size:56px;line-height:1;color:var(--accent)}
+.rush-newbest{font-weight:700;color:#f2c94c}
+.rush-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.rush-stats div{display:flex;flex-direction:column;background:rgba(255,255,255,.04);border-radius:8px;padding:8px}
+.rush-stats b{font-size:20px}
+.rush-stats span{font-size:12px;color:var(--muted,#9aa)}
+.rush-list{display:flex;flex-wrap:wrap;gap:6px}
+.rush-item{font-size:12px;padding:3px 7px;border-radius:6px;text-decoration:none;border:1px solid var(--line)}
+.rush-item.ok{color:#7fe3a0;border-color:rgba(127,227,160,.35)}
+.rush-item.bad{color:#ff7a70;border-color:rgba(255,122,112,.35)}
+.rush-hist{margin:22px auto 0;max-width:1110px;padding:16px 20px}
+.rush-hist-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:8px}
+.rush-bars{display:flex;align-items:flex-end;gap:3px;height:40px;min-width:120px}
+.rush-bars i{display:block;width:8px;background:var(--accent);opacity:.75;border-radius:2px 2px 0 0}
+.rush-table{width:100%;border-collapse:collapse;font-size:14px}
+.rush-table th{text-align:left;font-weight:500;color:var(--muted,#9aa);padding:6px 4px;border-bottom:1px solid var(--line)}
+.rush-table td{padding:6px 4px;border-bottom:1px solid rgba(255,255,255,.04)}
+.dash-rush{margin-bottom:18px}
+.dash-rush .rush-bars{margin:8px 0 0 4px}
 </style>
 </head>
 <body>
@@ -489,6 +540,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
     <button data-view="home" class="on" id="tabToday">Today</button>
     <button data-view="dash" id="tabDash">Dashboard</button>
     <button data-view="train" id="tabTrain">Training</button>
+    <button data-view="rush" id="tabRush">Rush</button>
     <button data-view="games" id="tabGames">Games</button>
     <button data-view="play" id="tabPlay">Play</button>
     <a href="chess-lab/" class="homelink" style="margin:0 0 0 auto">Spar &amp; Review →</a>
@@ -623,7 +675,54 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
   </section>
 
   <!-- DASHBOARD -->
+  <section id="rush" hidden>
+    <div class="rush-grid">
+      <div class="rush-boardwrap">
+        <div class="board" id="rushBoard" aria-label="Puzzle Rush board"></div>
+        <div class="rush-flash" id="rushFlash" aria-live="polite"></div>
+      </div>
+      <aside class="rush-side">
+        <div class="card rush-panel" id="rushIntro">
+          <div class="eyebrow">Puzzle Rush</div>
+          <h1>Solve as many as you can</h1>
+          <ul class="rush-rules">
+            <li><b>3 minutes</b> on the clock. It starts with your first move.</li>
+            <li>Puzzles start easy and get harder.</li>
+            <li>A wrong move costs <b>10 seconds</b> and skips the puzzle.</li>
+            <li>Streaks earn time: <b>+3s</b> at 5 in a row, <b>+5s</b> at 12, <b>+7s</b> at 20, <b>+10s</b> at 30 and every 10 after.</li>
+          </ul>
+          <div class="rush-best" id="rushBestLine"></div>
+          <button class="primary rush-go" id="rushStart" disabled>Loading puzzles…</button>
+          <p class="summary rush-note" id="rushLoadNote"></p>
+        </div>
+        <div class="card rush-panel" id="rushRun" hidden>
+          <div class="rush-top">
+            <div class="rush-clock" id="rushClock">3:00</div>
+            <div class="rush-score"><b id="rushScore">0</b><span>solved</span></div>
+          </div>
+          <div class="rush-combo">
+            <div class="rush-combo-lbl"><span>Streak <b id="rushCombo">0</b></span><span id="rushNext">+3s at 5</span></div>
+            <div class="rush-bar"><i id="rushBar"></i></div>
+          </div>
+          <div class="rush-status" id="rushStatus">Clock starts with your first move.</div>
+          <div class="summary rush-pz" id="rushPz"></div>
+          <button class="link" id="rushStop">End run</button>
+        </div>
+        <div class="card rush-panel" id="rushEnd" hidden>
+          <div class="eyebrow">Run finished</div>
+          <div class="rush-final"><b id="rushFinal">0</b><span>puzzles solved</span></div>
+          <div class="rush-newbest" id="rushNewBest" hidden>🏆 New personal best!</div>
+          <div class="rush-stats" id="rushStats"></div>
+          <button class="primary rush-go" id="rushAgain">Play again</button>
+          <div class="rush-list" id="rushList"></div>
+        </div>
+      </aside>
+    </div>
+    <div class="card rush-hist" id="rushHist"></div>
+  </section>
+
   <section id="dash" hidden>
+    <div id="dashRush" class="dash-rush"></div>
     <div class="dash-head">
       <div>
         <div class="eyebrow">Lichess puzzle dashboard</div>
@@ -1054,6 +1153,8 @@ function show(view){
   $("tabTrain").classList.toggle("on", view==="train");
   $("games").hidden = view!=="games"; $("tabGames").classList.toggle("on", view==="games");
   $("play").hidden = view!=="play"; $("tabPlay").classList.toggle("on", view==="play");
+  $("rush").hidden = view!=="rush"; $("tabRush").classList.toggle("on", view==="rush");
+  if(view !== "rush" && typeof rushLeave === "function") rushLeave();
   $("tabs").hidden = view==="drill";
   $("tabToday").classList.toggle("on", view==="home"); $("tabDash").classList.toggle("on", view==="dash");
   if(view !== "drill") window.scrollTo(0,0);
@@ -1827,18 +1928,304 @@ $("back").onclick = () => {
 };
 /* open a tab the same way its button does (used by "back" and after a reload) */
 function goTo(view){
-  if(view === "dash"){ show("dash"); loadDash(); }
+  if(view === "dash"){ show("dash"); renderRushDash(); loadDash(); }
   else if(view === "train"){ show("train"); renderTrain(); }
   else if(view === "games") gamesTab();
   else if(view === "play") playTab();
+  else if(view === "rush"){ show("rush"); rushTab(); }
   else { show("home"); renderHome(); }
 }
 $("tabToday").onclick = () => { show("home"); renderHome(); };
-$("tabDash").onclick = () => { show("dash"); loadDash(); };
+$("tabDash").onclick = () => { show("dash"); renderRushDash(); loadDash(); };
 $("sendLichess").checked = S.submit;
 $("sendLichess").onchange = e => { S.submit = e.target.checked; save(); renderSendNote(); if(S.submit) flushOutbox().catch(()=>{}); };
 renderSendNote();
 flushOutbox().catch(()=>{});   // retry anything that didn't send last time
+
+/* ---------- Puzzle Rush: solo timed run, like Lichess Puzzle Storm ---------- */
+S.rush ??= {runs: []};                // runs: [{t, score, highest, combo, acc, moves}]
+const RUSH_TIME = 180;               // seconds
+const RUSH_BONUS = [[5, 3], [12, 5], [20, 7], [30, 10]];   // streak -> seconds; then +10 every 10
+let rushPool = null, rushLoading = null;
+let R = null;                         // the run in progress
+function rushBonusAt(c){ for(const [n, b] of RUSH_BONUS) if(c === n) return b; return c > 30 && c % 10 === 0 ? 10 : 0; }
+function rushNextBonus(c){ for(const [n, b] of RUSH_BONUS) if(c < n) return [n, b]; return [Math.floor(c / 10) * 10 + 10, 10]; }
+function rushPrevMark(c){ let m = 0; for(const [n] of RUSH_BONUS) if(c >= n) m = n; return c > 30 ? Math.floor(c / 10) * 10 : m; }
+
+// Puzzles: three batches of mixed themes at different difficulties, merged into one easy-to-hard ramp.
+async function rushFetch(difficulty, nb){
+  const res = await fetch(`https://lichess.org/api/puzzle/batch/mix?nb=${nb}&difficulty=${difficulty}`, {headers: authHeaders()});
+  if(res.status === 429) throw new Error("Lichess is busy rate-limiting puzzle requests. Wait a minute and reload this tab.");
+  if(res.status === 401) throw new Error("Lichess rejected your API token. Paste a new one in settings on the Today tab.");
+  if(!res.ok) throw new Error(`Lichess returned an error (${res.status}). Check your connection and try again.`);
+  return ((await res.json()).puzzles || []).map(p => ({game: {pgn: p.game.pgn}, puzzle: p.puzzle}));
+}
+function rushLoad(){
+  if(rushPool && rushPool.length >= 40) return Promise.resolve(rushPool);
+  if(rushLoading) return rushLoading;
+  rushLoading = (async () => {
+    const all = [];
+    for(const [d, n] of [["easiest", 50], ["normal", 50], ["hardest", 40]]){ all.push(...await rushFetch(d, n)); }
+    const seen = new Set(), uniq = all.filter(p => !seen.has(p.puzzle.id) && seen.add(p.puzzle.id)).sort((a, b) => a.puzzle.rating - b.puzzle.rating);
+    // a ramp: aim for steadily rising ratings rather than walking through every easy puzzle first
+    const lo = uniq[0].puzzle.rating, hi = uniq[uniq.length - 1].puzzle.rating, steps = Math.min(90, uniq.length);
+    const left = uniq.slice(), ramp = [];
+    for(let i = 0; i < steps && left.length; i++){
+      const target = lo + (hi - lo) * Math.pow(i / (steps - 1), 1.15);
+      let k = 0, best = Infinity;
+      left.forEach((p, j) => { const dd = Math.abs(p.puzzle.rating - target); if(dd < best){ best = dd; k = j; } });
+      ramp.push(left.splice(k, 1)[0]);
+    }
+    rushPool = ramp;
+    return ramp;
+  })().finally(() => { rushLoading = null; });
+  return rushLoading;
+}
+
+function rushTab(){
+  rushRenderIntro();
+  rushHistory();
+  if(!R) rushShowPanel("intro");
+  if(!R || R.over) rushDrawIdle();
+  rushLoad().then(() => { $("rushStart").disabled = false; $("rushStart").textContent = "Start"; $("rushLoadNote").textContent = ""; })
+    .catch(e => { $("rushStart").disabled = true; $("rushStart").textContent = "Couldn't load puzzles"; $("rushLoadNote").textContent = e.message; });
+}
+function rushLeave(){ if(R && !R.over && R.started) rushEnd("left"); }
+function rushShowPanel(which){ $("rushIntro").hidden = which !== "intro"; $("rushRun").hidden = which !== "run"; $("rushEnd").hidden = which !== "end"; }
+function rushBest(){ return (S.rush.runs || []).reduce((m, r) => Math.max(m, r.score), 0); }
+function rushRenderIntro(){
+  const runs = S.rush.runs || [], best = rushBest();
+  const today = runs.filter(r => new Date(r.t).toDateString() === new Date().toDateString());
+  $("rushBestLine").innerHTML = runs.length
+    ? `Personal best <b>${best}</b>${today.length ? ` · today's best <b>${Math.max(...today.map(r => r.score))}</b>` : ""} · ${runs.length} run${runs.length === 1 ? "" : "s"}`
+    : "No runs yet. Your scores are saved here and on the Dashboard.";
+}
+function rushDrawIdle(){
+  const g = new Chess(); R = R && !R.over ? R : null;
+  rushDraw({game: g, color: "w", lastMove: null, selected: null});
+}
+
+// ----- one run -----
+function rushStart(){
+  if(!rushPool || !rushPool.length) return;
+  R = {queue: rushPool.slice(), idx: -1, time: RUSH_TIME * 1000, started: false, startedAt: 0, over: false,
+       score: 0, combo: 0, bestCombo: 0, moves: 0, errors: 0, results: [], busy: false, pz: null};
+  rushPool = null;              // fresh puzzles next time
+  rushLoad().catch(() => {});   // start fetching the next set in the background
+  rushShowPanel("run");
+  $("rushClock").classList.remove("low");
+  rushUpdateHud();
+  rushNextPuzzle();
+}
+function rushNextPuzzle(){
+  if(!R || R.over) return;
+  R.idx++;
+  const p = R.queue[R.idx];
+  if(!p){ rushEnd("out"); return; }
+  const g = new Chess();
+  g.load_pgn(p.game.pgn, {sloppy: true});
+  const plies = p.puzzle.initialPly + 1, hist = g.history();
+  let game = g;
+  if(hist.length > plies){ game = new Chess(); hist.slice(0, plies).forEach(m => game.move(m)); }
+  const v = game.history({verbose: true}), lm = v[v.length - 1];
+  R.pz = {p, game, color: game.turn(), sol: p.puzzle.solution, step: 0, lastMove: lm ? [lm.from, lm.to] : null, selected: null, failed: false, t0: performance.now()};
+  $("rushStatus").textContent = `${R.pz.color === "w" ? "White" : "Black"} to move.${R.started ? "" : " The clock starts with your first move."}`;
+  $("rushPz").innerHTML = `Puzzle ${R.idx + 1} · rating <b>${p.puzzle.rating}</b>`;
+  rushDraw(R.pz);
+}
+function rushTryMove(from, to){
+  const z = R && R.pz; if(!z || R.over || R.busy) return;
+  const piece = z.game.get(from);
+  if(!piece || piece.color !== z.color) return;
+  const exp = z.sol[z.step];
+  let promo;
+  if(piece.type === "p" && (to[1] === "8" || to[1] === "1")) promo = (exp && exp.slice(0, 4) === from + to && exp[4]) || "q";
+  const mv = z.game.move({from, to, promotion: promo});
+  if(!mv){ z.selected = null; rushDraw(z); return; }
+  if(!R.started){ R.started = true; R.startedAt = performance.now(); rushTick(); }
+  R.moves++;
+  const uci = from + to + (mv.promotion || "");
+  const last = z.step === z.sol.length - 1;
+  const ok = uci === exp || (last && z.game.in_checkmate());   // any mate on the final move counts
+  z.lastMove = [from, to]; z.selected = null;
+  if(!ok){
+    R.errors++; R.combo = 0; R.time -= 10000; z.failed = true;
+    sound("error"); rushFlash("−10s", "bad");
+    rushDraw(z, to);
+    R.results.push({p: z.p, ok: false, ms: performance.now() - z.t0});
+    rushUpdateHud();
+    R.busy = true;
+    setTimeout(() => { if(!R || R.over) return; R.busy = false; rushNextPuzzle(); }, 450);
+    return;
+  }
+  moveSound(mv);
+  z.step++;
+  if(z.step >= z.sol.length){ rushSolved(); return; }
+  // the opponent's reply from the solution
+  R.busy = true; rushDraw(z);
+  setTimeout(() => {
+    if(!R || R.over || R.pz !== z) return;
+    const u = z.sol[z.step];
+    const r = z.game.move({from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4]});
+    moveSound(r); z.lastMove = [u.slice(0, 2), u.slice(2, 4)]; z.step++;
+    R.busy = false; rushDraw(z);
+    if(z.step >= z.sol.length) rushSolved();
+  }, 160);
+}
+function rushSolved(){
+  const z = R.pz;
+  R.score++; R.combo++; R.bestCombo = Math.max(R.bestCombo, R.combo);
+  R.results.push({p: z.p, ok: true, ms: performance.now() - z.t0});
+  const bonus = rushBonusAt(R.combo);
+  if(bonus){ R.time += bonus * 1000; rushFlash(`+${bonus}s`, "good"); sound("solved"); }
+  rushUpdateHud();
+  R.busy = true;
+  setTimeout(() => { if(!R || R.over) return; R.busy = false; rushNextPuzzle(); }, 220);
+}
+function rushRemaining(){ return R ? Math.max(0, R.time - (R.started ? performance.now() - R.startedAt : 0)) : 0; }
+function rushTick(){
+  if(!R || R.over || !R.started) return;
+  const ms = rushRemaining();
+  const sec = Math.ceil(ms / 1000);
+  $("rushClock").textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+  $("rushClock").classList.toggle("low", sec <= 20);
+  if(ms <= 0){ rushEnd("time"); return; }
+  requestAnimationFrame(rushTick);
+}
+function rushUpdateHud(){
+  $("rushScore").textContent = R.score;
+  $("rushCombo").textContent = R.combo;
+  const [n, b] = rushNextBonus(R.combo), prev = rushPrevMark(R.combo);
+  $("rushNext").textContent = `+${b}s at ${n}`;
+  $("rushBar").style.width = `${Math.min(100, 100 * (R.combo - prev) / Math.max(1, n - prev))}%`;
+  if(!R.started){ const sec = Math.ceil(R.time / 1000); $("rushClock").textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`; }
+}
+function rushFlash(text, cls){
+  const f = $("rushFlash"); f.textContent = text; f.className = "rush-flash show " + cls;
+  clearTimeout(rushFlash.t); rushFlash.t = setTimeout(() => { f.className = "rush-flash"; }, 700);
+}
+function rushEnd(why){
+  if(!R || R.over) return;
+  R.over = true; R.busy = false;
+  if(!R.started && !R.results.length){ R = null; rushShowPanel("intro"); rushTab(); return; }   // never actually played
+  const solved = R.results.filter(x => x.ok);
+  const run = {t: Date.now(), score: R.score, highest: solved.reduce((m, x) => Math.max(m, x.p.puzzle.rating), 0),
+    combo: R.bestCombo, moves: R.moves, acc: R.moves ? Math.round(100 * (R.moves - R.errors) / R.moves) : 0, errors: R.errors};
+  const prevBest = rushBest();
+  S.rush.runs = [...(S.rush.runs || []), run].slice(-300);
+  save();
+  sound(run.score > prevBest ? "win" : "draw");
+  $("rushFinal").textContent = run.score;
+  $("rushNewBest").hidden = !(run.score > prevBest && prevBest > 0);
+  const avg = solved.length ? (solved.reduce((t, x) => t + x.ms, 0) / solved.length / 1000).toFixed(1) : "–";
+  $("rushStats").innerHTML = [
+    ["Moves", run.moves], ["Accuracy", run.acc + "%"], ["Best streak", run.combo],
+    ["Highest solved", run.highest || "–"], ["Time per puzzle", avg === "–" ? "–" : avg + "s"], ["Mistakes", run.errors],
+  ].map(([k, v]) => `<div><b class="num">${v}</b><span>${k}</span></div>`).join("") +
+    (why === "out" ? `<p class="summary" style="grid-column:1/-1;margin:4px 0 0">You went through every puzzle in this set!</p>` : "");
+  $("rushList").innerHTML = R.results.map(x => `<a class="rush-item ${x.ok ? "ok" : "bad"}" href="https://lichess.org/training/${x.p.puzzle.id}" target="_blank" rel="noopener" title="Open on Lichess">${x.ok ? "✓" : "✗"} ${x.p.puzzle.rating}</a>`).join("");
+  rushShowPanel("end");
+  rushHistory();
+  rushRenderIntro();
+}
+
+// ----- board (same look as the puzzle board: click or drag) -----
+function rushDraw(z, badSq){
+  const b = $("rushBoard"); b.innerHTML = "";
+  const files = "abcdefgh", g = z.game;
+  const targets = z.selected ? g.moves({square: z.selected, verbose: true}).map(m => m.to) : [];
+  const checkSq = g.in_check() ? (() => { for(const f of files) for(let r = 1; r <= 8; r++){ const pc = g.get(f + r); if(pc && pc.type === "k" && pc.color === g.turn()) return f + r; } })() : null;
+  for(let r = 0; r < 8; r++) for(let c = 0; c < 8; c++){
+    const rank = z.color === "w" ? 8 - r : r + 1, file = z.color === "w" ? files[c] : files[7 - c], sq = file + rank;
+    const pc = g.get(sq);
+    const el = document.createElement("div");
+    el.className = "sq " + ((r + c) % 2 ? "d" : "l");
+    if(z.lastMove && z.lastMove.includes(sq)) el.classList.add("last");
+    if(sq === z.selected) el.classList.add("sel");
+    if(sq === badSq) el.classList.add("bad");
+    if(sq === checkSq) el.classList.add("check");
+    if(targets.includes(sq)) el.classList.add("tgt", ...(pc ? ["occ"] : []));
+    if(pc) el.innerHTML = `<img class="pc" src="${PIECES[pc.color + pc.type]}" alt="" draggable="false">`;
+    if(c === 7) el.insertAdjacentHTML("beforeend", `<span class="coord r">${rank}</span>`);
+    if(r === 7) el.insertAdjacentHTML("beforeend", `<span class="coord f">${file}</span>`);
+    el.dataset.sq = sq;
+    b.appendChild(el);
+  }
+}
+(function rushInput(){
+  const b = $("rushBoard");
+  let drag = null;
+  const sqAt = (x, y) => { const el = document.elementFromPoint(x, y)?.closest("#rushBoard .sq"); return el ? el.dataset.sq : null; };
+  b.addEventListener("pointerdown", e => {
+    const z = R && R.pz; if(!z || R.over || R.busy) return;
+    const sq = e.target.closest(".sq")?.dataset.sq; if(!sq) return;
+    const pc = z.game.get(sq);
+    if(z.selected && z.selected !== sq && !(pc && pc.color === z.color)){ rushTryMove(z.selected, sq); return; }
+    if(pc && pc.color === z.color){
+      z.selected = sq; rushDraw(z);
+      const img = b.querySelector(`.sq[data-sq="${sq}"] .pc`);
+      if(img){
+        const rect = img.getBoundingClientRect();
+        const ghost = img.cloneNode(); ghost.className = "pc rush-ghost";
+        Object.assign(ghost.style, {width: rect.width + "px", height: rect.height + "px", left: (e.clientX - rect.width / 2) + "px", top: (e.clientY - rect.height / 2) + "px"});
+        document.body.appendChild(ghost); img.style.opacity = ".25";
+        drag = {from: sq, ghost, w: rect.width, h: rect.height, moved: false};
+        b.setPointerCapture(e.pointerId);
+      }
+    }
+  });
+  b.addEventListener("pointermove", e => {
+    if(!drag) return;
+    drag.moved = true;
+    drag.ghost.style.left = (e.clientX - drag.w / 2) + "px"; drag.ghost.style.top = (e.clientY - drag.h / 2) + "px";
+  });
+  const finish = e => {
+    if(!drag) return;
+    const d = drag; drag = null; d.ghost.remove();
+    const to = sqAt(e.clientX, e.clientY);
+    if(to && to !== d.from) rushTryMove(d.from, to);
+    else if(R && R.pz) rushDraw(R.pz);
+  };
+  b.addEventListener("pointerup", finish);
+  b.addEventListener("pointercancel", e => { if(drag){ drag.ghost.remove(); drag = null; if(R && R.pz) rushDraw(R.pz); } });
+})();
+$("rushStart").onclick = () => rushStart();
+$("rushAgain").onclick = () => { R = null; rushShowPanel("intro"); rushTab(); };
+$("rushStop").onclick = () => { if(R && R.started) rushEnd("stop"); else { R = null; rushShowPanel("intro"); rushDrawIdle(); } };
+$("tabRush").onclick = () => goTo("rush");
+
+// recent runs under the board, and the Dashboard card
+function rushBars(runs){
+  const max = Math.max(1, ...runs.map(r => r.score));
+  return `<div class="rush-bars">${runs.map(r => `<i style="height:${Math.max(4, 100 * r.score / max)}%" title="${new Date(r.t).toLocaleDateString()}: ${r.score} solved"></i>`).join("")}</div>`;
+}
+function rushHistory(){
+  const runs = S.rush.runs || [];
+  if(!runs.length){ $("rushHist").hidden = true; return; }
+  $("rushHist").hidden = false;
+  const last = runs.slice(-12).reverse();
+  $("rushHist").innerHTML = `<div class="rush-hist-head"><b>Recent runs</b>${rushBars(runs.slice(-30))}</div>
+    <table class="rush-table"><thead><tr><th>Date</th><th>Solved</th><th>Highest</th><th>Best streak</th><th>Accuracy</th></tr></thead><tbody>
+    ${last.map(r => `<tr><td>${new Date(r.t).toLocaleDateString()}</td><td><b>${r.score}</b></td><td>${r.highest || "–"}</td><td>${r.combo}</td><td>${r.acc}%</td></tr>`).join("")}</tbody></table>`;
+}
+function renderRushDash(){
+  const el = $("dashRush"); if(!el) return;
+  const runs = S.rush.runs || [];
+  if(!runs.length){ el.innerHTML = `<div class="theme-row global"><div class="info"><h3>Puzzle Rush</h3><p>No runs yet. Try a 3-minute <a href="#" id="dashRushGo">Puzzle Rush</a>.</p></div></div>`; }
+  else {
+    const wk = runs.filter(r => r.t > Date.now() - 7 * 86400000);
+    const avg = wk.length ? Math.round(wk.reduce((t, r) => t + r.score, 0) / wk.length) : "–";
+    el.innerHTML = `<div class="theme-row global">
+      <div class="info"><h3>Puzzle Rush</h3><p>3-minute runs. <a href="#" id="dashRushGo">Play one →</a></p></div>
+      <div class="tiles">
+        <div class="tile played"><b class="num">${rushBest()}</b><span>Best</span></div>
+        <div class="tile perf"><b class="num">${wk.length ? Math.max(...wk.map(r => r.score)) : "–"}</b><span>Best, 7 days</span></div>
+        <div class="tile ghost"><b class="num">${avg}</b><span>Average, 7 days</span></div>
+        <div class="tile ghost"><b class="num">${runs.length}</b><span>Runs</span></div>
+      </div></div>${rushBars(runs.slice(-30))}`;
+  }
+  const go = $("dashRushGo"); if(go) go.onclick = e => { e.preventDefault(); goTo("rush"); };
+}
 
 /* ---------- dashboard ---------- */
 const DESC = {
@@ -2953,7 +3340,7 @@ setTimeout(function restoreView(){
   if(v && v.view === "drill" && v.mode === "game"){ goTo("games"); return; }
   if(v && v.view === "drill" && v.mode === "live"){ goTo("play"); return; }
   if(v && v.view === "drill" && v.mode === "lreplay"){ goTo("dash"); return; }
-  if(v && ["dash", "train", "games", "play"].includes(v.view)){ try { goTo(v.view); return; } catch(e){ console.warn(e); } }
+  if(v && ["dash", "train", "games", "play", "rush"].includes(v.view)){ try { goTo(v.view); return; } catch(e){ console.warn(e); } }
 }, 0);
 
 /* ---------- play live games on Lichess (Board API) ----------
