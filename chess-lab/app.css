@@ -311,3 +311,9 @@ footer { color: var(--muted); font-size: 11px; position: fixed; right: 12px; bot
 .hold-bar b { color: var(--accent-2); }
 .hold-bar span { color: var(--muted); }
 .hold-bar.beat span { color: #7fd99a; }
+
+/* engine icons + Rodent personality picker */
+.eng-ico { margin-right: 5px; font-size: 1.05em; line-height: 1; }
+.avatar.emoji { font-size: 18px; background: rgba(255,255,255,.06); }
+#rodent-pers { display: block; width: 100%; margin-top: 6px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; color: var(--text); font: inherit; font-size: 14px; }
+.rodent-desc { display: block; margin-top: 5px; font-size: 12.5px; color: var(--muted); line-height: 1.4; }

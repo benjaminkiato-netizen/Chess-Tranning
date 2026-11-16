@@ -537,6 +537,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
 .gm-acct-rm.armed{font-size:12px;color:#ff7a70;border-color:#ff7a70}
 .gm-acct-wrap input{margin-top:6px}
 .gm-acct-tag{font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;margin-right:6px;background:rgba(255,255,255,.08);color:var(--muted,#9aa)}
+.eng-ico{margin-right:4px;font-style:normal}
 </style>
 </head>
 <body>
@@ -858,7 +859,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
     </div>
     <div class="engine" id="engine" hidden>
       <div class="eng-head">
-        <div><b>Stockfish 19</b> <span class="summary" id="engDepth"></span></div>
+        <div><b><span class="eng-ico">🐟</span>Stockfish 19</b> <span class="summary" id="engDepth"></span></div>
         <button id="engToggle" class="link">Turn off</button>
       </div>
       <div class="eng-lines" id="engLines"></div>
@@ -873,10 +874,10 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
       </div>
       <div class="nav-info"><span id="navInfo" class="num"></span>
         <button id="navReset" class="link" hidden>Back to the solution</button></div>
-      <a class="playon" id="playOn" href="https://lichess.org/" target="_blank" rel="noopener" hidden>Play on vs Stockfish on Lichess ↗</a>
+      <a class="playon" id="playOn" href="https://lichess.org/" target="_blank" rel="noopener" hidden><span class="eng-ico">🐟</span>Play on vs Stockfish on Lichess ↗</a>
       <div class="playlab" id="playLab" hidden>
-        <button id="vsPatricia" title="Opens Chess Lab in a new tab and plays this position out">▶ Continue vs Patricia</button>
-        <button id="vsMaia" title="Opens Chess Lab in a new tab and plays this position out">▶ Continue vs Maia</button>
+        <button id="vsPatricia" title="Opens Chess Lab in a new tab and plays this position out">▶ Continue vs <span class="eng-ico">🐰</span>Patricia</button>
+        <button id="vsMaia" title="Opens Chess Lab in a new tab and plays this position out">▶ Continue vs <span class="eng-ico">👤</span>Maia</button>
         <button id="saveLater" title="Save this position to the Training tab to play later">⏱ Train vs engine later</button>
       </div>
       <p class="nav-tip">Explore freely: move any piece for either side. Use ← → to step through moves.</p>
@@ -1246,9 +1247,9 @@ function renderHolds(){
         ${stat}
       </div>
       <div class="later-btns">
-        <button class="primary" data-hplay="patricia" data-id="${x.id}">▶ vs Patricia</button>
-        <button data-hplay="maia" data-id="${x.id}">▶ vs Maia</button>
-        <a class="sf-link" href="https://lichess.org/?fen=${encodeURIComponent(x.fen)}#ai" target="_blank" rel="noopener" title="Play this position against Stockfish on Lichess">vs Stockfish on Lichess ↗</a>
+        <button class="primary" data-hplay="patricia" data-id="${x.id}">▶ vs <span class="eng-ico">🐰</span>Patricia</button>
+        <button data-hplay="maia" data-id="${x.id}">▶ vs <span class="eng-ico">👤</span>Maia</button>
+        <a class="sf-link" href="https://lichess.org/?fen=${encodeURIComponent(x.fen)}#ai" target="_blank" rel="noopener" title="Play this position against Stockfish on Lichess"><span class="eng-ico">🐟</span>vs Stockfish on Lichess ↗</a>
         <button class="link" data-hrm="${x.id}">Remove</button>
       </div></div>`;
   }).join("");
@@ -1300,9 +1301,9 @@ function renderLater(){
         <div class="stars" role="group" aria-label="How hard was it to beat?"><span class="summary">Difficulty</span>${stars}</div>
       </div>
       <div class="later-btns">
-        <button class="primary" data-play="patricia" data-id="${x.id}">▶ vs Patricia</button>
-        <button data-play="maia" data-id="${x.id}">▶ vs Maia</button>
-        <a class="sf-link" href="https://lichess.org/?fen=${encodeURIComponent(x.fen)}#ai" target="_blank" rel="noopener" title="Play this position against Stockfish on Lichess">vs Stockfish on Lichess ↗</a>
+        <button class="primary" data-play="patricia" data-id="${x.id}">▶ vs <span class="eng-ico">🐰</span>Patricia</button>
+        <button data-play="maia" data-id="${x.id}">▶ vs <span class="eng-ico">👤</span>Maia</button>
+        <a class="sf-link" href="https://lichess.org/?fen=${encodeURIComponent(x.fen)}#ai" target="_blank" rel="noopener" title="Play this position against Stockfish on Lichess"><span class="eng-ico">🐟</span>vs Stockfish on Lichess ↗</a>
         <button class="link" data-rm="${x.id}">Remove</button>
       </div></div>`;
   }).join("");
