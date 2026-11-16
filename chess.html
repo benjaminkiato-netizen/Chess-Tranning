@@ -1610,7 +1610,7 @@ function clickSq(sq){
   document.addEventListener("pointermove", e => {
     if(!drag) return;
     e.preventDefault();
-    if(Math.hypot(e.clientX-drag.x0, e.clientY-drag.y0) > 4) drag.moved = true;
+    if(Math.hypot(e.clientX-drag.x0, e.clientY-drag.y0) > Math.max(8, drag.size / 5)) drag.moved = true;   // small wobble = still a click
     drag.ghost.style.left = (e.clientX - drag.size/2) + "px";
     drag.ghost.style.top = (e.clientY - drag.size/2) + "px";
   });
@@ -2201,6 +2201,7 @@ function rushDraw(z, badSq){
     const pc = z.game.get(sq);
     if(z.selected && z.selected !== sq && !(pc && pc.color === z.color)){ rushTryMove(z.selected, sq); return; }
     if(pc && pc.color === z.color){
+      const wasSel = z.selected === sq;
       z.selected = sq; rushDraw(z);
       const img = b.querySelector(`.sq[data-sq="${sq}"] .pc`);
       if(img){
@@ -2208,14 +2209,14 @@ function rushDraw(z, badSq){
         const ghost = img.cloneNode(); ghost.className = "pc rush-ghost";
         Object.assign(ghost.style, {width: rect.width + "px", height: rect.height + "px", left: (e.clientX - rect.width / 2) + "px", top: (e.clientY - rect.height / 2) + "px"});
         document.body.appendChild(ghost); img.style.opacity = ".25";
-        drag = {from: sq, ghost, w: rect.width, h: rect.height, moved: false};
+        drag = {from: sq, ghost, w: rect.width, h: rect.height, moved: false, wasSel, x0: e.clientX, y0: e.clientY};
         b.setPointerCapture(e.pointerId);
       }
     }
   });
   b.addEventListener("pointermove", e => {
     if(!drag) return;
-    drag.moved = true;
+    if(Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > Math.max(8, drag.w / 5)) drag.moved = true;
     drag.ghost.style.left = (e.clientX - drag.w / 2) + "px"; drag.ghost.style.top = (e.clientY - drag.h / 2) + "px";
   });
   const finish = e => {
@@ -2223,7 +2224,10 @@ function rushDraw(z, badSq){
     const d = drag; drag = null; d.ghost.remove();
     const to = sqAt(e.clientX, e.clientY);
     if(to && to !== d.from) rushTryMove(d.from, to);
-    else if(R && R.pz) rushDraw(R.pz);
+    else if(R && R.pz){
+      if(!d.moved && d.wasSel) R.pz.selected = null;   // clicking the selected piece again unselects it
+      rushDraw(R.pz);
+    }
   };
   b.addEventListener("pointerup", finish);
   b.addEventListener("pointercancel", e => { if(drag){ drag.ghost.remove(); drag = null; if(R && R.pz) rushDraw(R.pz); } });
