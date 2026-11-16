@@ -2040,11 +2040,34 @@ function rushNextPuzzle(){
   const plies = p.puzzle.initialPly + 1, hist = g.history();
   let game = g;
   if(hist.length > plies){ game = new Chess(); hist.slice(0, plies).forEach(m => game.move(m)); }
-  const v = game.history({verbose: true}), lm = v[v.length - 1];
-  R.pz = {p, game, color: game.turn(), sol: p.puzzle.solution, step: 0, lastMove: lm ? [lm.from, lm.to] : null, selected: null, failed: false, t0: performance.now()};
-  $("rushStatus").textContent = `${R.pz.color === "w" ? "White" : "Black"} to move.${R.started ? "" : " The clock starts with your first move."}`;
+  const z = R.pz = {p, game, color: game.turn(), sol: p.puzzle.solution, step: 0, lastMove: null, selected: null, failed: false, t0: performance.now()};
+  $("rushStatus").textContent = `${z.color === "w" ? "White" : "Black"} to move.${R.started ? "" : " The clock starts with your first move."}`;
   $("rushPz").innerHTML = `Puzzle ${R.idx + 1} · rating <b>${p.puzzle.rating}</b>`;
-  rushDraw(R.pz);
+  // show the position before the opponent's last move, then play that move so you can see it
+  const opp = game.undo();
+  rushDraw(z);
+  if(!opp){ return; }
+  R.busy = true;
+  const introStart = performance.now();
+  setTimeout(() => rushAnimate(opp.from, opp.to, () => {
+    if(!R || R.over || R.pz !== z) return;
+    const mv = game.move(opp); moveSound(mv);
+    z.lastMove = [opp.from, opp.to];
+    R.busy = false; z.t0 = performance.now();
+    if(R.started) R.time += performance.now() - introStart;   // the clock doesn't pay for watching
+    rushDraw(z);
+  }), reduceMotion ? 0 : 280);
+}
+// slide the piece on `from` to `to` on the Rush board, then call done (instant if motion is reduced)
+function rushAnimate(from, to, done){
+  const b = $("rushBoard");
+  const img = b.querySelector(`.sq[data-sq="${from}"] .pc`), dst = b.querySelector(`.sq[data-sq="${to}"]`);
+  if(reduceMotion || !img || !dst){ done(); return; }
+  const a = img.getBoundingClientRect(), c = dst.getBoundingClientRect();
+  img.style.transition = "transform .22s ease";
+  img.style.zIndex = "4";
+  img.style.transform = `translate(${c.left - a.left + (c.width - a.width) / 2}px, ${c.top - a.top + (c.height - a.height) / 2}px)`;
+  setTimeout(done, 230);
 }
 function rushTryMove(from, to){
   const z = R && R.pz; if(!z || R.over || R.busy) return;
@@ -2079,11 +2102,14 @@ function rushTryMove(from, to){
   setTimeout(() => {
     if(!R || R.over || R.pz !== z) return;
     const u = z.sol[z.step];
-    const r = z.game.move({from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4]});
-    moveSound(r); z.lastMove = [u.slice(0, 2), u.slice(2, 4)]; z.step++;
-    R.busy = false; rushDraw(z);
-    if(z.step >= z.sol.length) rushSolved();
-  }, 160);
+    rushAnimate(u.slice(0, 2), u.slice(2, 4), () => {
+      if(!R || R.over || R.pz !== z) return;
+      const r = z.game.move({from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4]});
+      moveSound(r); z.lastMove = [u.slice(0, 2), u.slice(2, 4)]; z.step++;
+      R.busy = false; rushDraw(z);
+      if(z.step >= z.sol.length) rushSolved();
+    });
+  }, 120);
 }
 function rushSolved(){
   const z = R.pz;
