@@ -2621,9 +2621,13 @@ function gameUrl(g, color, ply){
 // Saved accounts per site, and which one (or "*" = all of them) the Games tab shows.
 S.accounts ??= {lichess: [], chesscom: []};
 S.gameUserSel ??= {};
+S.accountsSeeded ??= {};
+// Put the username you used before this list existed into it, once per site (so a removed account stays removed).
 function seedAccounts(){
   for(const [site, key] of [["lichess", "lichessUser"], ["chesscom", "chesscomUser"]]){
+    if(S.accountsSeeded[site]) continue;
     const u = S[key];
+    if(u || S.accounts[site].length) S.accountsSeeded[site] = true;
     if(u && !S.accounts[site].some(a => a.toLowerCase() === u.toLowerCase())) S.accounts[site].push(u);
     if(!S.gameUserSel[site] && S.accounts[site].length) S.gameUserSel[site] = S.accounts[site][0];
   }
