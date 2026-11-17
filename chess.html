@@ -485,6 +485,25 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
 
 /* ---------- Puzzle Rush ---------- */
 .rush-grid{display:grid;gap:24px;justify-content:center;grid-template-columns:auto;align-items:start}
+/* rated puzzles */
+.rt-wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.rt-top{display:flex;align-items:center;gap:20px}
+.rt-rating{font-size:56px;font-weight:800;line-height:1}
+.rt-spark{flex:1;height:70px;min-width:0}
+.rt-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.rt-tiles .tile{border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column}
+.rt-tiles .tile b{font-size:20px}
+.rt-tiles .tile span{font-size:12px;color:var(--muted)}
+.rt-first{display:flex;flex-direction:column;gap:6px}
+.rt-first input{width:90px;margin-left:8px}
+.rt-go{font-size:17px;padding:12px}
+.rt-how{font-size:13px;line-height:1.5}
+.rt-hist-h{display:flex;justify-content:space-between;align-items:center}
+.rt-row a{color:inherit;text-decoration:none}.rt-row a:hover{text-decoration:underline}
+.rt-row{display:grid;grid-template-columns:22px 1fr auto auto;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line);font-size:14px}
+.rt-row .up{color:var(--good);font-weight:700}.rt-row .down{color:var(--bad);font-weight:700}
+.rt-delta-up{color:var(--good);font-weight:700}.rt-delta-down{color:var(--bad);font-weight:700}
+@media (max-width:600px){.rt-tiles{grid-template-columns:repeat(2,1fr)}.rt-rating{font-size:44px}}
 @media (min-width: 980px){ .rush-grid{grid-template-columns:auto 320px} }
 .rush-boardwrap{position:relative}
 #rushBoard{width:min(760px, calc(100vw - 32px - 22px), calc(100vh - 200px));max-width:none;min-width:260px}
@@ -551,6 +570,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
     <button data-view="home" class="on" id="tabToday">Today</button>
     <button data-view="dash" id="tabDash">Dashboard</button>
     <button data-view="train" id="tabTrain">Training</button>
+    <button data-view="rated" id="tabRated">Rated</button>
     <button data-view="rush" id="tabRush">Rush</button>
     <button data-view="games" id="tabGames">Games</button>
     <button data-view="play" id="tabPlay">Play</button>
@@ -692,6 +712,34 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
   </section>
 
   <!-- DASHBOARD -->
+  <section id="rated" hidden>
+    <div class="rt-wrap">
+      <div class="card rt-head">
+        <div class="eyebrow">Rated puzzles</div>
+        <div class="rt-top">
+          <div><div class="rt-rating num" id="rtRating">1200</div><div class="muted" id="rtSub"></div></div>
+          <svg class="rt-spark" id="rtSpark" viewBox="0 0 300 70" preserveAspectRatio="none" aria-label="Rating history"></svg>
+        </div>
+        <div class="rt-tiles" id="rtTiles"></div>
+        <div class="rt-first" id="rtFirst">
+          <label>Starting rating <input type="number" id="rtStartIn" min="400" max="2800" step="50" value="1200"></label>
+          <span class="muted">Pick roughly where you are. The first 20 puzzles move your rating faster so it finds your level.</span>
+        </div>
+        <button class="primary rt-go" id="rtGo">Start rated puzzles</button>
+        <div class="muted rt-how">
+          Solve it: you gain points. Your first wrong move, a hint or showing the solution: you lose points.
+          How many depends on the puzzle's rating versus yours: beating a much harder puzzle earns a lot,
+          failing a much easier one costs a lot, and one near your level is worth about ±8.
+        </div>
+        <div class="rt-err err" id="rtErr"></div>
+      </div>
+      <div class="card">
+        <div class="rt-hist-h"><b>Recent puzzles</b><button class="link rt-reset" id="rtReset">Reset rating</button></div>
+        <div id="rtHist"></div>
+      </div>
+    </div>
+  </section>
+
   <section id="rush" hidden>
     <div class="rush-grid">
       <div class="rush-boardwrap">
@@ -1171,6 +1219,7 @@ function show(view){
   $("games").hidden = view!=="games"; $("tabGames").classList.toggle("on", view==="games");
   $("play").hidden = view!=="play"; $("tabPlay").classList.toggle("on", view==="play");
   $("rush").hidden = view!=="rush"; $("tabRush").classList.toggle("on", view==="rush");
+  $("rated").hidden = view!=="rated"; $("tabRated").classList.toggle("on", view==="rated");
   if(view !== "rush" && typeof rushLeave === "function") rushLeave();
   $("tabs").hidden = view==="drill";
   $("tabToday").classList.toggle("on", view==="home"); $("tabDash").classList.toggle("on", view==="dash");
@@ -1432,6 +1481,7 @@ function renderFailed(){
 
 async function loadNext(){
   setDrillMode("puzzle");
+  if(mode === "rated") return ratedNext();
   if(mode === "lreplay") return loadReplayPuzzle();
   if(mode === "review"){
     if(reviewIdx >= reviewList.length){ goTo(returnView); return; }
@@ -1860,6 +1910,7 @@ function tryMove(from, to, legal){
   selected = null;
   if(!ok){
     mistakes++; sound("error");
+    if(mode === "rated" && !ratedDone){ ratedResult(false, "wrong"); draw(to); setTimeout(()=>draw(), 600); return; }
     setStatus("That's not it. Try again.", "bad");
     draw(to); setTimeout(()=>draw(), 600);
     return;
@@ -1920,6 +1971,12 @@ function complete(revealed){
   const clean = !revealed && !mistakes && !helped;
   startAnalysis();
   if(!revealed) setTimeout(() => sound("solved"), 120);
+  if(mode === "rated"){
+    if(!ratedDone) ratedResult(true);
+    else setStatus(revealed ? "That was the solution." : "Solved, but your rating already counted the miss.", "");
+    $("next").disabled = false; $("next").textContent = "Next puzzle";
+    return;
+  }
   if(mode === "lreplay"){
     report(theme, cur.puzzle.id, clean);
     reviewIdx++;
@@ -1956,9 +2013,10 @@ function complete(revealed){
   $("next").textContent = left > 0 ? "Next puzzle" : "Finish theme";
 }
 
-$("hint").onclick = () => { if(finished||!sol||intro) return; helped = true; hintSq = sol[step].slice(0,2); setStatus("Move the highlighted piece."); draw(); };
+$("hint").onclick = () => { if(finished||!sol||intro) return; if(mode === "rated" && !ratedDone) ratedResult(false, "hint"); helped = true; hintSq = sol[step].slice(0,2); setStatus("Move the highlighted piece."); draw(); };
 $("reveal").onclick = () => {
   if(finished||!sol||intro) return;
+  if(mode === "rated" && !ratedDone) ratedResult(false, "reveal");
   helped = true; finished = true; selected = null;
   const run = () => {
     if(step >= sol.length){ return complete(true); }
@@ -1982,7 +2040,8 @@ soundLabel();
 $("back").onclick = () => {
   if(mode === "live"){ mode = "daily"; playTab(); }   // the game keeps running on Lichess; reopen it from Play
   else if(mode === "game"){ sfStop(); mode = "daily"; show("games"); renderGames(); }
-  else if(mode === "lreplay"){ show("dash"); loadDash(); } else goTo(returnView);
+  else if(mode === "lreplay"){ show("dash"); loadDash(); }
+  else if(mode === "rated"){ mode = "daily"; goTo("rated"); } else goTo(returnView);
 };
 /* open a tab the same way its button does (used by "back" and after a reload) */
 function goTo(view){
@@ -1991,6 +2050,7 @@ function goTo(view){
   else if(view === "games") gamesTab();
   else if(view === "play") playTab();
   else if(view === "rush"){ show("rush"); rushTab(); }
+  else if(view === "rated"){ show("rated"); renderRated(); }
   else { show("home"); renderHome(); }
 }
 $("tabToday").onclick = () => { show("home"); renderHome(); };
@@ -2280,6 +2340,7 @@ $("rushStart").onclick = () => rushStart();
 $("rushAgain").onclick = () => { R = null; rushShowPanel("intro"); rushTab(); };
 $("rushStop").onclick = () => { if(R && R.started) rushEnd("stop"); else { R = null; rushShowPanel("intro"); rushDrawIdle(); } };
 $("tabRush").onclick = () => goTo("rush");
+$("tabRated").onclick = () => goTo("rated");
 
 // recent runs under the board, and the Dashboard card
 function rushBars(runs){
@@ -3502,6 +3563,131 @@ if(typeof Chess === "undefined"){
   document.querySelector(".wrap").insertAdjacentHTML("afterbegin",'<p class="err">The chess library didn\'t load. Check your internet connection and reload.</p>');
 }
 renderSetup(); renderHome();
+/* ---------- rated puzzles: your own puzzle rating, chess.com style ----------
+   Elo: expected = 1 / (1 + 10^((puzzle - you) / 400)); change = K × (result − expected).
+   K is 40 for your first 20 puzzles (to find your level fast), then 16. */
+S.rated ??= {rating: null, start: null, played: 0, wins: 0, peak: null, hist: [], seen: [], pending: null};
+let ratedPool = [], ratedFetched = new Set(), ratedDone = false, ratedLoading = null;
+const RT_LEVELS = ["easiest", "easier", "normal", "harder", "hardest"];
+const ratedK = () => S.rated.played < 20 ? 40 : 16;
+function ratedDelta(pr, win){
+  const R = S.rated.rating, E = 1 / (1 + Math.pow(10, (pr - R) / 400));
+  let d = Math.round(ratedK() * ((win ? 1 : 0) - E));
+  if(win && d < 1) d = 1; if(!win && d > -1) d = -1;
+  return d;
+}
+async function ratedFetch(level){
+  ratedFetched.add(level);
+  const ps = await rushFetch(level, 50);
+  const seen = new Set(S.rated.seen), have = new Set(ratedPool.map(p => p.puzzle.id));
+  ratedPool.push(...ps.filter(p => !seen.has(p.puzzle.id) && !have.has(p.puzzle.id)));
+}
+// mostly near your rating, sometimes a bit easier or harder (like chess.com)
+function ratedTarget(){
+  const g = Math.max(-2, Math.min(2, (Math.random() + Math.random() + Math.random() - 1.5) * 2));   // roughly normal, kept within ±2
+  return S.rated.rating + Math.round(g * 110);
+}
+async function ratedPick(){
+  const target = ratedTarget();
+  const near = () => ratedPool.reduce((b, p, i) => { const d = Math.abs(p.puzzle.rating - target); return d < b.d ? {d, i} : b; }, {d: Infinity, i: -1});
+  if(!ratedPool.length) await ratedFetch("normal");
+  let n = near();
+  // nothing close enough: fetch easier or harder puzzles from Lichess
+  while(n.d > 150){
+    const lo = Math.min(...ratedPool.map(p => p.puzzle.rating)), hi = Math.max(...ratedPool.map(p => p.puzzle.rating));
+    const order = target < lo ? RT_LEVELS : target > hi ? RT_LEVELS.slice().reverse() : ["normal", "easier", "harder", "easiest", "hardest"];
+    const next = order.find(l => !ratedFetched.has(l));
+    if(!next) break;
+    await ratedFetch(next); n = near();
+  }
+  if(n.i < 0){ ratedFetched.clear(); await ratedFetch("normal"); n = near(); }
+  if(n.i < 0) throw new Error("Lichess sent no new puzzles. Try again in a minute.");
+  return ratedPool.splice(n.i, 1)[0];
+}
+function ratedStart(){
+  if(S.rated.rating == null){
+    const v = Math.max(400, Math.min(2800, Math.round(+$("rtStartIn").value || 1200)));
+    S.rated.rating = S.rated.start = S.rated.peak = v; save();
+  }
+  mode = "rated"; returnView = "rated";
+  ratedNext();
+}
+async function ratedNext(){
+  $("rtErr").textContent = "";
+  let p = S.rated.pending;    // a puzzle you left unfinished comes back (no skipping hard ones)
+  if(!p){
+    if(ratedLoading) return;
+    $("rtGo").disabled = true; $("rtGo").textContent = "Finding a puzzle…";
+    try { ratedLoading = ratedPick(); p = await ratedLoading; }
+    catch(e){ ratedLoading = null; $("rtGo").disabled = false; $("rtGo").textContent = "Start rated puzzles"; show("rated"); $("rtErr").textContent = e.message; return; }
+    ratedLoading = null; $("rtGo").disabled = false; $("rtGo").textContent = "Start rated puzzles";
+    S.rated.pending = p;
+    S.rated.seen.push(p.puzzle.id); if(S.rated.seen.length > 3000) S.rated.seen.splice(0, S.rated.seen.length - 3000);
+    save();
+    ratedPool.length < 15 && RT_LEVELS.forEach(l => ratedFetched.delete(l));
+  }
+  mode = "rated"; cur = p; ratedDone = false;
+  show("drill");
+  $("d-theme").textContent = "Rated puzzles";
+  $("d-count").innerHTML = `Your rating <b class="num">${S.rated.rating}</b>`;
+  setup(p);
+  $("next").disabled = true; $("next").textContent = "Next puzzle";
+  $("meta").innerHTML = `<span>Puzzle <span class="num">${p.puzzle.rating}</span></span>
+    <span class="muted">Win <span class="num rt-delta-up">+${ratedDelta(p.puzzle.rating, true)}</span> · lose <span class="num rt-delta-down">${ratedDelta(p.puzzle.rating, false)}</span></span>
+    <a href="https://lichess.org/training/${p.puzzle.id}" target="_blank" rel="noopener">Open on Lichess</a>`;
+}
+function ratedResult(win, why){
+  ratedDone = true;
+  const R = S.rated, p = cur, pr = p.puzzle.rating, d = ratedDelta(pr, win);
+  R.rating = Math.max(100, R.rating + d); R.played++; if(win) R.wins++;
+  R.peak = Math.max(R.peak ?? R.rating, R.rating);
+  R.hist.push({t: Date.now(), id: p.puzzle.id, pr, win, d, r: R.rating, why: why || null});
+  if(R.hist.length > 1000) R.hist.splice(0, R.hist.length - 1000);
+  R.pending = null; save();
+  $("d-count").innerHTML = `Your rating <b class="num">${R.rating}</b> <span class="${d >= 0 ? "rt-delta-up" : "rt-delta-down"}">${d >= 0 ? "+" : ""}${d}</span>`;
+  $("next").disabled = false;
+  if(win) setStatus(`Solved! +${d} → ${R.rating}`, "good");
+  else setStatus(`${why === "hint" ? "Hint used" : why === "reveal" ? "Solution shown" : "Incorrect"}: ${d} → ${R.rating}. ${why === "wrong" ? "Keep going to finish it, or press Next." : ""}`.trim(), "bad");
+}
+function renderRated(){
+  const R = S.rated, H = R.hist, has = R.rating != null;
+  $("rtRating").textContent = has ? R.rating : "–";
+  $("rtFirst").hidden = has;
+  $("rtGo").textContent = R.pending ? "Continue your unfinished puzzle" : "Start rated puzzles";
+  const last10 = H.slice(-10), net = last10.reduce((a, h) => a + h.d, 0);
+  $("rtSub").innerHTML = !has ? "Not rated yet" : H.length
+    ? `Last 10: <span class="${net >= 0 ? "rt-delta-up" : "rt-delta-down"}">${net >= 0 ? "+" : ""}${net}</span> · started at ${R.start}`
+    : `Starting at ${R.start}`;
+  const today = H.filter(h => new Date(h.t).toDateString() === new Date().toDateString());
+  const tdNet = today.reduce((a, h) => a + h.d, 0);
+  $("rtTiles").innerHTML = [
+    [R.played, "Puzzles"], [R.played ? Math.round(100 * R.wins / R.played) + "%" : "–", "Solved"],
+    [R.peak ?? "–", "Highest"], [today.length ? `${tdNet >= 0 ? "+" : ""}${tdNet}` : "–", `Today (${today.length})`],
+  ].map(([v, l]) => `<div class="tile"><b class="num">${v}</b><span>${l}</span></div>`).join("");
+  // rating graph
+  const pts = [R.start, ...H.slice(-100).map(h => h.r)].filter(x => x != null);
+  const svg = $("rtSpark");
+  if(pts.length < 2){ svg.innerHTML = ""; }
+  else {
+    const lo = Math.min(...pts) - 10, hi = Math.max(...pts) + 10;
+    const xy = pts.map((v, i) => `${(i / (pts.length - 1) * 300).toFixed(1)},${(66 - (v - lo) / (hi - lo) * 62).toFixed(1)}`);
+    svg.innerHTML = `<polyline points="${xy.join(" ")}" fill="none" stroke="var(--accent, #6c5ce7)" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
+  }
+  $("rtHist").innerHTML = H.length ? H.slice(-15).reverse().map(h => `<div class="rt-row">
+      <span>${h.win ? "✅" : "❌"}</span>
+      <a href="https://lichess.org/training/${h.id}" target="_blank" rel="noopener">Puzzle ${h.pr}${h.why === "hint" ? " · hint" : h.why === "reveal" ? " · shown" : ""}</a>
+      <span class="${h.d >= 0 ? "up" : "down"} num">${h.d >= 0 ? "+" : ""}${h.d}</span>
+      <span class="num muted">${h.r}</span></div>`).join("")
+    : '<div class="muted">No rated puzzles yet.</div>';
+}
+$("rtGo").onclick = ratedStart;
+$("rtReset").onclick = () => {
+  const t = prompt('This erases your rated-puzzle rating and history. Type "yes" to reset.');
+  if((t || "").trim().toLowerCase() !== "yes") return;
+  S.rated = {rating: null, start: null, played: 0, wins: 0, peak: null, hist: [], seen: S.rated.seen, pending: null};
+  save(); renderRated();
+};
+
 /* after a reload, stay on the tab you were on (a puzzle set restarts with a fresh puzzle of the same theme).
    Runs after the whole script has loaded, so every tab's code is ready. */
 const savedView = (() => { try { return JSON.parse(sessionStorage.getItem("chess.view") || "null"); } catch(e){ return null; } })();
@@ -3519,7 +3705,8 @@ setTimeout(function restoreView(){
   if(v && v.view === "drill" && v.mode === "game"){ goTo("games"); return; }
   if(v && v.view === "drill" && v.mode === "live"){ goTo("play"); return; }
   if(v && v.view === "drill" && v.mode === "lreplay"){ goTo("dash"); return; }
-  if(v && ["dash", "train", "games", "play", "rush"].includes(v.view)){ try { goTo(v.view); return; } catch(e){ console.warn(e); } }
+  if(v && v.view === "drill" && v.mode === "rated"){ returnView = "rated"; show("rated"); renderRated(); ratedStart(); return; }
+  if(v && ["dash", "train", "games", "play", "rush", "rated"].includes(v.view)){ try { goTo(v.view); return; } catch(e){ console.warn(e); } }
 }, 0);
 
 /* ---------- play live games on Lichess (Board API) ----------
