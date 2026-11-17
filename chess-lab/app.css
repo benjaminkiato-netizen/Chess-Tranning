@@ -68,6 +68,11 @@ cg-board square.selected { background-color: rgba(217, 180, 90, .7); }
 cg-board square.move-dest { background: radial-gradient(rgba(20, 30, 20, .28) 26%, transparent 27%); }
 cg-board square.oc.move-dest { background: radial-gradient(transparent 0%, transparent 78%, rgba(20, 30, 20, .28) 79%); }
 cg-board square.move-dest:hover { background: rgba(20, 30, 20, .2); }
+/* premoves (queued while the engine thinks): blue, like Lichess */
+cg-board square.premove-dest { background: radial-gradient(rgba(40, 70, 190, .45) 24%, transparent 25%); }
+cg-board square.oc.premove-dest { background: radial-gradient(transparent 0%, transparent 78%, rgba(40, 70, 190, .45) 79%); }
+cg-board square.premove-dest:hover { background: rgba(40, 70, 190, .25); }
+cg-board square.current-premove { background-color: rgba(40, 80, 210, .55) !important; }
 cg-board square.check { background: radial-gradient(ellipse at center, rgba(255, 0, 0, 1) 0%, rgba(231, 0, 0, 1) 25%, rgba(169, 0, 0, 0) 89%, rgba(158, 0, 0, 0) 100%); }
 .cg-wrap coords { font: 600 11px "IBM Plex Sans", system-ui, sans-serif; text-shadow: none; }
 .cg-wrap coords coord { text-transform: lowercase !important; }
