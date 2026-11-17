@@ -86,6 +86,9 @@ summary{cursor:pointer;font-weight:600}
 .sq.bad::before{content:"";position:absolute;inset:0;background:var(--bad);opacity:.55}
 .sq.tgt::after{content:"";position:absolute;width:26%;height:26%;border-radius:50%;background:rgba(20,30,20,.28)}
 .sq.tgt.occ::after{width:88%;height:88%;background:transparent;box-shadow:inset 0 0 0 4px rgba(20,30,20,.28)}
+.sq.pre::before{content:"";position:absolute;inset:0;background:rgba(40,80,210,.55)}
+#board.pm .sq.tgt::after{background:rgba(40,70,190,.45)}
+#board.pm .sq.tgt.occ::after{background:transparent;box-shadow:inset 0 0 0 4px rgba(40,70,190,.45)}
 .pc{position:relative;z-index:1;width:92%;height:92%;pointer-events:none;display:block}
 .coord{position:absolute;font:600 1.8cqw var(--body);z-index:1;line-height:1}
 .coord.f{left:4px;bottom:3px} .coord.r{right:4px;top:3px}
@@ -1488,7 +1491,7 @@ function setStatus(t, cls){ const s=$("status"); s.textContent=t; s.className="s
 function draw(badSq){
   const b = $("board"); b.innerHTML = "";
   const files = "abcdefgh";
-  const targets = selected ? game.moves({square:selected, verbose:true}).map(m=>m.to) : [];
+  const targets = selected ? destsFor(selected) : [];
   for(let r=0;r<8;r++) for(let c=0;c<8;c++){
     const rank = color==="w" ? 8-r : r+1;
     const file = color==="w" ? files[c] : files[7-c];
@@ -1514,6 +1517,9 @@ function draw(badSq){
   animate(b);
 }
 function markBoard(b){
+  b.classList.toggle("pm", premoveMode());
+  const pm = mode === "live" && live && live.view == null && !live.over && live.premove;
+  if(pm) for(const q of [pm.from, pm.to]) b.querySelector(`[data-sq="${q}"]`)?.classList.add("pre");
   if(game.in_check()){
     const t = game.turn();
     for(const f of "abcdefgh") for(let r=1;r<=8;r++){ const p = game.get(f+r); if(p && p.type === "k" && p.color === t) b.querySelector(`[data-sq="${f+r}"]`)?.classList.add("check"); }
@@ -1590,11 +1596,33 @@ function makeGhost(src, w, h, x, y, cls){
 }
 function moveGhost(g, x, y, w, h){ g.style.transform = `translate3d(${x - w/2}px, ${y - h/2}px, 0)`; }
 let analysis = false, positions = [], mainline = null, viewIdx = 0, drag = null;
-const canMove = () => game && !intro && !(mode === "live" && live && live.view != null) && (analysis || (!finished && game.turn() === color));
+const canMove = () => game && !intro && !(mode === "live" && live && live.view != null) && (analysis || (!finished && (game.turn() === color || premoveMode())));
 const movable = () => analysis ? game.turn() : color;
 const legalFrom = (from, to) => game.moves({square:from, verbose:true}).filter(m => m.to === to);
+/* ----- premoves in live Lichess games: queue your next move while the opponent thinks ----- */
+const premoveMode = () => mode === "live" && live && !live.over && live.view == null && !analysis && game.turn() !== color;
+function premoveDests(sq){
+  const p = game.get(sq); if(!p || p.color !== color) return [];
+  const parts = game.fen().split(" "); parts[1] = color; parts[3] = "-";   // pretend it's already your turn
+  const g = new Chess(); const out = new Set();
+  if(g.load(parts.join(" "))) g.moves({square:sq, verbose:true}).forEach(m => out.add(m.to));
+  if(p.type === "p"){   // a pawn may capture a piece that arrives on its diagonal
+    const r = +sq[1] + (color === "w" ? 1 : -1), f = sq.charCodeAt(0);
+    for(const df of [-1, 1]){
+      const ff = f + df; if(ff < 97 || ff > 104 || r < 1 || r > 8) continue;
+      const t = String.fromCharCode(ff) + r, q = game.get(t);
+      if(!q || q.color !== color) out.add(t);
+    }
+  }
+  return [...out];
+}
+const destsFor = sq => premoveMode() ? premoveDests(sq) : game.moves({square:sq, verbose:true}).map(m => m.to);
+const canGo = (from, to) => premoveMode() ? premoveDests(from).includes(to) : legalFrom(from, to).length > 0;
+function setPremove(from, to){ live.premove = {from, to}; selected = null; draw(); liveStatus(); }
+function cancelPremove(){ if(live && live.premove){ live.premove = null; if(mode === "live") liveStatus(); return true; } return false; }
 
 function doMove(from, to){
+  if(premoveMode()){ if(!premoveDests(from).includes(to)) return false; setPremove(from, to); return true; }
   const legal = legalFrom(from, to);
   if(!legal.length) return false;
   if(analysis) analysisMove(from, to, legal[0]); else if(mode === "live") liveMove(from, to, legal[0]); else tryMove(from, to, legal[0]);
@@ -1605,6 +1633,7 @@ function clickSq(sq){
   const pc = game.get(sq);
   if(selected && selected !== sq && doMove(selected, sq)) return;
   selected = (pc && pc.color === movable() && sq !== selected) ? sq : null;
+  if(!selected) cancelPremove();
   draw();
 }
 (function(){
@@ -1613,12 +1642,12 @@ function clickSq(sq){
     if(e.button !== 0 || !canMove()) return;
     const el = e.target.closest(".sq"); if(!el) return;
     const sq = el.dataset.sq, pc = game.get(sq);
-    if(selected && selected !== sq && legalFrom(selected, sq).length){ doMove(selected, sq); return; }
-    if(!pc || pc.color !== movable()){ selected = null; draw(); return; }
+    if(selected && selected !== sq && canGo(selected, sq)){ doMove(selected, sq); return; }
+    if(!pc || pc.color !== movable()){ selected = null; cancelPremove(); draw(); return; }
     const wasSel = selected === sq;
     const size = el.getBoundingClientRect().width;
     const ghost = makeGhost(PIECES[pc.color + pc.type], size, size, e.clientX, e.clientY, "ghost");
-    selected = sq; paintSel(b, sq, game.moves({square:sq, verbose:true}).map(m => m.to));
+    selected = sq; paintSel(b, sq, destsFor(sq));
     const img = b.querySelector(`[data-sq="${sq}"] img`); if(img) img.style.opacity = ".35";
     drag = {from:sq, wasSel, moved:false, x0:e.clientX, y0:e.clientY, ghost, size};
     e.preventDefault();
@@ -3706,8 +3735,14 @@ function applyLive(st, force){
   finished = live.over; selected = null;
   if(fresh && hist.length > 1 && !force) moveSound(hist[hist.length-1].mv);
   if(live.over && !wasOver && !force) setTimeout(endSound, fresh ? 300 : 0);
+  if(live.premove && (live.over || live.view != null)) live.premove = null;
   draw(); renderLiveMoves(); liveStatus(); renderLiveActions(); tickClocks();
   if(live.over) clearInterval(liveTick);
+  if(fresh && !force && live.premove && live.view == null && game.turn() === color){
+    const p = live.premove; live.premove = null;
+    const legal = legalFrom(p.from, p.to);
+    if(legal.length) liveMove(p.from, p.to, legal[0]); else draw();   // no longer legal: dropped
+  }
 }
 function endSound(){
   const st = live?.state; if(!st) return;
@@ -3716,6 +3751,7 @@ function endSound(){
 }
 // step through the moves of the live (or finished) game
 function liveNav(i){
+  cancelPremove();
   if(!live || !live.hist || mode !== "live") return;
   const last = live.hist.length - 1, cur = live.view == null ? last : live.view;
   i = Math.max(0, Math.min(last, i));
@@ -3771,7 +3807,9 @@ function liveStatus(){
   }
   const oppDraw = live.myColor === "w" ? st.bdraw : st.wdraw;
   if(oppDraw) return setStatus("Your opponent offers a draw.");
-  setStatus(game.turn() === live.myColor ? "Your move." : "Waiting for your opponent…");
+  setStatus(game.turn() === live.myColor ? "Your move."
+    : live.premove ? `Waiting for your opponent… Premove ${live.premove.from}→${live.premove.to} is ready (click an empty square to cancel).`
+    : "Waiting for your opponent… You can premove.");
 }
 function boardPost(path){
   const id = live.id;
