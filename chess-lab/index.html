@@ -8,7 +8,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="vendor/chessground.base.css">
   <link rel="stylesheet" href="pieces.css?v=e1ff53eb">
-  <link rel="stylesheet" href="app.css?v=45221656">
+  <link rel="stylesheet" href="app.css?v=a86d1c0b">
 </head>
 <body>
   <div id="err-banner" style="display:none;position:fixed;left:12px;right:12px;bottom:12px;z-index:100;background:#5c1a1a;color:#fff;border:1px solid #ff5e57;border-radius:10px;padding:10px 14px;font:13px/1.4 system-ui,sans-serif;white-space:pre-wrap"></div>
@@ -127,10 +127,13 @@
       <div class="card hidden" id="move-card">
         <div class="move-head"><span id="mv-title"></span><span class="tag" id="mv-tag"></span></div>
         <p id="mv-text"></p>
-        <p class="legend"><span class="sw green"></span><span class="eng-ico">🐰</span>Patricia's choice <span class="sw red"></span>The move played</p>
+        <p class="legend"><span class="sw green"></span><span id="rv-legend-eng">🐰 Patricia's choice</span> <span class="sw red"></span>The move played</p>
       </div>
       <div class="card" id="source-card">
         <h2>Pick a game</h2>
+        <div class="field rv-eng">Review with
+          <div class="seg" id="rv-eng-seg"><button data-v="patricia" class="on"><span class="eng-ico">🐰</span>Patricia</button><button data-v="stockfish"><span class="eng-ico">🐟</span>Stockfish</button></div>
+        </div>
         <div class="row">
           <input id="lichess-user" placeholder="Lichess username" autocomplete="off">
           <button id="lichess-load">Load games</button>
@@ -153,6 +156,7 @@
       </div>
       <div class="card hidden" id="summary-card">
         <h2>Game summary</h2>
+        <p class="rv-by" id="rv-by"></p>
         <div class="stats" id="stats"></div>
         <div id="summary-text" class="summary"></div>
         <div class="row tight"><button id="rv-to-study" class="ghost">📖 Open this game in Study</button></div>
@@ -264,9 +268,14 @@
         <p class="hint">Play moves for both sides to add lines. Right-click and drag to draw arrows, right-click a square to circle it (hold Shift or Alt for other colours). ↑ ↓ switch between lines.</p>
       </div>
     </aside>
+      <aside class="side st-review hidden" id="st-review">
+      <div class="card st-rv-head" id="st-rv-head"></div>
+      <div class="card st-rv-move" id="st-rv-move"></div>
+      <div class="card st-rv-keys" id="st-rv-keys"></div>
+    </aside>
   </main>
 
   <footer>Engines: <a href="https://github.com/Adam-Kulju/Patricia" target="_blank" rel="noopener">Patricia</a> by Adam Kulju (GPL-3.0) · <a href="https://github.com/CSSLab/maia-platform-frontend" target="_blank" rel="noopener">Maia 3</a> by the CSSLab, University of Toronto (GPL-3.0) · <a href="https://github.com/nescitus/rodent-iv" target="_blank" rel="noopener">Rodent IV</a> by Pawel Koziol (GPL-3.0). Everything runs in your browser.</footer>
-  <script type="module" src="app.js?v=4c98d627"></script>
+  <script type="module" src="app.js?v=884155fa"></script>
 </body>
 </html>
