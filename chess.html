@@ -1051,8 +1051,11 @@ function renderHome(){
   }
   list.querySelectorAll("button[data-th]").forEach(b => b.onclick = () => startTheme(b.dataset.th));
   const all = themesToday.length && finished === themesToday.length;
-  $("overall").textContent = all ? "Everything's done for today. Come back tomorrow."
-    : `${finished} of ${themesToday.length} themes done today.`;
+  recordDay();
+  const L = S.log[D.date] || {done: 0, target: 0}, xr = L.rated || 0, xu = L.rush || 0;
+  const parts = [`${L.themes ?? L.done} themes`, xr && `${xr} rated`, xu && `${xu} Rush`].filter(Boolean);
+  $("overall").innerHTML = (all ? "Every theme is done for today. Come back tomorrow." : `${finished} of ${themesToday.length} themes done today.`)
+    + ` <b class="num">Puzzles today: ${L.done}/${L.target}</b>${xr || xu ? ` <span class="muted">(${parts.join(" + ")})</span>` : ""}`;
   if(all && !S.history[D.date]){ S.history[D.date] = true; save(); $("streak").textContent = streak(); }
   renderFocusBar();
   recordDay(); renderCalendar(); renderFailed();
@@ -1083,8 +1086,16 @@ function recordDay(){
   const list = dailyThemes(D);
   let target = 0;
   for(const th of list){ done += Math.min(D.progress[th]?.done||0, targetFor(th)); target += targetFor(th); }
-  S.log[D.date] = {done, target};
+  const x = D.extra || {}, extra = (x.rated || 0) + (x.rush || 0);
+  S.log[D.date] = {done: done + extra, target, themes: done, rated: x.rated || 0, rush: x.rush || 0};
+  // reaching the day's total with Rush / Rated puzzles counts as a finished day too
+  if(target && done + extra >= target && !S.history[D.date]) S.history[D.date] = true;
   save();
+}
+// Rated and Rush puzzles count toward today's puzzles (they can push you past the target, e.g. 80/60)
+function countExtra(kind){
+  const D = day(); D.extra ??= {rated: 0, rush: 0}; D.extra[kind] = (D.extra[kind] || 0) + 1;
+  recordDay();
 }
 function grade(date){
   const e = S.log[date], t = todayStr();
@@ -1121,7 +1132,8 @@ function renderFeedback(){
   const left = Math.max(0, te.target - te.done);
   let head, tone;
   if(te.target && te.done >= te.target){
-    head = `All ${te.target} done today. That's how ratings go up.`; tone = "pos";
+    head = te.done > te.target ? `${te.done} puzzles today, ${te.done - te.target} past your ${te.target}. That's how ratings go up.`
+      : `All ${te.target} done today. That's how ratings go up.`; tone = "pos";
   } else if(yg === "full"){
     head = `Yesterday you finished all ${ye.target}. Keep it going: ${left} left today.`; tone = "pos";
   } else if(yg === "short"){
@@ -2193,7 +2205,7 @@ function rushTryMove(from, to){
     R.errors++; R.combo = 0; R.time -= 10000; z.failed = true;
     sound("error"); rushFlash("−10s", "bad");
     rushDraw(z, to);
-    R.results.push({p: z.p, ok: false, ms: performance.now() - z.t0});
+    R.results.push({p: z.p, ok: false, ms: performance.now() - z.t0}); countExtra("rush");
     rushUpdateHud();
     R.busy = true;
     setTimeout(() => { if(!R || R.over) return; R.busy = false; rushNextPuzzle(); }, 450);
@@ -2219,7 +2231,7 @@ function rushTryMove(from, to){
 function rushSolved(){
   const z = R.pz;
   R.score++; R.combo++; R.bestCombo = Math.max(R.bestCombo, R.combo);
-  R.results.push({p: z.p, ok: true, ms: performance.now() - z.t0});
+  R.results.push({p: z.p, ok: true, ms: performance.now() - z.t0}); countExtra("rush");
   const bonus = rushBonusAt(R.combo);
   if(bonus){ R.time += bonus * 1000; rushFlash(`+${bonus}s`, "good"); sound("solved"); }
   rushUpdateHud();
@@ -3643,7 +3655,7 @@ function ratedResult(win, why){
   R.peak = Math.max(R.peak ?? R.rating, R.rating);
   R.hist.push({t: Date.now(), id: p.puzzle.id, pr, win, d, r: R.rating, why: why || null});
   if(R.hist.length > 1000) R.hist.splice(0, R.hist.length - 1000);
-  R.pending = null; save();
+  R.pending = null; save(); countExtra("rated");
   $("d-count").innerHTML = `Your rating <b class="num">${R.rating}</b> <span class="${d >= 0 ? "rt-delta-up" : "rt-delta-down"}">${d >= 0 ? "+" : ""}${d}</span>`;
   $("next").disabled = false;
   if(win) setStatus(`Solved! +${d} → ${R.rating}`, "good");
