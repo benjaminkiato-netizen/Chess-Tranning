@@ -1729,12 +1729,16 @@ function clickSq(sq){
 }
 (function(){
   const b = $("board");
+  // a piece that can't move right now (not your turn, opponent's piece, puzzle over) still lights up when clicked
+  const lookSelect = (sq, pc) => { selected = pc && selected !== sq ? sq : null; paintSel(b, selected, []); };
   b.addEventListener("pointerdown", e => {
-    if(e.button !== 0 || !canMove()) return;
+    if(e.button !== 0 || !game) return;
     const el = e.target.closest(".sq"); if(!el) return;
     const sq = el.dataset.sq, pc = game.get(sq);
+    if(!canMove()){ if(e.isPrimary) lookSelect(sq, pc); return; }
     if(selected && selected !== sq && canGo(selected, sq)){ doMove(selected, sq); return; }
-    if(!pc || pc.color !== movable()){ selected = null; cancelPremove(); draw(); return; }
+    if(pc && pc.color !== movable()){ cancelPremove(); lookSelect(sq, pc); return; }
+    if(!pc){ selected = null; cancelPremove(); draw(); return; }
     const wasSel = selected === sq;
     const size = el.getBoundingClientRect().width;
     const ghost = makeGhost(PIECES[pc.color + pc.type], size, size, e.clientX, e.clientY, "ghost");
@@ -2331,10 +2335,18 @@ function rushDraw(z, badSq){
   let drag = null;
   const sqAt = (x, y) => { const el = document.elementFromPoint(x, y)?.closest("#rushBoard .sq"); return el ? el.dataset.sq : null; };
   b.addEventListener("pointerdown", e => {
-    const z = R && R.pz; if(!z || R.over || R.busy) return;
+    const z = R && R.pz; if(!z) return;
     const sq = e.target.closest(".sq")?.dataset.sq; if(!sq) return;
     const pc = z.game.get(sq);
-    if(z.selected && z.selected !== sq && !(pc && pc.color === z.color)){ rushTryMove(z.selected, sq); return; }
+    // can't move right now (reply playing, run over) or an opponent piece: just light it up
+    const look = () => { z.selected = pc && z.selected !== sq ? sq : null; paintSel(b, z.selected, []); };
+    if(R.over || R.busy){ look(); return; }
+    if(z.selected && z.selected !== sq && !(pc && pc.color === z.color)){
+      if(z.game.moves({square: z.selected, verbose: true}).some(m => m.to === sq)){ rushTryMove(z.selected, sq); return; }
+      if(z.game.get(z.selected)?.color === z.color && !pc){ rushTryMove(z.selected, sq); return; }
+    }
+    if(pc && pc.color !== z.color){ look(); return; }
+    if(!pc){ z.selected = null; paintSel(b, null, []); return; }
     if(pc && pc.color === z.color){
       const wasSel = z.selected === sq;
       z.selected = sq; paintSel(b, sq, z.game.moves({square: sq, verbose: true}).map(m => m.to));
