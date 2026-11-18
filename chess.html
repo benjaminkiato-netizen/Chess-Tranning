@@ -87,6 +87,9 @@ summary{cursor:pointer;font-weight:600}
 .sq.tgt::after{content:"";position:absolute;width:26%;height:26%;border-radius:50%;background:rgba(20,30,20,.28)}
 .sq.tgt.occ::after{width:88%;height:88%;background:transparent;box-shadow:inset 0 0 0 4px rgba(20,30,20,.28)}
 .sq.pre::before{content:"";position:absolute;inset:0;background:rgba(40,80,210,.55)}
+.sq.mine{cursor:grab}
+body.dragging, body.dragging *{cursor:grabbing !important}
+.sq.hov{outline:4px solid rgba(255,255,255,.8);outline-offset:-4px;z-index:3}
 #board.pm .sq.tgt::after{background:rgba(40,70,190,.45)}
 #board.pm .sq.tgt.occ::after{background:transparent;box-shadow:inset 0 0 0 4px rgba(40,70,190,.45)}
 .pc{position:relative;z-index:1;width:92%;height:92%;pointer-events:none;display:block}
@@ -1551,30 +1554,16 @@ let intro = false, introToken = 0;
 function setStatus(t, cls){ const s=$("status"); s.textContent=t; s.className="status"+(cls?" "+cls:""); }
 
 function draw(badSq){
-  const b = $("board"); b.innerHTML = "";
-  const files = "abcdefgh";
+  const b = $("board");
   const targets = selected ? destsFor(selected) : [];
-  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
-    const rank = color==="w" ? 8-r : r+1;
-    const file = color==="w" ? files[c] : files[7-c];
-    const sq = file+rank;
-    const pc = game.get(sq);
-    const el = document.createElement("div");
-    el.setAttribute("role","button"); el.tabIndex = 0;
-    el.className = "sq " + ((r+c)%2 ? "d" : "l");
-    if(lastMove && lastMove.includes(sq)) el.classList.add("last");
-    if(sq===selected) el.classList.add("sel");
-    if(sq===hintSq) el.classList.add("hint");
-    if(sq===badSq) el.classList.add("bad");
-    if(targets.includes(sq)) el.classList.add("tgt", ...(pc?["occ"]:[]));
-    el.setAttribute("aria-label", sq + (pc ? " " + (pc.color==="w"?"white ":"black ") + pc.type : ""));
-    if(pc) el.innerHTML = `<img class="pc" src="${PIECES[pc.color+pc.type]}" alt="" draggable="false">`;
-    if(c===7) el.insertAdjacentHTML("beforeend", `<span class="coord r">${rank}</span>`);
-    if(r===7) el.insertAdjacentHTML("beforeend", `<span class="coord f">${file}</span>`);
-    el.dataset.sq = sq;
-    el.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); clickSq(sq); } };  // mouse/touch handled by pointer events
-    b.appendChild(el);
-  }
+  const mv = canMove() ? movable() : null;
+  syncSquares(b, color, sq => game.get(sq), (sq, pc) =>
+      (lastMove && lastMove.includes(sq) ? " last" : "") + (sq===selected ? " sel" : "") + (sq===hintSq ? " hint" : "")
+    + (sq===badSq ? " bad" : "") + (targets.includes(sq) ? (pc ? " tgt occ" : " tgt") : "") + (pc && pc.color === mv ? " mine" : ""),
+    (el, sq) => {
+      el.setAttribute("role","button"); el.tabIndex = 0;
+      el.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); clickSq(sq); } };  // mouse/touch handled by pointer events
+    });
   markBoard(b);
   animate(b);
 }
@@ -1636,6 +1625,46 @@ function animate(b){
     img.addEventListener("transitionend", () => { sqEl.style.zIndex = ""; }, {once:true});
   }
 }
+
+/* ---------- board drawing: the squares and piece images stay in place between moves
+   (like Lichess/Chess.com); only classes and pieces that changed are updated ---------- */
+function syncSquares(b, orient, getPc, flags, onBuild){
+  const files = "abcdefgh";
+  if(b.dataset.orient !== orient || b.children.length !== 64){
+    b.innerHTML = ""; b.dataset.orient = orient;
+    for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+      const rank = orient==="w" ? 8-r : r+1, file = orient==="w" ? files[c] : files[7-c], sq = file+rank;
+      const el = document.createElement("div");
+      el.dataset.sq = sq; el.dataset.base = (r+c)%2 ? "d" : "l";
+      if(c===7) el.insertAdjacentHTML("beforeend", `<span class="coord r">${rank}</span>`);
+      if(r===7) el.insertAdjacentHTML("beforeend", `<span class="coord f">${file}</span>`);
+      if(onBuild) onBuild(el, sq);
+      b.appendChild(el);
+    }
+  }
+  for(const el of b.children){
+    const sq = el.dataset.sq, pc = getPc(sq);
+    el.className = "sq " + el.dataset.base + flags(sq, pc);
+    el.style.zIndex = "";
+    for(const x of el.querySelectorAll(".mbadge")) x.remove();
+    let img = el.querySelector("img.pc");
+    if(pc){
+      const k = pc.color + pc.type;
+      if(!img){ img = document.createElement("img"); img.className = "pc"; img.alt = ""; img.draggable = false; el.prepend(img); }
+      if(img.dataset.k !== k){ img.src = PIECES[k]; img.dataset.k = k; }
+      img.style.opacity = ""; img.style.transform = ""; img.style.transition = "";
+    } else if(img) img.remove();
+    el.setAttribute("aria-label", sq + (pc ? " " + (pc.color==="w"?"white ":"black ") + pc.type : ""));
+  }
+}
+// outline the square under a dragged piece, like Lichess / Chess.com
+function dragHover(d, b, x, y){
+  const el = document.elementFromPoint(x, y)?.closest?.(".sq");
+  const t = el && b.contains(el) && d.moved ? el : null;
+  if(t === d.hov) return;
+  d.hov?.classList.remove("hov"); t?.classList.add("hov"); d.hov = t;
+}
+function dragEnd(d){ d.hov?.classList.remove("hov"); document.body.classList.remove("dragging"); }
 
 /* ---------- input: click-click and drag-and-drop ---------- */
 // Light-weight updates used while a piece is picked up (no full board rebuild, so it feels instant)
@@ -1711,7 +1740,8 @@ function clickSq(sq){
     const ghost = makeGhost(PIECES[pc.color + pc.type], size, size, e.clientX, e.clientY, "ghost");
     selected = sq; paintSel(b, sq, destsFor(sq));
     const img = b.querySelector(`[data-sq="${sq}"] img`); if(img) img.style.opacity = ".35";
-    drag = {from:sq, wasSel, moved:false, x0:e.clientX, y0:e.clientY, ghost, size};
+    drag = {from:sq, wasSel, moved:false, x0:e.clientX, y0:e.clientY, ghost, size, hov:null};
+    document.body.classList.add("dragging");
     e.preventDefault();
   });
   // listen on the whole document so the drag keeps working even if the pointer leaves the board
@@ -1720,10 +1750,11 @@ function clickSq(sq){
     e.preventDefault();
     if(Math.hypot(e.clientX-drag.x0, e.clientY-drag.y0) > Math.max(8, drag.size / 5)) drag.moved = true;   // small wobble = still a click
     moveGhost(drag.ghost, e.clientX, e.clientY, drag.size, drag.size);
+    dragHover(drag, b, e.clientX, e.clientY);
   });
   const end = e => {
     if(!drag) return;
-    const d = drag; drag = null; d.ghost.remove();
+    const d = drag; drag = null; d.ghost.remove(); dragEnd(d);
     const el = document.elementFromPoint(e.clientX, e.clientY)?.closest?.(".sq");
     const to = el && b.contains(el) ? el.dataset.sq : null;
     skipAnimTo = to;
@@ -1733,7 +1764,7 @@ function clickSq(sq){
     draw();
   };
   document.addEventListener("pointerup", end);
-  document.addEventListener("pointercancel", () => { if(drag){ drag.ghost.remove(); drag = null; draw(); } });
+  document.addEventListener("pointercancel", () => { if(drag){ drag.ghost.remove(); dragEnd(drag); drag = null; draw(); } });
   b.addEventListener("dragstart", e => e.preventDefault());   // stop the browser's own image dragging
 })();
 
@@ -2287,26 +2318,13 @@ function rushEnd(why){
 
 // ----- board (same look as the puzzle board: click or drag) -----
 function rushDraw(z, badSq){
-  const b = $("rushBoard"); b.innerHTML = "";
+  const b = $("rushBoard");
   const files = "abcdefgh", g = z.game;
   const targets = z.selected ? g.moves({square: z.selected, verbose: true}).map(m => m.to) : [];
   const checkSq = g.in_check() ? (() => { for(const f of files) for(let r = 1; r <= 8; r++){ const pc = g.get(f + r); if(pc && pc.type === "k" && pc.color === g.turn()) return f + r; } })() : null;
-  for(let r = 0; r < 8; r++) for(let c = 0; c < 8; c++){
-    const rank = z.color === "w" ? 8 - r : r + 1, file = z.color === "w" ? files[c] : files[7 - c], sq = file + rank;
-    const pc = g.get(sq);
-    const el = document.createElement("div");
-    el.className = "sq " + ((r + c) % 2 ? "d" : "l");
-    if(z.lastMove && z.lastMove.includes(sq)) el.classList.add("last");
-    if(sq === z.selected) el.classList.add("sel");
-    if(sq === badSq) el.classList.add("bad");
-    if(sq === checkSq) el.classList.add("check");
-    if(targets.includes(sq)) el.classList.add("tgt", ...(pc ? ["occ"] : []));
-    if(pc) el.innerHTML = `<img class="pc" src="${PIECES[pc.color + pc.type]}" alt="" draggable="false">`;
-    if(c === 7) el.insertAdjacentHTML("beforeend", `<span class="coord r">${rank}</span>`);
-    if(r === 7) el.insertAdjacentHTML("beforeend", `<span class="coord f">${file}</span>`);
-    el.dataset.sq = sq;
-    b.appendChild(el);
-  }
+  syncSquares(b, z.color, sq => g.get(sq), (sq, pc) =>
+      (z.lastMove && z.lastMove.includes(sq) ? " last" : "") + (sq === z.selected ? " sel" : "") + (sq === badSq ? " bad" : "")
+    + (sq === checkSq ? " check" : "") + (targets.includes(sq) ? (pc ? " tgt occ" : " tgt") : "") + (pc && pc.color === z.color ? " mine" : ""));
 }
 (function rushInput(){
   const b = $("rushBoard");
@@ -2325,7 +2343,8 @@ function rushDraw(z, badSq){
         const rect = img.getBoundingClientRect();
         const ghost = makeGhost(img.src, rect.width, rect.height, e.clientX, e.clientY, "pc rush-ghost");
         img.style.opacity = ".25";
-        drag = {from: sq, ghost, w: rect.width, h: rect.height, moved: false, wasSel, x0: e.clientX, y0: e.clientY};
+        drag = {from: sq, ghost, w: rect.width, h: rect.height, moved: false, wasSel, x0: e.clientX, y0: e.clientY, hov: null};
+        document.body.classList.add("dragging");
         b.setPointerCapture(e.pointerId);
       }
     }
@@ -2334,10 +2353,11 @@ function rushDraw(z, badSq){
     if(!drag) return;
     if(Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > Math.max(8, drag.w / 5)) drag.moved = true;
     moveGhost(drag.ghost, e.clientX, e.clientY, drag.w, drag.h);
+    dragHover(drag, b, e.clientX, e.clientY);
   });
   const finish = e => {
     if(!drag) return;
-    const d = drag; drag = null; d.ghost.remove();
+    const d = drag; drag = null; d.ghost.remove(); dragEnd(d);
     const to = sqAt(e.clientX, e.clientY);
     if(to && to !== d.from) rushTryMove(d.from, to);
     else if(R && R.pz){
@@ -2346,7 +2366,7 @@ function rushDraw(z, badSq){
     }
   };
   b.addEventListener("pointerup", finish);
-  b.addEventListener("pointercancel", e => { if(drag){ drag.ghost.remove(); drag = null; if(R && R.pz) rushDraw(R.pz); } });
+  b.addEventListener("pointercancel", e => { if(drag){ drag.ghost.remove(); dragEnd(drag); drag = null; if(R && R.pz) rushDraw(R.pz); } });
 })();
 $("rushStart").onclick = () => rushStart();
 $("rushAgain").onclick = () => { R = null; rushShowPanel("intro"); rushTab(); };
