@@ -338,12 +338,25 @@ button.mv{white-space:nowrap;overflow:hidden}
 /* coach column: left of the move list on wide screens (game review) */
 .gcoach{display:none}
 @media (min-width:1500px){
+  /* left side becomes two columns: coach card beside the move buttons, move list full width underneath */
   .wrap.wide{max-width:1880px}
-  .drill-grid.gm{grid-template-columns:270px 290px auto 300px}
-  .drill-grid.gm .gcoach{display:block;order:0;position:sticky;top:16px}
+  .drill-grid.gm{grid-template-columns:584px auto 300px}
+  .drill-grid.gm .gleft{display:grid;grid-template-columns:270px 290px;grid-template-areas:"coach nav" "moves moves";gap:14px 24px;align-items:stretch}
+  .drill-grid.gm .gleft > .nav{grid-area:nav}
+  .drill-grid.gm .gcoach{display:flex;grid-area:coach}
   .drill-grid.gm .gcoach[hidden]{display:none}
-  .drill-grid.gm .board{width:min(900px, calc(100vw - 32px - 72px - 270px - 290px - 300px - 22px), calc(100vh - 48px))}
+  .drill-grid.gm .gcoach .coach-card{flex:1}
+  .drill-grid.gm .gleft > .gp-movebox{grid-area:moves}
+  .drill-grid.gm .gp-moves{grid-template-columns:44px minmax(0,1fr) minmax(0,1fr);font-size:15px;gap:4px 10px}
+  .drill-grid.gm .board{width:min(900px, calc(100vw - 32px - 48px - 584px - 300px - 22px), calc(100vh - 48px))}
   .drill-grid.gm .gp-comment{display:none}
+  .drill-grid.gm .coach-card{padding:20px}
+  .drill-grid.gm .coach-badge{width:42px;height:42px;font-size:18px}
+  .drill-grid.gm .coach-badge svg{width:24px;height:24px}
+  .drill-grid.gm .coach-kind{font-size:21px}
+  .drill-grid.gm .coach-move{font-size:14px}
+  .drill-grid.gm .coach-text, .drill-grid.gm .coach-text p{font-size:16px}
+  .drill-grid.gm .coach-text p:is(.coach-line,.coach-note,.coach-empty), .drill-grid.gm .coach-empty{font-size:15px}
 }
 .coach-card{gap:12px;padding:16px}
 .coach-top{display:flex;align-items:center;gap:10px}
@@ -353,7 +366,7 @@ button.mv{white-space:nowrap;overflow:hidden}
 .coach-move{font-size:13px;color:var(--muted)}
 .coach-move .num{margin-left:6px}
 .coach-text{font-size:14px;line-height:1.55;display:flex;flex-direction:column;gap:8px}
-.coach-text p{margin:0}
+.gp .coach-text p{margin:0;font-size:14px}
 .coach-line{font-size:13px;color:var(--muted);border-left:3px solid var(--line);padding-left:10px}
 .coach-note{font-size:13px;border-left:3px solid #8b7cf6;padding-left:10px}
 .coach-empty{color:var(--muted);font-size:14px}
@@ -926,10 +939,10 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
 
   <!-- DRILL -->
   <section id="drill" class="drill-grid" hidden>
-    <div class="gcoach" id="gcoach" hidden>
-      <div class="gp coach-card" id="gpCoach"></div>
-    </div>
     <div class="gleft" id="gleft" hidden>
+      <div class="gcoach" id="gcoach" hidden>
+        <div class="gp coach-card" id="gpCoach"></div>
+      </div>
       <div class="gp gp-movebox">
         <div class="gp-moves" id="gpMoves"></div>
         <div class="gp-comment" id="gpComment"></div>
