@@ -1,16 +1,17 @@
-/* Piece set from Dede's image (cream and black with a light rim), cut into one PNG per piece in pieces/. Used by every board on the site. */
-.cg-wrap piece.king.white { background-image: url("pieces/wk.png?v=5"); }
-.cg-wrap piece.queen.white { background-image: url("pieces/wq.png?v=5"); }
-.cg-wrap piece.rook.white { background-image: url("pieces/wr.png?v=5"); }
-.cg-wrap piece.bishop.white { background-image: url("pieces/wb.png?v=5"); }
-.cg-wrap piece.knight.white { background-image: url("pieces/wn.png?v=5"); }
-.cg-wrap piece.pawn.white { background-image: url("pieces/wp.png?v=5"); }
-.cg-wrap piece.king.black { background-image: url("pieces/bk.png?v=5"); }
-.cg-wrap piece.queen.black { background-image: url("pieces/bq.png?v=5"); }
-.cg-wrap piece.rook.black { background-image: url("pieces/br.png?v=5"); }
-.cg-wrap piece.bishop.black { background-image: url("pieces/bb.png?v=5"); }
-.cg-wrap piece.knight.black { background-image: url("pieces/bn.png?v=5"); }
-.cg-wrap piece.pawn.black { background-image: url("pieces/bp.png?v=5"); }
+/* Piece sets live in pieces/<set>/ (cartoon, geometric, outlined), one PNG per piece. board-theme.js sets --pc-wk etc. to the chosen set;
+   cartoon is the fallback. Used by every board on the site. */
+.cg-wrap piece.king.white { background-image: var(--pc-wk, url("pieces/cartoon/wk.png?v=6")); }
+.cg-wrap piece.queen.white { background-image: var(--pc-wq, url("pieces/cartoon/wq.png?v=6")); }
+.cg-wrap piece.rook.white { background-image: var(--pc-wr, url("pieces/cartoon/wr.png?v=6")); }
+.cg-wrap piece.bishop.white { background-image: var(--pc-wb, url("pieces/cartoon/wb.png?v=6")); }
+.cg-wrap piece.knight.white { background-image: var(--pc-wn, url("pieces/cartoon/wn.png?v=6")); }
+.cg-wrap piece.pawn.white { background-image: var(--pc-wp, url("pieces/cartoon/wp.png?v=6")); }
+.cg-wrap piece.king.black { background-image: var(--pc-bk, url("pieces/cartoon/bk.png?v=6")); }
+.cg-wrap piece.queen.black { background-image: var(--pc-bq, url("pieces/cartoon/bq.png?v=6")); }
+.cg-wrap piece.rook.black { background-image: var(--pc-br, url("pieces/cartoon/br.png?v=6")); }
+.cg-wrap piece.bishop.black { background-image: var(--pc-bb, url("pieces/cartoon/bb.png?v=6")); }
+.cg-wrap piece.knight.black { background-image: var(--pc-bn, url("pieces/cartoon/bn.png?v=6")); }
+.cg-wrap piece.pawn.black { background-image: var(--pc-bp, url("pieces/cartoon/bp.png?v=6")); }
 
 /* Pieces drawn 25% bigger than before (115% of the square instead of 92%), standing on the square's bottom edge.
    A background can't spill outside its element, so the image is drawn on ::before, which can: tall pieces
