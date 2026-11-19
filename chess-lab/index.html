@@ -3,12 +3,13 @@
 <head>
   <meta charset="utf-8">
   <script src="../sync.js"></script>
+  <script src="../board-theme.js?v=1"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Chess Lab · Spar &amp; Review</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="vendor/chessground.base.css">
   <link rel="stylesheet" href="pieces.css?v=5">
-  <link rel="stylesheet" href="app.css?v=nav2">
+  <link rel="stylesheet" href="app.css?v=theme1">
 </head>
 <body>
   <div id="err-banner" style="display:none;position:fixed;left:12px;right:12px;bottom:12px;z-index:100;background:#5c1a1a;color:#fff;border:1px solid #ff5e57;border-radius:10px;padding:10px 14px;font:13px/1.4 system-ui,sans-serif;white-space:pre-wrap"></div>
@@ -37,6 +38,7 @@
       <button class="tab" data-tab="openings" role="tab">Openings</button>
       <button class="tab" data-tab="study" role="tab">Study</button>
     </nav>
+    <button class="snd" id="theme-btn" title="Board colors" onclick="BoardTheme.open()">🎨</button>
     <button class="snd" id="sync-btn" title="Sync between browsers" onclick="window.HubSync && HubSync.openPanel()">☁</button>
     <button class="snd" id="snd-toggle" title="Sound on/off">🔊</button>
   </header>

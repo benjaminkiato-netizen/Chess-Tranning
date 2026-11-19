@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script src="sync.js"></script>
+<script src="board-theme.js?v=1"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Daily Puzzle Drill</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -10,6 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 <link rel="stylesheet" href="chess-lab/vendor/chessground.base.css">
 <link rel="stylesheet" href="chess-lab/pieces.css?v=5">
+<style>.themebtn{background:none;border:0;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:8px}.themebtn:hover{background:rgba(127,127,127,.15)}</style>
 <script src="chess-lab/vendor/chessground.iife.js"></script>
 <style>
 /* Layout: one narrow column. Home = theme checklist for today; Drill = board + controls. */
@@ -81,7 +83,7 @@ summary{cursor:pointer;font-weight:600}
   box-shadow:0 0 0 1px var(--line);user-select:none;-webkit-user-select:none;touch-action:manipulation}
 .sq{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;min-width:0;min-height:0;font-size:9cqw;line-height:1;cursor:pointer;border:0;padding:0;border-radius:0}
 .pc{font-family:"DejaVu Sans","Segoe UI Symbol","Noto Sans Symbols 2",serif;font-variant-emoji:text}
-.sq.l{background:#eed5a4} .sq.d{background:#355a31}
+.sq.l{background:var(--sq-l,#eed5a4)} .sq.d{background:var(--sq-d,#355a31)}
 .board{box-shadow:0 0 0 2px #1d2b1b;border-radius:2px}
 .sq.last::before{content:"";position:absolute;inset:0;background:rgba(214,40,40,.55)}
 .sq.sel::before{content:"";position:absolute;inset:0;background:rgba(190,220,50,.85)}
@@ -94,7 +96,7 @@ summary{cursor:pointer;font-weight:600}
 /* chessground (Lichess's board, the same one Chess Lab / Study uses) */
 .board.cgb{display:block;position:relative}
 .board.cgb .cg-host{width:100%;height:100%}
-.board.cgb cg-board{background-color:#eed5a4;background-image:conic-gradient(#355a31 0 25%, transparent 0 50%, #355a31 0 75%, transparent 0);background-size:25% 25%}
+.board.cgb cg-board{background-color:var(--sq-l,#eed5a4);background-image:conic-gradient(var(--sq-d,#355a31) 0 25%, transparent 0 50%, var(--sq-d,#355a31) 0 75%, transparent 0);background-size:25% 25%}
 .board.cgb piece{background-size:92% 92%;background-position:center;background-repeat:no-repeat}
 .board.cgb cg-board square.last-move{background-color:rgba(214,40,40,.55)}
 .board.cgb cg-board square.selected{background-color:rgba(190,220,50,.85)}
@@ -109,10 +111,10 @@ summary{cursor:pointer;font-weight:600}
 .board.cgb cg-board square.bad{background-color:rgba(220,50,50,.55)}
 .board.cgb coords{font:600 11px system-ui,sans-serif;text-shadow:none}
 .board.cgb coords coord{text-transform:lowercase !important}
-.board.cgb coords.ranks coord:nth-child(2n+1),.board.cgb coords.files coord:nth-child(2n+1){color:#eed5a4}
-.board.cgb coords.ranks coord:nth-child(2n),.board.cgb coords.files coord:nth-child(2n){color:#355a31}
-.board.cgb .orientation-black coords.ranks coord:nth-child(2n+1),.board.cgb .orientation-black coords.files coord:nth-child(2n+1){color:#355a31}
-.board.cgb .orientation-black coords.ranks coord:nth-child(2n),.board.cgb .orientation-black coords.files coord:nth-child(2n){color:#eed5a4}
+.board.cgb coords.ranks coord:nth-child(2n+1),.board.cgb coords.files coord:nth-child(2n+1){color:var(--sq-l,#eed5a4)}
+.board.cgb coords.ranks coord:nth-child(2n),.board.cgb coords.files coord:nth-child(2n){color:var(--sq-d,#355a31)}
+.board.cgb .orientation-black coords.ranks coord:nth-child(2n+1),.board.cgb .orientation-black coords.files coord:nth-child(2n+1){color:var(--sq-d,#355a31)}
+.board.cgb .orientation-black coords.ranks coord:nth-child(2n),.board.cgb .orientation-black coords.files coord:nth-child(2n){color:var(--sq-l,#eed5a4)}
 .board.cgb .badge-layer{position:absolute;inset:0;pointer-events:none;z-index:5}
 .board.cgb .badge-layer .bsq{position:absolute;width:12.5%;height:12.5%}
 body.dragging, body.dragging *{cursor:grabbing !important}
@@ -122,7 +124,7 @@ body.dragging, body.dragging *{cursor:grabbing !important}
 .pc{position:relative;z-index:1;width:115%;height:115%;max-width:none;flex:none;top:-7.5%;pointer-events:none;display:block}
 .coord{position:absolute;font:600 1.8cqw var(--body);z-index:1;line-height:1}
 .coord.f{left:4px;bottom:3px} .coord.r{right:4px;top:3px}
-.sq.l .coord{color:#355a31} .sq.d .coord{color:#eed5a4}
+.sq.l .coord{color:var(--sq-d,#355a31)} .sq.d .coord{color:var(--sq-l,#eed5a4)}
 
 .board{touch-action:none}
 .sq{user-select:none;-webkit-user-select:none;-webkit-user-drag:none}
@@ -484,7 +486,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
 .later-empty{grid-column:1/-1}
 .later-card{display:flex;flex-direction:column;gap:10px}
 .mb{display:grid;grid-template-columns:repeat(8,1fr);aspect-ratio:1;border-radius:4px;overflow:hidden;box-shadow:0 0 0 2px #1d2b1b}
-.mb i{display:block;position:relative}.mb i.l{background:#eed5a4}.mb i.d{background:#355a31}
+.mb i{display:block;position:relative}.mb i.l{background:var(--sq-l,#eed5a4)}.mb i.d{background:var(--sq-d,#355a31)}
 .mb img{position:absolute;left:-7.5%;top:-15%;width:115%;height:115%;z-index:1}
 .later-info{display:flex;flex-direction:column;gap:2px}
 .later-btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -604,7 +606,8 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
     <button data-view="rush" id="tabRush">Rush</button>
     <button data-view="games" id="tabGames">Games</button>
     <button data-view="play" id="tabPlay">Play</button>
-    <a href="chess-lab/" class="homelink" style="margin:0 0 0 auto">Spar &amp; Review →</a>
+    <button class="themebtn" style="margin:0 0 0 auto" title="Board colors" onclick="BoardTheme.open()">🎨</button>
+    <a href="chess-lab/" class="homelink">Spar &amp; Review →</a>
   </nav>
 
   <!-- PLAY -->
