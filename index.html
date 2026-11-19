@@ -152,6 +152,7 @@ document.getElementById("greet").textContent = (h<12?"Good morning, Dede.":h<18?
   const n = s => items.filter(i => i.status===s).length;
   document.getElementById("libStat").innerHTML = items.length
     ? `<span>Done <b>${n("done")}/${items.filter(i=>i.status!=="dropped").length}</b></span>` + (n("doing") ? `<span>In progress <b>${n("doing")}</b></span>` : "")
+      + (() => { const r = items.filter(i => i.rating); return r.length ? `<span>Avg <b>★ ${(r.reduce((a,i)=>a+i.rating,0)/r.length).toFixed(1)}</b></span>` : ""; })()
     : `<span>Your recommendations are waiting</span>`;
 })();
 </script>

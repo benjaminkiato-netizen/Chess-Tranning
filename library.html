@@ -72,9 +72,17 @@ button.ghost{font:600 14px var(--body);color:var(--fg);background:var(--panel);b
 .seg button.on[data-v="dropped"]{background:#341313;color:#f87171}
 .icon{background:none;border:0;color:var(--muted);cursor:pointer;font-size:16px;padding:6px;border-radius:8px}
 .icon:hover{color:var(--fg);background:var(--panel2)}
-.stars{display:inline-flex;gap:1px}
-.stars button{background:none;border:0;cursor:pointer;font-size:17px;color:#3a414b;padding:0 1px;line-height:1}
-.stars button.on{color:#facc15}
+.rate{display:inline-flex;align-items:center;gap:6px}
+.stars{display:inline-flex;gap:2px}
+.star{position:relative;width:20px;height:20px;font-size:20px;line-height:20px;text-align:center;user-select:none}
+.star i{font-style:normal;background:linear-gradient(90deg,#facc15 var(--f),#3a414b var(--f));-webkit-background-clip:text;background-clip:text;color:transparent}
+.star button{position:absolute;top:0;bottom:0;width:50%;background:none;border:0;padding:0;cursor:pointer}
+.star button:first-of-type{left:0} .star button:last-of-type{right:0}
+.score{font:500 13px var(--mono);color:var(--muted);min-width:42px;font-variant-numeric:tabular-nums}
+.score.set{color:#facc15}
+.review{grid-column:1/-1;margin:2px 0 0;font-size:14px;color:var(--fg);border-left:2px solid #3b3260;padding-left:10px}
+.review b{color:var(--lib);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin-right:6px}
+.pcard .avg{color:#facc15}
 .empty{color:var(--muted);text-align:center;padding:36px 0}
 dialog{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:14px;padding:20px;width:min(460px,calc(100vw - 32px))}
 dialog::backdrop{background:rgba(0,0,0,.6)}
@@ -109,7 +117,7 @@ dialog .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
       <option value="status">Sort: status</option>
       <option value="added">Sort: newest</option>
       <option value="title">Sort: A–Z</option>
-      <option value="rating">Sort: rating</option>
+      <option value="rating">Sort: top rated</option>
     </select>
     <button class="pri" id="addBtn">+ Add</button>
   </div>
@@ -129,6 +137,12 @@ dialog .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
   <textarea id="fNote" rows="3"></textarea>
   <label for="fStatus">Status</label>
   <select id="fStatus"></select>
+  <div id="fRateWrap">
+    <label for="fRating">Rating</label>
+    <select id="fRating"></select>
+    <label for="fReview">My take</label>
+    <textarea id="fReview" rows="2" placeholder="What you thought, in a line or two"></textarea>
+  </div>
   <div class="row"><button class="ghost" id="dlgCancel">Cancel</button><button class="pri" id="dlgSave">Save</button></div>
 </dialog>
 
@@ -216,9 +230,10 @@ function load(){
   try{ S = JSON.parse(localStorage.getItem(KEY)); }catch(e){}
   if(!S || !Array.isArray(S.items)){
     const now = Date.now();
-    S = { items: SEED.map(([type,title,by,note,status],i) => ({ id:uid()+i, type, title, by, note, status:status||"todo", rating:0, added:now-i })) };
+    S = { items: SEED.map(([type,title,by,note,status],i) => ({ id:uid()+i, type, title, by, note, status:status||"todo", rating:0, added:now-i })), v:2 };
     persist(S);
   }
+  if((S.v||1) < 2){ S.items.forEach(i => { i.rating = (i.rating||0) * 2; }); S.v = 2; persist(S); }
   return S;
 }
 function persist(s){ try{ localStorage.setItem(KEY, JSON.stringify(s)); }catch(e){} }
@@ -230,13 +245,30 @@ try{ Object.assign(view, JSON.parse(sessionStorage.getItem("library.view"))||{})
 const $ = id => document.getElementById(id);
 const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
 
+const RATE_WORDS = ["","Awful","Bad","Weak","Meh","Okay","Decent","Good","Great","Amazing","Masterpiece"];
+const canRate = i => i.status==="done" || i.status==="dropped";
+const fmt = r => (r/2).toFixed(r%2 ? 1 : 0);
+function starsHTML(r){
+  return `<span class="stars">${[1,2,3,4,5].map(n => {
+    const f = r >= n*2 ? 100 : r === n*2-1 ? 50 : 0;
+    return `<span class="star"><i style="--f:${f}%">★</i><button data-r="${n*2-1}" aria-label="${fmt(n*2-1)} stars"></button><button data-r="${n*2}" aria-label="${n} stars"></button></span>`;
+  }).join("")}</span>`;
+}
+function paint(box, r){
+  box.querySelectorAll(".star i").forEach((el, k) => { const n = k+1; el.style.setProperty("--f", (r >= n*2 ? 100 : r === n*2-1 ? 50 : 0) + "%"); });
+  const sc = box.querySelector(".score"); sc.textContent = r ? `${r}/10` : "Rate"; sc.title = RATE_WORDS[r] || "";
+}
+
 function render(){
   try{ sessionStorage.setItem("library.view", JSON.stringify(view)); }catch(e){}
   // progress cards
   $("progress").innerHTML = Object.entries(TYPES).map(([t,m]) => {
     const all = S.items.filter(i => i.type===t && i.status!=="dropped"), done = all.filter(i => i.status==="done").length;
     const pct = all.length ? Math.round(done/all.length*100) : 0;
-    return `<div class="pcard"><div class="row"><b>${m.label}</b><span>${done}/${all.length} ${t==="book"?"read":"watched"}</span></div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+    const rated = S.items.filter(i => i.type===t && i.rating);
+    const avg = rated.length ? (rated.reduce((a,i)=>a+i.rating,0)/rated.length).toFixed(1) : null;
+    return `<div class="pcard"><div class="row"><b>${m.label}</b><span>${done}/${all.length} ${t==="book"?"read":"watched"}</span></div><div class="bar"><i style="width:${pct}%"></i></div>`
+      + `<div class="row"><span>${avg ? `avg <span class="avg">★ ${avg}/10</span>` : "no ratings yet"}</span><span>${rated.length ? rated.length+" rated" : ""}</span></div></div>`;
   }).join("");
   // tabs
   const count = t => S.items.filter(i => t==="all" || i.type===t).length;
@@ -244,17 +276,17 @@ function render(){
     `<button class="tab ${view.type===k?"on":""}" data-t="${k}" role="tab">${l}<small>${count(k)}</small></button>`).join("");
   // status chips
   const tt = view.type==="all" ? null : view.type;
-  $("chips").innerHTML = [["all","All"],...["todo","doing","done","dropped"].map(s=>[s,statusLabel(s,tt)])].map(([k,l]) =>
+  $("chips").innerHTML = [["all","All"],...["todo","doing","done","dropped"].map(s=>[s,statusLabel(s,tt)]),["rated","★ Rated"]].map(([k,l]) =>
     `<button class="chip ${view.status===k?"on":""}" data-s="${k}">${l}</button>`).join("");
   $("q").value = view.q; $("sort").value = view.sort;
   // list
   const q = view.q.trim().toLowerCase();
-  let items = S.items.filter(i => (view.type==="all"||i.type===view.type) && (view.status==="all"||i.status===view.status)
+  let items = S.items.filter(i => (view.type==="all"||i.type===view.type) && (view.status==="all"||i.status===view.status||(view.status==="rated"&&i.rating))
     && (!q || (i.title+" "+i.by+" "+i.note).toLowerCase().includes(q)));
   const byTitle = (a,b) => a.title.localeCompare(b.title);
   items.sort({
     status:(a,b)=>STATUS_ORDER.indexOf(a.status)-STATUS_ORDER.indexOf(b.status) || b.added-a.added,
-    added:(a,b)=>b.added-a.added, title:byTitle, rating:(a,b)=>b.rating-a.rating || byTitle(a,b)
+    added:(a,b)=>b.added-a.added, title:byTitle, rating:(a,b)=>(b.rating||0)-(a.rating||0) || STATUS_ORDER.indexOf(a.status)-STATUS_ORDER.indexOf(b.status) || byTitle(a,b)
   }[view.sort]);
   $("list").innerHTML = items.length ? items.map(i => `
     <div class="item" data-id="${i.id}" data-s="${i.status}">
@@ -262,12 +294,13 @@ function render(){
       <div class="side">
         <div class="seg" role="group" aria-label="Status">${["todo","doing","done","dropped"].map(s =>
           `<button data-v="${s}" class="${i.status===s?"on":""}">${statusLabel(s,i.type)}</button>`).join("")}</div>
-        ${i.status==="done" ? `<span class="stars">${[1,2,3,4,5].map(n=>`<button data-r="${n}" class="${n<=i.rating?"on":""}" aria-label="${n} stars">★</button>`).join("")}</span>` : ""}
+        ${canRate(i) ? `<span class="rate" data-r="${i.rating||0}">${starsHTML(i.rating||0)}<span class="score ${i.rating?"set":""}" title="${RATE_WORDS[i.rating||0]}">${i.rating ? i.rating+"/10" : "Rate"}</span></span>` : ""}
         <button class="icon" data-act="edit" title="Edit">✎</button>
         <button class="icon" data-act="del" title="Delete">✕</button>
       </div>
       ${i.by ? `<div class="by">${esc(i.by)}</div>` : ""}
       ${i.note ? `<p class="note">${esc(i.note)}</p>` : ""}
+      ${i.review ? `<p class="review"><b>My take</b>${esc(i.review)}</p>` : ""}
     </div>`).join("") : `<div class="empty">Nothing here${q?" for that search":""}.</div>`;
   const b = $("syncBtn"); if (window.HubSync && HubSync.connected()) { b.textContent = "☁ Sync on"; b.classList.add("on"); }
 }
@@ -284,8 +317,8 @@ $("toastUndo").onclick = () => { if(undo) undo(); undo = null; $("toast").classL
 $("list").onclick = e => {
   const card = e.target.closest(".item"); if(!card) return;
   const it = S.items.find(x => x.id===card.dataset.id); if(!it) return;
-  const seg = e.target.closest(".seg button"), star = e.target.closest(".stars button"), act = e.target.closest("[data-act]");
-  if(seg){ it.status = seg.dataset.v; if(it.status!=="done") it.rating = it.rating||0; save(); }
+  const seg = e.target.closest(".seg button"), star = e.target.closest(".star button"), act = e.target.closest("[data-act]");
+  if(seg){ it.status = seg.dataset.v; save(); }
   else if(star){ const n = +star.dataset.r; it.rating = it.rating===n ? 0 : n; save(); }
   else if(act?.dataset.act==="del"){
     const idx = S.items.indexOf(it); S.items.splice(idx,1); save();
@@ -294,8 +327,13 @@ $("list").onclick = e => {
   else if(act?.dataset.act==="edit") openDlg(it);
 };
 
+$("list").addEventListener("mouseover", e => { const b = e.target.closest(".star button"); if(b) paint(b.closest(".rate"), +b.dataset.r); });
+$("list").addEventListener("mouseout", e => { const r = e.target.closest(".rate"); if(r && !r.contains(e.relatedTarget)) paint(r, +r.dataset.r); });
+
 // add / edit dialog
 let editing = null;
+function fillRating(cur){ $("fRating").innerHTML = `<option value="0">Not rated</option>` + [10,9,8,7,6,5,4,3,2,1].map(r => `<option value="${r}" ${r===cur?"selected":""}>${"★".repeat(Math.floor(r/2))}${r%2?"½":""}  ${r}/10 · ${RATE_WORDS[r]}</option>`).join(""); }
+const showRate = () => { $("fRateWrap").style.display = ["done","dropped"].includes($("fStatus").value) ? "" : "none"; };
 function fillStatus(type, cur){ $("fStatus").innerHTML = STATUS_ORDER.map(s=>`<option value="${s}" ${s===cur?"selected":""}>${statusLabel(s,type)}</option>`).join(""); }
 function openDlg(it){
   editing = it || null;
@@ -303,14 +341,17 @@ function openDlg(it){
   $("dlgTitle").textContent = it ? "Edit" : "Add to library";
   $("fType").value = type; $("fTitle").value = it?.title||""; $("fBy").value = it?.by||""; $("fNote").value = it?.note||"";
   $("fByLabel").textContent = TYPES[type].by; fillStatus(type, it?.status||"todo");
+  fillRating(it?.rating||0); $("fReview").value = it?.review||""; showRate();
   $("dlg").showModal(); $("fTitle").focus();
 }
 $("fType").onchange = e => { $("fByLabel").textContent = TYPES[e.target.value].by; fillStatus(e.target.value, $("fStatus").value); };
+$("fStatus").onchange = showRate;
 $("addBtn").onclick = () => openDlg(null);
 $("dlgCancel").onclick = () => $("dlg").close();
 $("dlgSave").onclick = () => {
   const title = $("fTitle").value.trim(); if(!title){ $("fTitle").focus(); return; }
-  const data = { type:$("fType").value, title, by:$("fBy").value.trim(), note:$("fNote").value.trim(), status:$("fStatus").value };
+  const data = { type:$("fType").value, title, by:$("fBy").value.trim(), note:$("fNote").value.trim(), status:$("fStatus").value, rating:+$("fRating").value, review:$("fReview").value.trim() };
+  if(!["done","dropped"].includes(data.status)){ delete data.rating; delete data.review; }
   if(editing) Object.assign(editing, data);
   else S.items.push({ id:uid(), rating:0, added:Date.now(), ...data });
   $("dlg").close(); save();
