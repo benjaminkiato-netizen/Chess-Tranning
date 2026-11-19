@@ -1982,7 +1982,26 @@ function playUci(u){ const mv = game.move({from:u.slice(0,2), to:u.slice(2,4), p
 /* ---------- sound (synthesized, no files) ---------- */
 S.sound ??= true;
 let AC = null;
-function ctx(){ AC ??= new (window.AudioContext || window.webkitAudioContext)(); if(AC.state==="suspended") AC.resume(); return AC; }
+function ctx(){ AC ??= new (window.AudioContext || window.webkitAudioContext)(); if(AC.state==="suspended") AC.resume(); loadSamples(AC); return AC; }
+const SND_BASE = "sounds/";
+// recorded wooden piece sounds (two takes for moves, picked at random; a double knock for captures)
+const SAMPLES = {}; let samplesLoading = null;
+function loadSamples(ac){
+  samplesLoading ||= Promise.all(["move1", "move2", "capture"].map(n =>
+    fetch(SND_BASE + n + ".mp3").then(r => r.arrayBuffer())
+      .then(b => new Promise((res, rej) => ac.decodeAudioData(b, res, rej)))
+      .then(buf => { SAMPLES[n] = buf; }).catch(() => {})));
+}
+function sample(ac, t, name, vol = 1){
+  const b = SAMPLES[name]; if(!b) return false;
+  const s = ac.createBufferSource(); s.buffer = b;
+  const g = ac.createGain(); g.gain.value = vol;
+  s.connect(g).connect(ac.destination); s.start(t);
+  return true;
+}
+const pickMove = () => Math.random() < .5 ? "move1" : "move2";
+// get the sounds ready on your first click, so the very first move already uses them
+document.addEventListener("pointerdown", () => { if(S.sound) try{ ctx(); }catch(e){} }, {once: true, capture: true});
 function knock(ac, t, freq, len, vol){
   // short filtered noise burst = the "clack" of wood on wood
   const n = Math.floor(ac.sampleRate*len), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
@@ -2006,9 +2025,9 @@ function sound(kind){
   if(!S.sound) return;
   try{
     const ac = ctx(), t = ac.currentTime;
-    if(kind==="move") knock(ac, t, 1400, .06, 1.2);
-    else if(kind==="capture"){ knock(ac, t, 1000, .08, 1.6); knock(ac, t+.045, 1700, .05, .9); }
-    else if(kind==="check"){ knock(ac, t, 1400, .06, 1.2); tone(ac, t+.03, 880, .18, .12, "triangle"); }
+    if(kind==="move"){ if(!sample(ac, t, pickMove())) knock(ac, t, 1400, .06, 1.2); }
+    else if(kind==="capture"){ if(!sample(ac, t, "capture")){ knock(ac, t, 1000, .08, 1.6); knock(ac, t+.045, 1700, .05, .9); } }
+    else if(kind==="check"){ if(!sample(ac, t, pickMove())) knock(ac, t, 1400, .06, 1.2); tone(ac, t+.03, 880, .18, .12, "triangle"); }
     else if(kind==="error") tone(ac, t, 160, .22, .25, "square");
     else if(kind==="solved") [523, 659, 784].forEach((f,i) => tone(ac, t+i*.09, f, .3, .18, "triangle"));
     else if(kind==="win") [523, 659, 784, 1047].forEach((f,i) => tone(ac, t+i*.11, f, i===3 ? .6 : .3, .2, "triangle"));
