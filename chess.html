@@ -79,6 +79,16 @@ summary{cursor:pointer;font-weight:600}
 
 /* Drill */
 .drill-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+/* material count in game review: pieces each side has taken, plus who is up and by how much (like chess.com) */
+.matbox{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 150px;align-items:flex-end}
+.mat-row{display:flex;align-items:center;gap:6px;min-height:20px}
+.mat-row .dot{width:10px;height:10px;border-radius:50%;border:1px solid var(--muted);flex:none}
+.mat-row .dot.w{background:#f2f2f2} .mat-row .dot.b{background:#222}
+.mat-pcs{display:flex;align-items:center}
+.mat-pcs img{width:24px;height:24px;margin-right:-10px} .mat-pcs img.gap{margin-left:7px}
+.mat-pcs img:last-child{margin-right:0}
+.mat-up{font:600 13px var(--mono, monospace);color:var(--muted);margin-left:4px}
+.mat-none{font-size:12px;color:var(--muted)}
 .board{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));grid-template-rows:repeat(8,minmax(0,1fr));width:100%;max-width:520px;aspect-ratio:1/1;container-type:inline-size;border-radius:6px;overflow:hidden;
   box-shadow:0 0 0 1px var(--line);user-select:none;-webkit-user-select:none;touch-action:manipulation}
 .sq{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;min-width:0;min-height:0;font-size:9cqw;line-height:1;cursor:pointer;border:0;padding:0;border-radius:0}
@@ -962,6 +972,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
         <h2 id="d-theme"></h2>
       </div>
       <button id="back">← All themes</button>
+      <div class="matbox" id="matBox" hidden></div>
     </div>
     <div class="status" id="status">Loading puzzle…</div>
     <div class="live" id="live" hidden>
@@ -2820,7 +2831,7 @@ function setDrillMode(m){
   const g = m === "game";
   $("gpTop").hidden = !g; $("gpBottom").hidden = !g;
   document.querySelector("#drill .side").classList.toggle("gm", g);
-  $("drill").classList.toggle("gm", g); $("gleft").hidden = !g; $("gcoach").hidden = !g;
+  $("drill").classList.toggle("gm", g); $("gleft").hidden = !g; $("gcoach").hidden = !g; $("matBox").hidden = !g;
   document.querySelector(".wrap").classList.toggle("wide", g);
   if(g) $("gleft").prepend($("nav")); else $("gpBottom").before($("nav"));
   const L = m === "live";
@@ -3433,6 +3444,7 @@ function gameSync(){
     }
   } else com = '<span class="muted">Starting position. Press → to begin.</span>';
   $("gpComment").innerHTML = com;
+  renderMaterial(positions[viewIdx]?.fen);
   renderCoach(onMain, d, A, e);
   const mn = $("gpMoveNote");
   const can = onMain && gPly > 0;
@@ -3440,6 +3452,29 @@ function gameSync(){
   if(document.activeElement !== mn) mn.value = can ? (S.gnotes[curGame.id]?.moves?.[gPly] || "") : "";
   mn.disabled = !can; mn.placeholder = can ? "What were you thinking here?" : "Go to a move from the game to add a note.";
   $("gpLog").disabled = !can;
+}
+/* Material: for each side, the enemy pieces it has captured (pawns first, then knights, bishops, rooks, queen)
+   and "+N" for the side that is ahead. Counts come from what is missing from the board, so promotions are handled
+   by the point total rather than the icons. */
+function renderMaterial(fen){
+  const box = $("matBox"); if(!box || !fen) return;
+  const START = {p:8, n:2, b:2, r:2, q:1}, have = {w:{p:0,n:0,b:0,r:0,q:0,k:0}, b:{p:0,n:0,b:0,r:0,q:0,k:0}};
+  for(const ch of fen.split(" ")[0]) if(/[pnbrqk]/i.test(ch)) have[ch === ch.toLowerCase() ? "b" : "w"][ch.toLowerCase()]++;
+  const pts = c => Object.keys(START).reduce((a,t) => a + have[c][t]*PVAL[t], 0);
+  const diff = pts("w") - pts("b");
+  const row = (side) => {      // side = who did the capturing; shows the other colour's missing pieces
+    const lost = side === "w" ? "b" : "w";
+    let html = "", first = true;
+    for(const t of ["p","n","b","r","q"]){
+      const n = Math.max(0, START[t] - have[lost][t]);
+      for(let i = 0; i < n; i++){ html += `<img src="${PIECES[lost + t]}" alt="" class="${i === 0 && !first ? "gap" : ""}">`; }
+      if(n) first = false;
+    }
+    const up = side === "w" ? diff : -diff;
+    const name = playerName(curGame.players[side === "w" ? "white" : "black"]);
+    return `<div class="mat-row" title="${esc(name)}${side === color ? " (you)" : ""}"><span class="dot ${side}"></span><span class="mat-pcs">${html || '<span class="mat-none">nothing taken</span>'}</span>${up > 0 ? `<span class="mat-up">+${up}</span>` : ""}</div>`;
+  };
+  box.innerHTML = row("w") + row("b");
 }
 /* Coach card (wide screens): what kind of move this was and why, for every move, not just the errors. */
 const COACH_TXT = {
