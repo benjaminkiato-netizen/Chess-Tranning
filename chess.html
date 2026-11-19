@@ -3556,11 +3556,16 @@ function buildAnalysis(fens, moves, res){
   const evals = [], cls = [];
   for(let k=1; k<fens.length; k++){
     const side = fens[k-1].split(" ")[1], s = side === "w" ? 1 : -1, st = P[side];
-    const before = wcOf(res[k-1])*s, after = wcOf(res[k])*s, drop = before - after;
+    const best = res[k-1].pv[0], played = moves[k] ? moves[k][0] + moves[k][1] : "";
+    // If the played move is one of the engine's top 3, judge it with that line's own score from the same search.
+    // Scoring it from the next position (a separate search) can disagree by a few tenths and wrongly
+    // turn the engine's own 2nd choice into an "inaccuracy".
+    const alts = res[k-1].alts || [], idx = alts.findIndex(a => a.m && a.m.slice(0,4) === played);
+    const top = idx >= 0 && alts[0] ? alts[0] : res[k-1], got = idx >= 0 ? alts[idx] : res[k];
+    const before = wcOf(top)*s, after = wcOf(got)*s, drop = before - after;
     const e = res[k].mate !== undefined ? {mate: res[k].mate} : {eval: res[k].eval};
     const acc = Math.max(0, Math.min(100, 103.1668*Math.exp(-0.04354*((50+50*before)-(50+50*after))) - 3.1669));
-    st.n++; st.acc += acc; st.loss += Math.max(0, cp(res[k-1])*s - cp(res[k])*s);
-    const best = res[k-1].pv[0], played = moves[k] ? moves[k][0] + moves[k][1] : "";
+    st.n++; st.acc += acc; st.loss += Math.max(0, cp(top)*s - cp(got)*s);
     if(drop >= 0.1 && best && best.slice(0,4) !== played){
       const name = drop >= 0.3 ? "Blunder" : drop >= 0.2 ? "Mistake" : "Inaccuracy";
       st[name.toLowerCase()]++;
@@ -3570,7 +3575,6 @@ function buildAnalysis(fens, moves, res){
     }
     evals.push(e);
     // rating vs the engine's top 3: best = star, 2nd = thumbs up, anything else that isn't an error = check
-    const alts = res[k-1].alts || [], idx = alts.findIndex(a => a.m && a.m.slice(0,4) === played);
     let c = "ok";
     if(idx === 0){
       c = "best";
