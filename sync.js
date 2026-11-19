@@ -16,7 +16,9 @@
   const LS = {
     token: 'hubSync.token', key: 'hubSync.key', salt: 'hubSync.salt', gist: 'hubSync.gist', imgGist: 'hubSync.imgGist',
     device: 'hubSync.device', lastHash: 'hubSync.lastHash', lastAt: 'hubSync.lastAt', imgs: 'hubSync.imgs', user: 'hubSync.user',
+    pauseUntil: 'hubSync.pauseUntil', lastPush: 'hubSync.lastPush',
   };
+  const PUSH_EVERY = 90_000;   // at most one upload per 90 s across all tabs (GitHub limits how often a gist can be edited)
   const SYNCED_PREFIXES = ['dailyPuzzleDrill.', 'chesslab.', 'library.'];
   const NEVER_SYNC = new Set(['chesslab.inbox', 'chesslab.studies.history']);
   const PUZZLE_KEY = 'dailyPuzzleDrill.v1';
@@ -70,10 +72,21 @@
       headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token || ls.get(LS.token)}`, ...(opts.body ? { 'Content-Type': 'application/json' } : {}) },
     });
     if (!res.ok) {
-      const msg = res.status === 401 ? 'GitHub key is not valid (it may have expired)'
-        : res.status === 403 || res.status === 404 ? 'GitHub key needs the "gist" permission'
-          : `GitHub error ${res.status}`;
-      const err = new Error(msg); err.status = res.status; throw err;
+      let ghMsg = '';
+      try { ghMsg = (await res.json()).message || ''; } catch { /* */ }
+      const retryAfter = +res.headers.get('retry-after') || 0;
+      const reset = +res.headers.get('x-ratelimit-reset') || 0;
+      const rateLimited = res.status === 429 || (res.status === 403 && (res.headers.get('x-ratelimit-remaining') === '0' || retryAfter || /rate limit|abuse/i.test(ghMsg)));
+      let msg;
+      if (res.status === 401) msg = 'GitHub key is not valid (it may have expired)';
+      else if (rateLimited) msg = 'GitHub asked to slow down';
+      else if (res.status === 404 && path.startsWith('/gists/')) msg = 'sync gist not found';
+      else if (res.status === 403 || res.status === 404) msg = 'GitHub key needs the "gist" permission' + (ghMsg ? ` (${ghMsg})` : '');
+      else msg = `GitHub error ${res.status}` + (ghMsg ? `: ${ghMsg}` : '');
+      const err = new Error(msg); err.status = res.status; err.rateLimited = rateLimited;
+      err.missingGist = res.status === 404 && path.startsWith('/gists/');
+      err.retryAt = retryAfter ? Date.now() + retryAfter * 1000 : reset ? reset * 1000 : Date.now() + 5 * 60_000;
+      throw err;
     }
     return res.status === 204 ? null : res.json();
   }
@@ -183,6 +196,16 @@
     await gh(`/gists/${ls.get(LS.gist)}`, { method: 'PATCH', body: JSON.stringify({ files: { [DATA_FILE]: { content: JSON.stringify(env) } } }) });
     ls.set(LS.lastHash, snap.hash);
     ls.set(LS.lastAt, savedAt);
+    ls.set(LS.lastPush, String(Date.now()));
+  }
+
+  // the data gist was deleted or replaced: find it again by its description, or make a new one
+  async function relinkGist() {
+    const gists = await gh('/gists?per_page=100');
+    const dataG = gists.find((g) => g.description === DESC && g.files[DATA_FILE]);
+    if (dataG) { ls.set(LS.gist, dataG.id); return; }
+    const data = await gh('/gists', { method: 'POST', body: JSON.stringify({ description: DESC, public: false, files: { [DATA_FILE]: { content: '{}' } } }) });
+    ls.set(LS.gist, data.id); ls.del(LS.lastAt);
   }
 
   async function remoteEnvelope(gistId, token) {
@@ -230,9 +253,10 @@
 
   // ---------- the regular check ----------
   let busy = false, conflictShown = false;
-  let firstCheck = true;
-  async function check({ quiet } = {}) {
+  let firstCheck = true, relinked = false;
+  async function check({ quiet, leaving } = {}) {
     if (!connected() || busy) return;
+    if (Date.now() < +(ls.get(LS.pauseUntil) || 0)) return;   // GitHub asked us to wait
     busy = true;
     try {
       const first = firstCheck; firstCheck = false;
@@ -255,13 +279,23 @@
       } else if (remoteNewer && localChanged) {
         showConflict(env, snap);
       } else if (localChanged) {
+        // batch quick edits into one upload instead of one per change
+        if (!leaving && Date.now() - +(ls.get(LS.lastPush) || 0) < PUSH_EVERY) return;
         chip('Saving to GitHub…', 'busy');
         await push(snap);
         chip('Saved', 'ok');
       }
     } catch (e) {
       console.warn('sync', e);
-      chip('Sync problem: ' + e.message, 'err', true);
+      if (e.rateLimited) {
+        // not a real problem: wait until GitHub's limit resets, then carry on by itself
+        ls.set(LS.pauseUntil, String(Math.min(e.retryAt, Date.now() + 60 * 60_000)));
+        chip(`GitHub asked to slow down. Sync resumes in ${Math.max(1, Math.round((+ls.get(LS.pauseUntil) - Date.now()) / 60_000))} min`, 'busy');
+        setTimeout(() => chip('Sync paused for a few minutes', 'ok'), 3000);
+      } else if (e.missingGist && !relinked) {
+        relinked = true;
+        try { await relinkGist(); setTimeout(() => check({ quiet: false, leaving: true }), 0); } catch (e2) { chip('Sync problem: ' + e2.message, 'err', true); }
+      } else chip('Sync problem: ' + e.message, 'err', true);
     } finally { busy = false; }
   }
 
@@ -385,7 +419,7 @@
       d.querySelector('#hs-now').onclick = async () => {
         msg('Syncing…');
         sessionStorage.removeItem('hubSync.look');
-        await check();
+        await check({ leaving: true });
         msg(`Done. Last saved or loaded: ${ago(ls.get(LS.lastAt))}`, 'ok');
       };
     } else {
@@ -431,7 +465,8 @@
     if (!connected()) return;
     check({ quiet: true });
     setInterval(() => { if (document.visibilityState === 'visible') check({ quiet: true }); }, 20_000);
-    document.addEventListener('visibilitychange', () => { check({ quiet: document.visibilityState === 'visible' ? false : true }); });
+    document.addEventListener('visibilitychange', () => { const hidden = document.visibilityState !== 'visible'; check({ quiet: hidden, leaving: hidden }); });
+    window.addEventListener('pagehide', () => check({ quiet: true, leaving: true }));
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();
