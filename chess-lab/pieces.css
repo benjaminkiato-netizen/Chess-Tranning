@@ -1,4 +1,4 @@
-/* Piece sets live in pieces/<set>/ (cartoon, geometric, outlined), one PNG per piece. board-theme.js sets --pc-wk etc. to the chosen set;
+/* Piece sets live in pieces/<set>/, one PNG per piece. board-theme.js sets --pc-wk etc. to the chosen set;
    cartoon is the fallback. Used by every board on the site. */
 .cg-wrap piece.king.white { background-image: var(--pc-wk, url("pieces/cartoon/wk.png?v=6")); }
 .cg-wrap piece.queen.white { background-image: var(--pc-wq, url("pieces/cartoon/wq.png?v=6")); }
