@@ -335,6 +335,28 @@ button.mv{white-space:nowrap;overflow:hidden}
   .drill-grid.gm .gleft{order:1} .drill-grid.gm .bcol{order:2}
   .drill-grid.gm .board{width:min(900px, calc(100vw - 32px - 48px - 290px - 300px - 22px), calc(100vh - 48px))}
 }
+/* coach column: left of the move list on wide screens (game review) */
+.gcoach{display:none}
+@media (min-width:1500px){
+  .wrap.wide{max-width:1880px}
+  .drill-grid.gm{grid-template-columns:270px 290px auto 300px}
+  .drill-grid.gm .gcoach{display:block;order:0;position:sticky;top:16px}
+  .drill-grid.gm .gcoach[hidden]{display:none}
+  .drill-grid.gm .board{width:min(900px, calc(100vw - 32px - 72px - 270px - 290px - 300px - 22px), calc(100vh - 48px))}
+  .drill-grid.gm .gp-comment{display:none}
+}
+.coach-card{gap:12px;padding:16px}
+.coach-top{display:flex;align-items:center;gap:10px}
+.coach-badge{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px}
+.coach-badge svg{width:20px;height:20px;fill:#fff}
+.coach-kind{font:700 17px/1.2 var(--display, inherit)}
+.coach-move{font-size:13px;color:var(--muted)}
+.coach-move .num{margin-left:6px}
+.coach-text{font-size:14px;line-height:1.55;display:flex;flex-direction:column;gap:8px}
+.coach-text p{margin:0}
+.coach-line{font-size:13px;color:var(--muted);border-left:3px solid var(--line);padding-left:10px}
+.coach-note{font-size:13px;border-left:3px solid #8b7cf6;padding-left:10px}
+.coach-empty{color:var(--muted);font-size:14px}
 .gp{display:flex;flex-direction:column;gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
 .gp p{margin:0;font-size:13px}
 .gp-pl{display:flex;flex-direction:column;gap:3px;padding-bottom:8px;border-bottom:1px solid var(--line)}
@@ -904,6 +926,9 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
 
   <!-- DRILL -->
   <section id="drill" class="drill-grid" hidden>
+    <div class="gcoach" id="gcoach" hidden>
+      <div class="gp coach-card" id="gpCoach"></div>
+    </div>
     <div class="gleft" id="gleft" hidden>
       <div class="gp gp-movebox">
         <div class="gp-moves" id="gpMoves"></div>
@@ -2782,7 +2807,7 @@ function setDrillMode(m){
   const g = m === "game";
   $("gpTop").hidden = !g; $("gpBottom").hidden = !g;
   document.querySelector("#drill .side").classList.toggle("gm", g);
-  $("drill").classList.toggle("gm", g); $("gleft").hidden = !g;
+  $("drill").classList.toggle("gm", g); $("gleft").hidden = !g; $("gcoach").hidden = !g;
   document.querySelector(".wrap").classList.toggle("wide", g);
   if(g) $("gleft").prepend($("nav")); else $("gpBottom").before($("nav"));
   const L = m === "live";
@@ -3395,12 +3420,42 @@ function gameSync(){
     }
   } else com = '<span class="muted">Starting position. Press → to begin.</span>';
   $("gpComment").innerHTML = com;
+  renderCoach(onMain, d, A, e);
   const mn = $("gpMoveNote");
   const can = onMain && gPly > 0;
   $("gpMoveNoteLbl").textContent = can ? `Note on ${moveLabel(gPly)}` : "Note on this move";
   if(document.activeElement !== mn) mn.value = can ? (S.gnotes[curGame.id]?.moves?.[gPly] || "") : "";
   mn.disabled = !can; mn.placeholder = can ? "What were you thinking here?" : "Go to a move from the game to add a note.";
   $("gpLog").disabled = !can;
+}
+/* Coach card (wide screens): what kind of move this was and why, for every move, not just the errors. */
+const COACH_TXT = {
+  best: "Stockfish's top choice here.",
+  good: "Stockfish's second choice. Close to the best move.",
+  ok: "A playable move, but not one of Stockfish's top 3.",
+  only: "The only good move. Everything else loses ground."
+};
+function renderCoach(onMain, d, A, e){
+  const box = $("gpCoach"); if(!box) return;
+  if(!onMain){ box.innerHTML = `<div class="coach-empty">Exploring your own line from ${d > 1 ? esc(moveLabel(d-1)) : "the start"}. The engine panel on the right follows along.</div>`; return; }
+  if(gPly < 1){ box.innerHTML = `<div class="coach-empty">Starting position. Press → or click a move to see what the coach thinks of it.</div>`; return; }
+  const ev = e ? (e.mate !== undefined ? (e.mate === 0 ? "" : `#${e.mate}`) : `${e.eval > 0 ? "+" : ""}${(e.eval/100).toFixed(1)}`) : "";
+  const kind = e?.judgment ? SYM[e.judgment.name][1] : A?.cls?.[gPly-1];
+  const b = kind && BADGE[kind];
+  const mover = mainline[gPly-1]?.fen.split(" ")[1], you = mover === color;
+  const who = you ? "You" : "Your opponent";
+  let html = `<div class="coach-top">${b ? `<span class="coach-badge" style="background:${b.bg}">${b.html}</span>` : ""}
+    <div><div class="coach-kind">${b ? esc(e?.judgment ? e.judgment.name : b.t.split(":")[0]) : esc(moveLabel(gPly))}</div>
+    <div class="coach-move">${esc(moveLabel(gPly))} · ${who === "You" ? "your move" : "opponent's move"}${ev ? `<span class="num">${ev}</span>` : ""}</div></div></div><div class="coach-text">`;
+  if(!A) html += `<p class="coach-empty">Run the analysis (right panel) to get comments on every move.</p>`;
+  else if(e?.judgment){
+    html += `<p>${esc(e.judgment.comment)}</p>`;
+    const coach = coachLine(gPly, e); if(coach) html += `<p>${esc(coach)}</p>`;
+    if(e.variation) html += `<p class="coach-line">Best line: ${esc(e.variation.split(" ").slice(0,8).join(" "))}</p>`;
+  } else if(kind && COACH_TXT[kind]) html += `<p>${COACH_TXT[kind]}</p>`;
+  const note = S.gnotes[curGame.id]?.moves?.[gPly];
+  if(note) html += `<p class="coach-note">${esc(note)}</p>`;
+  box.innerHTML = html + "</div>";
 }
 let noteTimer = 0;
 const saveSoon = () => { clearTimeout(noteTimer); noteTimer = setTimeout(save, 300); };
