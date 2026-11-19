@@ -8,6 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<link rel="stylesheet" href="chess-lab/vendor/chessground.base.css">
+<link rel="stylesheet" href="chess-lab/pieces.css">
+<script src="chess-lab/vendor/chessground.iife.js"></script>
 <style>
 /* Layout: one narrow column. Home = theme checklist for today; Drill = board + controls. */
 :root{
@@ -88,6 +91,30 @@ summary{cursor:pointer;font-weight:600}
 .sq.tgt.occ::after{width:88%;height:88%;background:transparent;box-shadow:inset 0 0 0 4px rgba(20,30,20,.28)}
 .sq.pre::before{content:"";position:absolute;inset:0;background:rgba(40,80,210,.55)}
 .sq.mine{cursor:grab}
+/* chessground (Lichess's board, the same one Chess Lab / Study uses) */
+.board.cgb{display:block;position:relative}
+.board.cgb .cg-host{width:100%;height:100%}
+.board.cgb cg-board{background-color:#eed5a4;background-image:conic-gradient(#355a31 0 25%, transparent 0 50%, #355a31 0 75%, transparent 0);background-size:25% 25%}
+.board.cgb piece{background-size:92% 92%;background-position:center;background-repeat:no-repeat}
+.board.cgb cg-board square.last-move{background-color:rgba(214,40,40,.55)}
+.board.cgb cg-board square.selected{background-color:rgba(190,220,50,.85)}
+.board.cgb cg-board square.move-dest{background:radial-gradient(rgba(20,30,20,.28) 26%, transparent 27%)}
+.board.cgb cg-board square.oc.move-dest{background:radial-gradient(transparent 0%, transparent 78%, rgba(20,30,20,.28) 79%)}
+.board.cgb cg-board square.move-dest:hover{background:rgba(20,30,20,.2)}
+.board.cgb cg-board square.premove-dest{background:radial-gradient(rgba(40,70,190,.45) 24%, transparent 25%)}
+.board.cgb cg-board square.oc.premove-dest{background:radial-gradient(transparent 0%, transparent 78%, rgba(40,70,190,.45) 79%)}
+.board.cgb cg-board square.current-premove{background-color:rgba(40,80,210,.55) !important}
+.board.cgb cg-board square.check{background:radial-gradient(ellipse at center, rgba(255,0,0,1) 0%, rgba(231,0,0,1) 25%, rgba(169,0,0,0) 89%, rgba(158,0,0,0) 100%)}
+.board.cgb cg-board square.hint{box-shadow:inset 0 0 0 4px var(--accent)}
+.board.cgb cg-board square.bad{background-color:rgba(220,50,50,.55)}
+.board.cgb coords{font:600 11px system-ui,sans-serif;text-shadow:none}
+.board.cgb coords coord{text-transform:lowercase !important}
+.board.cgb coords.ranks coord:nth-child(2n+1),.board.cgb coords.files coord:nth-child(2n+1){color:#eed5a4}
+.board.cgb coords.ranks coord:nth-child(2n),.board.cgb coords.files coord:nth-child(2n){color:#355a31}
+.board.cgb .orientation-black coords.ranks coord:nth-child(2n+1),.board.cgb .orientation-black coords.files coord:nth-child(2n+1){color:#355a31}
+.board.cgb .orientation-black coords.ranks coord:nth-child(2n),.board.cgb .orientation-black coords.files coord:nth-child(2n){color:#eed5a4}
+.board.cgb .badge-layer{position:absolute;inset:0;pointer-events:none;z-index:5}
+.board.cgb .badge-layer .bsq{position:absolute;width:12.5%;height:12.5%}
 body.dragging, body.dragging *{cursor:grabbing !important}
 .sq.hov{outline:4px solid rgba(255,255,255,.8);outline-offset:-4px;z-index:3}
 #board.pm .sq.tgt::after{background:rgba(40,70,190,.45)}
@@ -1553,38 +1580,38 @@ let intro = false, introToken = 0;
 
 function setStatus(t, cls){ const s=$("status"); s.textContent=t; s.className="status"+(cls?" "+cls:""); }
 
+let mainCg = null;
 function draw(badSq){
+  if(!game) return;
   const b = $("board");
-  const targets = selected ? destsFor(selected) : [];
-  const mv = canMove() ? movable() : null;
-  syncSquares(b, color, sq => game.get(sq), (sq, pc) =>
-      (lastMove && lastMove.includes(sq) ? " last" : "") + (sq===selected ? " sel" : "") + (sq===hintSq ? " hint" : "")
-    + (sq===badSq ? " bad" : "") + (targets.includes(sq) ? (pc ? " tgt occ" : " tgt") : "") + (pc && pc.color === mv ? " mine" : ""),
-    (el, sq) => {
-      el.setAttribute("role","button"); el.tabIndex = 0;
-      el.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); clickSq(sq); } };  // mouse/touch handled by pointer events
-    });
-  markBoard(b);
-  animate(b);
-}
-function markBoard(b){
-  b.classList.toggle("pm", premoveMode());
-  const pm = mode === "live" && live && live.view == null && !live.over && live.premove;
-  if(pm) for(const q of [pm.from, pm.to]) b.querySelector(`[data-sq="${q}"]`)?.classList.add("pre");
-  if(game.in_check()){
-    const t = game.turn();
-    for(const f of "abcdefgh") for(let r=1;r<=8;r++){ const p = game.get(f+r); if(p && p.type === "k" && p.color === t) b.querySelector(`[data-sq="${f+r}"]`)?.classList.add("check"); }
-  }
+  mainCg ||= cgBoard(b, (o, d) => { if(!doMove(o, d)) draw(); }, {
+    premovable: {enabled: false, showDests: true, castle: true,
+      events: {set: (o, d) => { if(premoveMode()) setPremove(o, d); }, unset: () => { cancelPremove(); }}},
+  });
+  const can = canMove(), pm = premoveMode();
+  const custom = new Map();
+  if(hintSq) custom.set(hintSq, "hint");
+  if(badSq) custom.set(badSq, "bad");
+  mainCg.set({
+    orientation: cgColor(color), fen: game.fen(), turnColor: cgColor(game.turn()),
+    lastMove: lastMove || undefined, check: game.in_check() ? cgColor(game.turn()) : false,
+    movable: {color: can ? cgColor(pm ? color : movable()) : undefined, dests: can && !pm ? cgDests(game) : new Map()},
+    premovable: {enabled: mode === "live"},
+    highlight: {custom},
+  });
+  if(!(mode === "live" && live && live.premove)) mainCg.cancelPremove();
+  if(!can) mainCg.selectSquare(null);
+  // move-quality badge in game review
+  const layer = b.querySelector(".badge-layer"); layer.innerHTML = "";
   if(mode === "game" && analysis && viewIdx > 0 && mainline && mainline[viewIdx] && positions[viewIdx]?.fen === mainline[viewIdx].fen){
     const kind = moveKind(viewIdx), to = positions[viewIdx].lm?.[1];
-    if(kind && to) b.querySelector(`[data-sq="${to}"]`)?.insertAdjacentHTML("beforeend", badgeHtml(kind, "mbadge"));
+    if(kind && to){
+      const f = to.charCodeAt(0) - 97, r = +to[1] - 1;
+      const x = color === "w" ? f : 7 - f, y = color === "w" ? 7 - r : r;
+      layer.innerHTML = `<div class="bsq" style="left:${x*12.5}%;top:${y*12.5}%">${badgeHtml(kind, "mbadge")}</div>`;
+    }
   }
 }
-
-/* ---------- move animation ----------
-   Compare the board before and after, pair each piece that appeared with the
-   nearest matching piece that disappeared, and slide it across. This covers
-   normal moves, captures, castling (both pieces), promotion and multi-move jumps. */
 let prevBoard = null, skipAnimTo = null;
 const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 function snapshot(){
@@ -1624,6 +1651,28 @@ function animate(b){
     img.style.transform = "";
     img.addEventListener("transitionend", () => { sqEl.style.zIndex = ""; }, {once:true});
   }
+}
+
+/* ---------- chessground: Lichess's own board code, the same as Chess Lab's Study / Spar ---------- */
+const cgColor = c => c === "w" ? "white" : "black";
+function cgDests(g){
+  const m = new Map();
+  for(const mv of g.moves({verbose:true})){ if(!m.has(mv.from)) m.set(mv.from, []); if(!m.get(mv.from).includes(mv.to)) m.get(mv.from).push(mv.to); }
+  return m;
+}
+function cgBoard(b, after, extra = {}){
+  b.classList.add("cgb");
+  b.innerHTML = '<div class="cg-host"></div><div class="badge-layer"></div>';
+  const cg = CG.Chessground(b.querySelector(".cg-host"), Object.assign({
+    coordinates: true,
+    animation: {enabled: !reduceMotion, duration: 200},
+    movable: {free: false, showDests: true, events: {after}},
+    premovable: {enabled: false},
+    highlight: {lastMove: true, check: true},
+    drawable: {enabled: true},
+  }, extra));
+  if(window.ResizeObserver) new ResizeObserver(() => cg.redrawAll()).observe(b);
+  return cg;
 }
 
 /* ---------- board drawing: the squares and piece images stay in place between moves
@@ -1727,50 +1776,7 @@ function clickSq(sq){
   if(!selected) cancelPremove();
   draw();
 }
-(function(){
-  const b = $("board");
-  // a piece that can't move right now (not your turn, opponent's piece, puzzle over) still lights up when clicked
-  const lookSelect = (sq, pc) => { selected = pc && selected !== sq ? sq : null; paintSel(b, selected, []); };
-  b.addEventListener("pointerdown", e => {
-    if(e.button !== 0 || !game) return;
-    const el = e.target.closest(".sq"); if(!el) return;
-    const sq = el.dataset.sq, pc = game.get(sq);
-    if(!canMove()){ if(e.isPrimary) lookSelect(sq, pc); return; }
-    if(selected && selected !== sq && canGo(selected, sq)){ doMove(selected, sq); return; }
-    if(pc && pc.color !== movable()){ cancelPremove(); lookSelect(sq, pc); return; }
-    if(!pc){ selected = null; cancelPremove(); draw(); return; }
-    const wasSel = selected === sq;
-    const size = el.getBoundingClientRect().width;
-    const ghost = makeGhost(PIECES[pc.color + pc.type], size, size, e.clientX, e.clientY, "ghost");
-    selected = sq; paintSel(b, sq, destsFor(sq));
-    const img = b.querySelector(`[data-sq="${sq}"] img`); if(img) img.style.opacity = ".35";
-    drag = {from:sq, wasSel, moved:false, x0:e.clientX, y0:e.clientY, ghost, size, hov:null};
-    document.body.classList.add("dragging");
-    e.preventDefault();
-  });
-  // listen on the whole document so the drag keeps working even if the pointer leaves the board
-  document.addEventListener("pointermove", e => {
-    if(!drag) return;
-    e.preventDefault();
-    if(Math.hypot(e.clientX-drag.x0, e.clientY-drag.y0) > Math.max(8, drag.size / 5)) drag.moved = true;   // small wobble = still a click
-    moveGhost(drag.ghost, e.clientX, e.clientY, drag.size, drag.size);
-    dragHover(drag, b, e.clientX, e.clientY);
-  });
-  const end = e => {
-    if(!drag) return;
-    const d = drag; drag = null; d.ghost.remove(); dragEnd(d);
-    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest?.(".sq");
-    const to = el && b.contains(el) ? el.dataset.sq : null;
-    skipAnimTo = to;
-    if(to && to !== d.from && doMove(d.from, to)) return;
-    skipAnimTo = null;
-    if(!d.moved && d.wasSel) selected = null;   // clicking a selected piece again deselects it
-    draw();
-  };
-  document.addEventListener("pointerup", end);
-  document.addEventListener("pointercancel", () => { if(drag){ drag.ghost.remove(); dragEnd(drag); drag = null; draw(); } });
-  b.addEventListener("dragstart", e => e.preventDefault());   // stop the browser's own image dragging
-})();
+// (clicks and drags on the main board are handled by chessground, see draw())
 
 /* ---------- after the puzzle: step through moves and explore ---------- */
 function record(){ positions.push({fen: game.fen(), lm: lastMove ? lastMove.slice() : null}); if(!analysis) viewIdx = positions.length-1; }
@@ -2212,13 +2218,8 @@ function rushNextPuzzle(){
 }
 // slide the piece on `from` to `to` on the Rush board, then call done (instant if motion is reduced)
 function rushAnimate(from, to, done){
-  const b = $("rushBoard");
-  const img = b.querySelector(`.sq[data-sq="${from}"] .pc`), dst = b.querySelector(`.sq[data-sq="${to}"]`);
-  if(reduceMotion || !img || !dst){ done(); return; }
-  const a = img.getBoundingClientRect(), c = dst.getBoundingClientRect();
-  img.style.transition = "transform .22s ease";
-  img.style.zIndex = "4";
-  img.style.transform = `translate(${c.left - a.left + (c.width - a.width) / 2}px, ${c.top - a.top + (c.height - a.height) / 2}px)`;
+  if(reduceMotion || !rushCg){ done(); return; }
+  rushCg.move(from, to);
   setTimeout(done, 230);
 }
 function rushTryMove(from, to){
@@ -2321,65 +2322,21 @@ function rushEnd(why){
 }
 
 // ----- board (same look as the puzzle board: click or drag) -----
+let rushCg = null;
 function rushDraw(z, badSq){
-  const b = $("rushBoard");
-  const files = "abcdefgh", g = z.game;
-  const targets = z.selected ? g.moves({square: z.selected, verbose: true}).map(m => m.to) : [];
-  const checkSq = g.in_check() ? (() => { for(const f of files) for(let r = 1; r <= 8; r++){ const pc = g.get(f + r); if(pc && pc.type === "k" && pc.color === g.turn()) return f + r; } })() : null;
-  syncSquares(b, z.color, sq => g.get(sq), (sq, pc) =>
-      (z.lastMove && z.lastMove.includes(sq) ? " last" : "") + (sq === z.selected ? " sel" : "") + (sq === badSq ? " bad" : "")
-    + (sq === checkSq ? " check" : "") + (targets.includes(sq) ? (pc ? " tgt occ" : " tgt") : "") + (pc && pc.color === z.color ? " mine" : ""));
+  const b = $("rushBoard"), g = z.game;
+  rushCg ||= cgBoard(b, (o, d) => rushTryMove(o, d));
+  const can = R && !R.over && !R.busy && g.turn() === z.color;
+  const custom = new Map(); if(badSq) custom.set(badSq, "bad");
+  rushCg.set({
+    orientation: cgColor(z.color), fen: g.fen(), turnColor: cgColor(g.turn()),
+    lastMove: z.lastMove || undefined, check: g.in_check() ? cgColor(g.turn()) : false,
+    movable: {color: can ? cgColor(z.color) : undefined, dests: can ? cgDests(g) : new Map()},
+    highlight: {custom},
+  });
+  if(!can) rushCg.selectSquare(null);
 }
-(function rushInput(){
-  const b = $("rushBoard");
-  let drag = null;
-  const sqAt = (x, y) => { const el = document.elementFromPoint(x, y)?.closest("#rushBoard .sq"); return el ? el.dataset.sq : null; };
-  b.addEventListener("pointerdown", e => {
-    const z = R && R.pz; if(!z) return;
-    const sq = e.target.closest(".sq")?.dataset.sq; if(!sq) return;
-    const pc = z.game.get(sq);
-    // can't move right now (reply playing, run over) or an opponent piece: just light it up
-    const look = () => { z.selected = pc && z.selected !== sq ? sq : null; paintSel(b, z.selected, []); };
-    if(R.over || R.busy){ look(); return; }
-    if(z.selected && z.selected !== sq && !(pc && pc.color === z.color)){
-      if(z.game.moves({square: z.selected, verbose: true}).some(m => m.to === sq)){ rushTryMove(z.selected, sq); return; }
-      if(z.game.get(z.selected)?.color === z.color && !pc){ rushTryMove(z.selected, sq); return; }
-    }
-    if(pc && pc.color !== z.color){ look(); return; }
-    if(!pc){ z.selected = null; paintSel(b, null, []); return; }
-    if(pc && pc.color === z.color){
-      const wasSel = z.selected === sq;
-      z.selected = sq; paintSel(b, sq, z.game.moves({square: sq, verbose: true}).map(m => m.to));
-      const img = b.querySelector(`.sq[data-sq="${sq}"] .pc`);
-      if(img){
-        const rect = img.getBoundingClientRect();
-        const ghost = makeGhost(img.src, rect.width, rect.height, e.clientX, e.clientY, "pc rush-ghost");
-        img.style.opacity = ".25";
-        drag = {from: sq, ghost, w: rect.width, h: rect.height, moved: false, wasSel, x0: e.clientX, y0: e.clientY, hov: null};
-        document.body.classList.add("dragging");
-        b.setPointerCapture(e.pointerId);
-      }
-    }
-  });
-  b.addEventListener("pointermove", e => {
-    if(!drag) return;
-    if(Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > Math.max(8, drag.w / 5)) drag.moved = true;
-    moveGhost(drag.ghost, e.clientX, e.clientY, drag.w, drag.h);
-    dragHover(drag, b, e.clientX, e.clientY);
-  });
-  const finish = e => {
-    if(!drag) return;
-    const d = drag; drag = null; d.ghost.remove(); dragEnd(d);
-    const to = sqAt(e.clientX, e.clientY);
-    if(to && to !== d.from) rushTryMove(d.from, to);
-    else if(R && R.pz){
-      if(!d.moved && d.wasSel) R.pz.selected = null;   // clicking the selected piece again unselects it
-      rushDraw(R.pz);
-    }
-  };
-  b.addEventListener("pointerup", finish);
-  b.addEventListener("pointercancel", e => { if(drag){ drag.ghost.remove(); dragEnd(drag); drag = null; if(R && R.pz) rushDraw(R.pz); } });
-})();
+// (clicks and drags on the Rush board are handled by chessground, see rushDraw())
 $("rushStart").onclick = () => rushStart();
 $("rushAgain").onclick = () => { R = null; rushShowPanel("intro"); rushTab(); };
 $("rushStop").onclick = () => { if(R && R.started) rushEnd("stop"); else { R = null; rushShowPanel("intro"); rushDrawIdle(); } };
