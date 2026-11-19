@@ -11,3 +11,10 @@
 .cg-wrap piece.bishop.black { background-image: url("pieces/bb.png?v=2"); }
 .cg-wrap piece.knight.black { background-image: url("pieces/bn.png?v=2"); }
 .cg-wrap piece.pawn.black { background-image: url("pieces/bp.png?v=2"); }
+
+/* Pieces drawn 25% bigger than before (115% of the square instead of 92%), standing on the square's bottom edge.
+   A background can't spill outside its element, so the image is drawn on ::before, which can: tall pieces
+   like the king poke a little into the square above. */
+.cg-wrap piece { background-size: 0 0 !important; }
+.cg-wrap piece::before { content: ""; position: absolute; left: -7.5%; top: -15%; width: 115%; height: 115%;
+  background-image: inherit; background-size: 100% 100%; background-repeat: no-repeat; pointer-events: none; }
