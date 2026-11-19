@@ -24,13 +24,6 @@
     { id: 'cartoon', name: 'Cartoon' },
     { id: 'geometric', name: 'Geometric' },
     { id: 'outlined', name: 'Outlined' },
-    { id: 'minimalism', name: 'Minimalism' },
-    { id: 'organic', name: 'Organic' },
-    { id: 'neofuturism', name: 'Neo-Futurism' },
-    { id: 'postmodern', name: 'Postmodernism' },
-    { id: 'deconstructivism', name: 'Deconstructivism' },
-    { id: 'parametric', name: 'Parametric' },
-    { id: 'hightech', name: 'High-Tech' },
   ];
   const KEYS = ['w', 'b'].flatMap((c) => [...'kqrbnp'].map((p) => c + p));
   const read = (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } };
