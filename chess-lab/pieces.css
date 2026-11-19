@@ -1,11 +1,11 @@
 /* Piece set from Dede's image (cream and black, bold outlines), cut into one PNG per piece in pieces/. Used by every board on the site. */
-.cg-wrap piece.king.white { background-image: url("pieces/wk.png?v=2"); }
+.cg-wrap piece.king.white { background-image: url("pieces/wk.png?v=3"); }
 .cg-wrap piece.queen.white { background-image: url("pieces/wq.png?v=2"); }
 .cg-wrap piece.rook.white { background-image: url("pieces/wr.png?v=2"); }
 .cg-wrap piece.bishop.white { background-image: url("pieces/wb.png?v=2"); }
 .cg-wrap piece.knight.white { background-image: url("pieces/wn.png?v=2"); }
 .cg-wrap piece.pawn.white { background-image: url("pieces/wp.png?v=2"); }
-.cg-wrap piece.king.black { background-image: url("pieces/bk.png?v=2"); }
+.cg-wrap piece.king.black { background-image: url("pieces/bk.png?v=3"); }
 .cg-wrap piece.queen.black { background-image: url("pieces/bq.png?v=2"); }
 .cg-wrap piece.rook.black { background-image: url("pieces/br.png?v=2"); }
 .cg-wrap piece.bishop.black { background-image: url("pieces/bb.png?v=2"); }

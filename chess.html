@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 <link rel="stylesheet" href="chess-lab/vendor/chessground.base.css">
-<link rel="stylesheet" href="chess-lab/pieces.css?v=3">
+<link rel="stylesheet" href="chess-lab/pieces.css?v=4">
 <script src="chess-lab/vendor/chessground.iife.js"></script>
 <style>
 /* Layout: one narrow column. Home = theme checklist for today; Drill = board + controls. */
@@ -1250,7 +1250,7 @@ function finishedPuzzle(theme, id){
 let theme, game, sol, step, color, mistakes, helped, finished, selected=null, lastMove=null, cur=null, queue=null, hintSq=null;
 const GLYPH = {k:"♚",q:"♛",r:"♜",b:"♝",n:"♞",p:"♟"};
 // piece set: chess-lab/pieces/*.png (same files as chess-lab/pieces.css)
-const PIECES = Object.fromEntries(['w','b'].flatMap(c => [...'kqrbnp'].map(p => [c+p, `chess-lab/pieces/${c}${p}.png?v=2`])));
+const PIECES = Object.fromEntries(['w','b'].flatMap(c => [...'kqrbnp'].map(p => [c+p, `chess-lab/pieces/${c}${p}.png?v=${p==="k"?3:2}`])));
 
 let returnView = "home";   // where "back" goes after a puzzle set
 function show(view){
