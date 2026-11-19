@@ -1,16 +1,16 @@
-/* Piece set from Dede's image (cream and black, bold outlines), cut into one PNG per piece in pieces/. Used by every board on the site. */
-.cg-wrap piece.king.white { background-image: url("pieces/wk.png?v=3"); }
-.cg-wrap piece.queen.white { background-image: url("pieces/wq.png?v=2"); }
-.cg-wrap piece.rook.white { background-image: url("pieces/wr.png?v=2"); }
-.cg-wrap piece.bishop.white { background-image: url("pieces/wb.png?v=2"); }
-.cg-wrap piece.knight.white { background-image: url("pieces/wn.png?v=2"); }
-.cg-wrap piece.pawn.white { background-image: url("pieces/wp.png?v=2"); }
-.cg-wrap piece.king.black { background-image: url("pieces/bk.png?v=3"); }
-.cg-wrap piece.queen.black { background-image: url("pieces/bq.png?v=2"); }
-.cg-wrap piece.rook.black { background-image: url("pieces/br.png?v=2"); }
-.cg-wrap piece.bishop.black { background-image: url("pieces/bb.png?v=2"); }
-.cg-wrap piece.knight.black { background-image: url("pieces/bn.png?v=2"); }
-.cg-wrap piece.pawn.black { background-image: url("pieces/bp.png?v=2"); }
+/* Piece set from Dede's image (cream and black with a light rim), cut into one PNG per piece in pieces/. Used by every board on the site. */
+.cg-wrap piece.king.white { background-image: url("pieces/wk.png?v=5"); }
+.cg-wrap piece.queen.white { background-image: url("pieces/wq.png?v=5"); }
+.cg-wrap piece.rook.white { background-image: url("pieces/wr.png?v=5"); }
+.cg-wrap piece.bishop.white { background-image: url("pieces/wb.png?v=5"); }
+.cg-wrap piece.knight.white { background-image: url("pieces/wn.png?v=5"); }
+.cg-wrap piece.pawn.white { background-image: url("pieces/wp.png?v=5"); }
+.cg-wrap piece.king.black { background-image: url("pieces/bk.png?v=5"); }
+.cg-wrap piece.queen.black { background-image: url("pieces/bq.png?v=5"); }
+.cg-wrap piece.rook.black { background-image: url("pieces/br.png?v=5"); }
+.cg-wrap piece.bishop.black { background-image: url("pieces/bb.png?v=5"); }
+.cg-wrap piece.knight.black { background-image: url("pieces/bn.png?v=5"); }
+.cg-wrap piece.pawn.black { background-image: url("pieces/bp.png?v=5"); }
 
 /* Pieces drawn 25% bigger than before (115% of the square instead of 92%), standing on the square's bottom edge.
    A background can't spill outside its element, so the image is drawn on ::before, which can: tall pieces
