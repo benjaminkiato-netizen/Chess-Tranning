@@ -1,5 +1,5 @@
 /* Practice hub sync
- * Keeps this site's data (chess page, Chess Lab, trade journal) in two private GitHub gists so it
+ * Keeps this site's data (chess page, Chess Lab, library, trade journal) in two private GitHub gists so it
  * follows you to any browser. Everything is encrypted in the browser with your sync password
  * (AES-GCM, key from PBKDF2) before upload: GitHub only ever stores unreadable data.
  *  - data gist:  hub-data.json  (localStorage data + trade journal, without screenshots)
@@ -17,7 +17,7 @@
     token: 'hubSync.token', key: 'hubSync.key', salt: 'hubSync.salt', gist: 'hubSync.gist', imgGist: 'hubSync.imgGist',
     device: 'hubSync.device', lastHash: 'hubSync.lastHash', lastAt: 'hubSync.lastAt', imgs: 'hubSync.imgs', user: 'hubSync.user',
   };
-  const SYNCED_PREFIXES = ['dailyPuzzleDrill.', 'chesslab.'];
+  const SYNCED_PREFIXES = ['dailyPuzzleDrill.', 'chesslab.', 'library.'];
   const NEVER_SYNC = new Set(['chesslab.inbox', 'chesslab.studies.history']);
   const PUZZLE_KEY = 'dailyPuzzleDrill.v1';
   const PUZZLE_LOCAL_ONLY = ['token', 'pool', 'ganalysis'];

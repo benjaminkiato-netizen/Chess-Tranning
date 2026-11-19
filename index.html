@@ -8,10 +8,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
-/* Layout: centered greeting, two equal doors (Trading | Chess) that stack on phones. Dark to match both apps. */
+/* Layout: centered greeting, three equal doors (Trading | Chess | Library) that stack on phones. Dark to match the apps. */
 :root{
   --bg:#0b0d10; --panel:#13171c; --line:#262d36; --fg:#e6e9ee; --muted:#8b95a3;
-  --trade:#22c55e; --trade-red:#ef4444; --chess:#eed5a4; --chess-dark:#355a31;
+  --trade:#22c55e; --trade-red:#ef4444; --chess:#eed5a4; --chess-dark:#355a31; --lib:#a78bfa;
   --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
   --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
@@ -21,17 +21,19 @@
 html,body{margin:0;min-height:100%}
 body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--body);
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:56px 48px}
-.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:36px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:36px}
 .hello{display:flex;flex-direction:column;gap:6px}
 .eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
 h1{font-family:var(--display);font-size:clamp(30px,5vw,48px);line-height:1.08;margin:0;text-wrap:balance;font-weight:700}
-.doors{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.doors{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+@media (max-width:1000px){.doors{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:700px){.doors{grid-template-columns:minmax(0,1fr)}}
 a.door{display:flex;flex-direction:column;gap:18px;text-decoration:none;color:inherit;background:var(--panel);border:1px solid var(--line);
   border-radius:16px;padding:24px;min-width:0}
 @media (prefers-reduced-motion:no-preference){a.door{transition:transform .15s,border-color .15s}a.door:hover{transform:translateY(-3px)}}
 a.door.trade:hover,a.door.trade:focus-visible{border-color:var(--trade)}
 a.door.chess:hover,a.door.chess:focus-visible{border-color:var(--chess)}
+a.door.lib:hover,a.door.lib:focus-visible{border-color:var(--lib)}
 a.door:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
 .art{height:150px;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center}
 .trade .art{background:#0e1115;border:1px solid var(--line)}
@@ -48,7 +50,9 @@ h2{font-family:var(--display);font-size:28px;margin:0;line-height:1.1}
   border-radius:999px;padding:7px 14px;cursor:pointer}
 .syncbtn:hover{border-color:var(--muted)}
 .syncbtn.on{border-color:#2f7d4f}
-.trade .go{color:var(--trade)} .chess .go{color:var(--chess)}
+.trade .go{color:var(--trade)} .chess .go{color:var(--chess)} .lib .go{color:var(--lib)}
+.lib .art{background:#120f1c;border:1px solid var(--line)}
+.lib .art svg{width:100%;height:100%}
 </style>
 </head>
 <body>
@@ -78,6 +82,15 @@ h2{font-family:var(--display);font-size:28px;margin:0;line-height:1.1}
       <div><h2>Chess</h2><p>Daily Lichess puzzles by theme, with failed-puzzle redos.</p></div>
       <div class="stat" id="chessStat"></div>
       <span class="go">Start puzzles →</span>
+    </a>
+
+    <a class="door lib" href="library.html">
+      <div class="art" aria-hidden="true">
+        <svg viewBox="0 0 300 150" preserveAspectRatio="xMidYMax meet"><g id="spines"></g><rect x="20" y="132" width="260" height="6" rx="2" fill="#2a2440"/></svg>
+      </div>
+      <div><h2>Library</h2><p>Books, movies and anime to get through.</p></div>
+      <div class="stat" id="libStat"></div>
+      <span class="go">Open library →</span>
     </a>
   </div>
 </div>
@@ -119,6 +132,27 @@ document.getElementById("greet").textContent = (h<12?"Good morning, Dede.":h<18?
   while(hist[f(c)]){ streak++; c.setDate(c.getDate()-1); }
   const failed = Object.values(S.failed || {}).reduce((a,b)=>a+b.length,0);
   el.innerHTML = `<span>Today <b>${done}/${target}</b></span><span>Streak <b>${streak}</b></span>` + (failed ? `<span>To redo <b>${failed}</b></span>` : "");
+})();
+
+// bookshelf art + library progress
+(function(){
+  const cols = ["#a78bfa","#7c6bd6","#c4b5fd","#5b4bb3","#8b7cf0","#d8ccff","#6d5ad1"];
+  let x = 34, out = "", seed = 3;
+  const rnd = () => (seed = (seed*9301+49297)%233280)/233280;
+  for(let i=0;i<14;i++){
+    const w = 11 + rnd()*9, h = 58 + rnd()*54, c = cols[i%cols.length];
+    const tilt = i===9 ? ` transform="rotate(-12 ${x} 132)"` : "";
+    out += `<rect x="${x}" y="${132-h}" width="${w}" height="${h}" rx="2" fill="${c}" opacity="${0.55+rnd()*0.45}"${tilt}/>`;
+    out += `<rect x="${x}" y="${132-h+10}" width="${w}" height="3" fill="#120f1c" opacity=".35"${tilt}/>`;
+    x += w + 3 + (i===8 ? 8 : 0);
+  }
+  document.getElementById("spines").innerHTML = out;
+  let L = null; try{ L = JSON.parse(localStorage.getItem("library.v1")); }catch(e){}
+  const items = (L && L.items) || [];
+  const n = s => items.filter(i => i.status===s).length;
+  document.getElementById("libStat").innerHTML = items.length
+    ? `<span>Done <b>${n("done")}/${items.filter(i=>i.status!=="dropped").length}</b></span>` + (n("doing") ? `<span>In progress <b>${n("doing")}</b></span>` : "")
+    : `<span>Your recommendations are waiting</span>`;
 })();
 </script>
 <script>

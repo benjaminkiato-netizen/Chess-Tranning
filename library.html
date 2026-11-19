@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="sync.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Library · Dede's Practice Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one column. Header, type tabs, status chips + search, add form, then the list of cards. */
+:root{
+  --bg:#0b0d10; --panel:#13171c; --panel2:#181d23; --line:#262d36; --fg:#e6e9ee; --muted:#8b95a3;
+  --lib:#a78bfa; --todo:#8b95a3; --doing:#f59e0b; --done:#22c55e; --drop:#ef4444;
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 64px}
+.wrap{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+a{color:inherit}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.homelink{color:var(--muted);text-decoration:none;font-weight:600}
+.homelink:hover{color:var(--fg)}
+.syncbtn{font:600 13px var(--body);color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer}
+.syncbtn.on{border-color:#2f7d4f}
+h1{font-family:var(--display);font-size:clamp(30px,5vw,44px);line-height:1.05;margin:0}
+.sub{color:var(--muted);margin:4px 0 0}
+.progress{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:560px){.progress{gap:8px}.pcard{padding:10px}.pcard .row{flex-direction:column;gap:0}.pcard b{font-size:15px}.pcard span{font-size:12px}}
+.pcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.pcard .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.pcard b{font-family:var(--display);font-size:17px;font-weight:700}
+.pcard span{font-family:var(--mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--done);border-radius:99px}
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);font:600 15px var(--body);padding:10px 12px;cursor:pointer;white-space:nowrap}
+.tab.on{color:var(--fg);border-bottom-color:var(--lib)}
+.tab small{font-family:var(--mono);font-size:12px;margin-left:4px;color:var(--muted)}
+.tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:600 13px var(--body);color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer}
+.chip.on{color:var(--fg);border-color:var(--lib);background:#1d1830}
+input,select,textarea{font:15px var(--body);color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-width:0}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--lib)}
+.search{flex:1 1 180px}
+button.pri{font:600 14px var(--body);color:#0b0d10;background:var(--lib);border:0;border-radius:10px;padding:10px 16px;cursor:pointer}
+button.ghost{font:600 14px var(--body);color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 14px;cursor:pointer}
+.list{display:flex;flex-direction:column;gap:10px}
+.item{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--todo);border-radius:12px;padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px}
+.item[data-s="doing"]{border-left-color:var(--doing)}
+.item[data-s="done"]{border-left-color:var(--done)}
+.item[data-s="dropped"]{border-left-color:var(--drop);opacity:.7}
+.item .t{font-weight:600;font-size:16px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.item .kind{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--lib);border:1px solid #3b3260;border-radius:6px;padding:1px 6px}
+.item .by{color:var(--muted);font-size:14px}
+.item .note{grid-column:1/-1;color:var(--muted);font-size:14px;margin:0}
+.item .side{display:flex;gap:8px;align-items:center;justify-content:flex-end;grid-row:1/3;grid-column:2}
+@media (max-width:620px){.item{grid-template-columns:minmax(0,1fr)}.item .side{grid-row:auto;grid-column:1;justify-content:flex-start;flex-wrap:wrap;order:5;gap:4px;margin-top:4px}
+  .seg button{padding:7px 8px;font-size:12px}.icon{padding:6px 5px}}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{background:var(--panel2);border:0;border-right:1px solid var(--line);color:var(--muted);font:600 13px var(--body);padding:7px 10px;cursor:pointer;white-space:nowrap}
+.seg button:last-child{border-right:0}
+.seg button.on[data-v="todo"]{background:#2a3038;color:var(--fg)}
+.seg button.on[data-v="doing"]{background:#3a2a0b;color:#fbbf24}
+.seg button.on[data-v="done"]{background:#0f2e1b;color:#4ade80}
+.seg button.on[data-v="dropped"]{background:#341313;color:#f87171}
+.icon{background:none;border:0;color:var(--muted);cursor:pointer;font-size:16px;padding:6px;border-radius:8px}
+.icon:hover{color:var(--fg);background:var(--panel2)}
+.stars{display:inline-flex;gap:1px}
+.stars button{background:none;border:0;cursor:pointer;font-size:17px;color:#3a414b;padding:0 1px;line-height:1}
+.stars button.on{color:#facc15}
+.empty{color:var(--muted);text-align:center;padding:36px 0}
+dialog{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:14px;padding:20px;width:min(460px,calc(100vw - 32px))}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+dialog h2{font-family:var(--display);margin:0 0 12px;font-size:22px}
+dialog label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px;font-weight:600}
+dialog input,dialog select,dialog textarea{width:100%}
+dialog .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:none;gap:12px;align-items:center;z-index:5}
+.toast.show{display:flex}
+.toast button{background:none;border:0;color:var(--lib);font:600 14px var(--body);cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a href="index.html" class="homelink">← Home</a>
+    <button class="syncbtn" id="syncBtn" onclick="window.HubSync && HubSync.openPanel()">☁ Sync</button>
+  </div>
+  <div>
+    <h1>Library</h1>
+    <p class="sub">Books, movies and anime to get through.</p>
+  </div>
+
+  <div class="progress" id="progress"></div>
+
+  <div class="tabs" id="tabs" role="tablist"></div>
+
+  <div class="tools">
+    <div class="chips" id="chips"></div>
+    <input class="search" id="q" type="search" placeholder="Search title, author, note…">
+    <select id="sort" aria-label="Sort">
+      <option value="status">Sort: status</option>
+      <option value="added">Sort: newest</option>
+      <option value="title">Sort: A–Z</option>
+      <option value="rating">Sort: rating</option>
+    </select>
+    <button class="pri" id="addBtn">+ Add</button>
+  </div>
+
+  <div class="list" id="list"></div>
+</div>
+
+<dialog id="dlg">
+  <h2 id="dlgTitle">Add</h2>
+  <label for="fType">Type</label>
+  <select id="fType"><option value="book">Book</option><option value="movie">Movie</option><option value="anime">Anime</option></select>
+  <label for="fTitle">Title</label>
+  <input id="fTitle" autocomplete="off">
+  <label for="fBy" id="fByLabel">Author</label>
+  <input id="fBy" autocomplete="off">
+  <label for="fNote">Note</label>
+  <textarea id="fNote" rows="3"></textarea>
+  <label for="fStatus">Status</label>
+  <select id="fStatus"></select>
+  <div class="row"><button class="ghost" id="dlgCancel">Cancel</button><button class="pri" id="dlgSave">Save</button></div>
+</dialog>
+
+<div class="toast" id="toast"><span id="toastMsg"></span><button id="toastUndo">Undo</button></div>
+
+<script>
+const KEY = "library.v1";
+const TYPES = { book:{label:"Books", one:"Book", by:"Author"}, movie:{label:"Movies", one:"Movie", by:"Year"}, anime:{label:"Anime", one:"Anime", by:"Year / studio"} };
+const STATUS_ORDER = ["doing","todo","done","dropped"];
+const statusLabel = (s, type) => ({
+  todo:"Not started",
+  doing: type==="book" ? "Reading" : type ? "Watching" : "In progress",
+  done:  type==="book" ? "Read" : type ? "Watched" : "Done",
+  dropped:"Dropped"
+})[s];
+
+// starting list: everything recommended in chat (anime marked watched were already seen)
+const SEED = [
+  ["book","Ball Lightning","Liu Cixin","Same universe as Three-Body; a character from it shows up in Death's End."],
+  ["book","Blindsight","Peter Watts","First contact with aliens that have no consciousness. Dark Forest energy."],
+  ["book","Children of Time","Adrian Tchaikovsky","Spiders evolve into a civilization over thousands of years."],
+  ["book","Project Hail Mary","Andy Weir","Wakes up alone on a ship with amnesia and has to save Earth. Funny and smart."],
+  ["book","Rendezvous with Rama","Arthur C. Clarke","A giant alien cylinder enters the solar system."],
+  ["book","Revelation Space","Alastair Reynolds","Huge, dark space opera about the Fermi paradox."],
+  ["book","The Sirens of Titan","Kurt Vonnegut","Closest thing to Hitchhiker's. Cosmic, absurd, darkly funny."],
+  ["book","The Cyberiad","Stanisław Lem","Two robot inventors building ridiculous machines. Sheckley energy."],
+  ["book","Dirk Gently's Holistic Detective Agency","Douglas Adams","Adams's other series."],
+  ["book","Mindswap","Robert Sheckley","More Sheckley after Dimension of Miracles."],
+  ["book","We Are Legion (We Are Bob)","Dennis E. Taylor","Uploaded into a space probe, clones himself across the galaxy."],
+  ["book","All Systems Red (Murderbot Diaries #1)","Martha Wells","Antisocial security robot who just wants to watch TV."],
+  ["book","Redshirts","John Scalzi","Low-ranking crew realize they're in a sci-fi show and keep dying."],
+  ["book","Snow Crash","Neal Stephenson","Funny cyberpunk. The hero is named Hiro Protagonist."],
+  ["book","Neuromancer","William Gibson","The book that started cyberpunk."],
+
+  ["movie","Interstellar","2014","Black holes, time dilation, and it gets emotional."],
+  ["movie","Dune","2021","Desert planet, huge visuals."],
+  ["movie","Dune: Part Two","2024","The epic battles half."],
+  ["movie","The Martian","2015","Stranded on Mars, survives on potatoes and science."],
+  ["movie","Alien","1979","Horror in space."],
+  ["movie","Aliens","1986","Marines versus aliens."],
+  ["movie","Event Horizon","1997","A ship comes back from hell. Creepy."],
+  ["movie","Sunshine","2007","A crew tries to restart the dying sun."],
+  ["movie","Edge of Tomorrow","2014","Alien war plus a time loop. Die, retry, get better."],
+  ["movie","Arrival","2016","Aliens arrive and it messes with how you think about time."],
+  ["movie","Pitch Black","2000","Vin Diesel on a dark planet full of monsters."],
+  ["movie","Blade Runner","1982","The original cyberpunk look."],
+  ["movie","Blade Runner 2049","2017","Gorgeous sequel."],
+  ["movie","Akira","1988","The legendary anime film. Watch first."],
+  ["movie","Ghost in the Shell","1995","The anime one. Very Lain-adjacent."],
+  ["movie","The Matrix","1999","Just in case."],
+  ["movie","Upgrade","2018","AI chip turns him into a fighting machine. Underrated."],
+  ["movie","Dredd","2012","Brutal judge stuck in a mega-tower. Short and intense."],
+  ["movie","Alita: Battle Angel","2019","Cyborg girl, manga-based, great action."],
+  ["movie","Ex Machina","2014","Slow-burn AI thriller."],
+  ["movie","Elysium","2013","Gritty future, Neill Blomkamp."],
+  ["movie","District 9","2009","Gritty aliens-in-slums, Neill Blomkamp."],
+
+  ["anime","Vinland Saga","","Vikings and revenge. Season 1 is one of the best."],
+  ["anime","Gurren Lagann","","More ridiculous and more hype every episode."],
+  ["anime","Kill la Kill","","Same studio, same insane energy."],
+  ["anime","Hellsing Ultimate","","Overpowered vampire wrecks everyone. Overlord energy x100."],
+  ["anime","Black Lagoon","","Mercenaries, guns, great characters."],
+  ["anime","Sakamoto Days","","Retired hitman runs a convenience store."],
+  ["anime","Golden Kamuy","","Violent treasure hunt, weirdly hilarious."],
+  ["anime","Kaiji","","High-stakes gambling, unbearable tension."],
+  ["anime","Tomodachi Game","","Friends thrown into a betrayal game."],
+  ["anime","Kakegurui","","Unhinged gambling-addict schoolgirl."],
+  ["anime","Classroom of the Elite","","Cold, calculating, secretly overpowered MC."],
+  ["anime","Devilman Crybaby","","Short, brutal, unforgettable."],
+  ["anime","Paranoia Agent","","Satoshi Kon psychological mystery."],
+  ["anime","Dorohedoro","","Lizard-head guy hunting whoever cursed him. Grimy and funny."],
+  ["anime","Ergo Proxy","","If Lain was your thing."],
+  ["anime","Texhnolyze","","Lain, but further down."],
+  ["anime","Asobi Asobase","","Three girls, insane faces. Saiki-tier comedy."],
+  ["anime","Daily Lives of High School Boys","","Pure stupid boy comedy."],
+  ["anime","Great Teacher Onizuka","","Ex-gangster becomes a teacher. Old classic."],
+  ...["Dandadan","Chainsaw Man","Hunter x Hunter (2011)","Fullmetal Alchemist: Brotherhood","One Punch Man","Hell's Paradise",
+      "Konosuba","Mushoku Tensei","Frieren","Grand Blue","Kaguya-sama: Love is War","Mashle","Steins;Gate","Monster",
+      "Cyberpunk: Edgerunners","Parasyte"].map(t => ["anime",t,"","","done"]),
+];
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+function load(){
+  let S = null;
+  try{ S = JSON.parse(localStorage.getItem(KEY)); }catch(e){}
+  if(!S || !Array.isArray(S.items)){
+    const now = Date.now();
+    S = { items: SEED.map(([type,title,by,note,status],i) => ({ id:uid()+i, type, title, by, note, status:status||"todo", rating:0, added:now-i })) };
+    persist(S);
+  }
+  return S;
+}
+function persist(s){ try{ localStorage.setItem(KEY, JSON.stringify(s)); }catch(e){} }
+let S = load();
+const save = () => { persist(S); render(); };
+
+let view = { type:"all", status:"all", q:"", sort:"status" };
+try{ Object.assign(view, JSON.parse(sessionStorage.getItem("library.view"))||{}); }catch(e){}
+const $ = id => document.getElementById(id);
+const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+
+function render(){
+  try{ sessionStorage.setItem("library.view", JSON.stringify(view)); }catch(e){}
+  // progress cards
+  $("progress").innerHTML = Object.entries(TYPES).map(([t,m]) => {
+    const all = S.items.filter(i => i.type===t && i.status!=="dropped"), done = all.filter(i => i.status==="done").length;
+    const pct = all.length ? Math.round(done/all.length*100) : 0;
+    return `<div class="pcard"><div class="row"><b>${m.label}</b><span>${done}/${all.length} ${t==="book"?"read":"watched"}</span></div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+  }).join("");
+  // tabs
+  const count = t => S.items.filter(i => t==="all" || i.type===t).length;
+  $("tabs").innerHTML = [["all","All"],...Object.entries(TYPES).map(([k,m])=>[k,m.label])].map(([k,l]) =>
+    `<button class="tab ${view.type===k?"on":""}" data-t="${k}" role="tab">${l}<small>${count(k)}</small></button>`).join("");
+  // status chips
+  const tt = view.type==="all" ? null : view.type;
+  $("chips").innerHTML = [["all","All"],...["todo","doing","done","dropped"].map(s=>[s,statusLabel(s,tt)])].map(([k,l]) =>
+    `<button class="chip ${view.status===k?"on":""}" data-s="${k}">${l}</button>`).join("");
+  $("q").value = view.q; $("sort").value = view.sort;
+  // list
+  const q = view.q.trim().toLowerCase();
+  let items = S.items.filter(i => (view.type==="all"||i.type===view.type) && (view.status==="all"||i.status===view.status)
+    && (!q || (i.title+" "+i.by+" "+i.note).toLowerCase().includes(q)));
+  const byTitle = (a,b) => a.title.localeCompare(b.title);
+  items.sort({
+    status:(a,b)=>STATUS_ORDER.indexOf(a.status)-STATUS_ORDER.indexOf(b.status) || b.added-a.added,
+    added:(a,b)=>b.added-a.added, title:byTitle, rating:(a,b)=>b.rating-a.rating || byTitle(a,b)
+  }[view.sort]);
+  $("list").innerHTML = items.length ? items.map(i => `
+    <div class="item" data-id="${i.id}" data-s="${i.status}">
+      <div class="t">${esc(i.title)} ${view.type==="all"?`<span class="kind">${TYPES[i.type].one}</span>`:""}</div>
+      <div class="side">
+        <div class="seg" role="group" aria-label="Status">${["todo","doing","done","dropped"].map(s =>
+          `<button data-v="${s}" class="${i.status===s?"on":""}">${statusLabel(s,i.type)}</button>`).join("")}</div>
+        ${i.status==="done" ? `<span class="stars">${[1,2,3,4,5].map(n=>`<button data-r="${n}" class="${n<=i.rating?"on":""}" aria-label="${n} stars">★</button>`).join("")}</span>` : ""}
+        <button class="icon" data-act="edit" title="Edit">✎</button>
+        <button class="icon" data-act="del" title="Delete">✕</button>
+      </div>
+      ${i.by ? `<div class="by">${esc(i.by)}</div>` : ""}
+      ${i.note ? `<p class="note">${esc(i.note)}</p>` : ""}
+    </div>`).join("") : `<div class="empty">Nothing here${q?" for that search":""}.</div>`;
+  const b = $("syncBtn"); if (window.HubSync && HubSync.connected()) { b.textContent = "☁ Sync on"; b.classList.add("on"); }
+}
+
+$("tabs").onclick = e => { const t = e.target.closest(".tab"); if(!t) return; view.type = t.dataset.t; render(); };
+$("chips").onclick = e => { const c = e.target.closest(".chip"); if(!c) return; view.status = c.dataset.s; render(); };
+$("q").oninput = e => { view.q = e.target.value; const pos = e.target.selectionStart; render(); $("q").focus(); $("q").setSelectionRange(pos,pos); };
+$("sort").onchange = e => { view.sort = e.target.value; render(); };
+
+let undo = null, toastT = 0;
+function toast(msg, fn){ undo = fn; $("toastMsg").textContent = msg; $("toast").classList.add("show"); clearTimeout(toastT); toastT = setTimeout(()=>$("toast").classList.remove("show"), 5000); }
+$("toastUndo").onclick = () => { if(undo) undo(); undo = null; $("toast").classList.remove("show"); };
+
+$("list").onclick = e => {
+  const card = e.target.closest(".item"); if(!card) return;
+  const it = S.items.find(x => x.id===card.dataset.id); if(!it) return;
+  const seg = e.target.closest(".seg button"), star = e.target.closest(".stars button"), act = e.target.closest("[data-act]");
+  if(seg){ it.status = seg.dataset.v; if(it.status!=="done") it.rating = it.rating||0; save(); }
+  else if(star){ const n = +star.dataset.r; it.rating = it.rating===n ? 0 : n; save(); }
+  else if(act?.dataset.act==="del"){
+    const idx = S.items.indexOf(it); S.items.splice(idx,1); save();
+    toast(`Deleted “${it.title}”`, () => { S.items.splice(idx,0,it); save(); });
+  }
+  else if(act?.dataset.act==="edit") openDlg(it);
+};
+
+// add / edit dialog
+let editing = null;
+function fillStatus(type, cur){ $("fStatus").innerHTML = STATUS_ORDER.map(s=>`<option value="${s}" ${s===cur?"selected":""}>${statusLabel(s,type)}</option>`).join(""); }
+function openDlg(it){
+  editing = it || null;
+  const type = it?.type || (view.type==="all" ? "book" : view.type);
+  $("dlgTitle").textContent = it ? "Edit" : "Add to library";
+  $("fType").value = type; $("fTitle").value = it?.title||""; $("fBy").value = it?.by||""; $("fNote").value = it?.note||"";
+  $("fByLabel").textContent = TYPES[type].by; fillStatus(type, it?.status||"todo");
+  $("dlg").showModal(); $("fTitle").focus();
+}
+$("fType").onchange = e => { $("fByLabel").textContent = TYPES[e.target.value].by; fillStatus(e.target.value, $("fStatus").value); };
+$("addBtn").onclick = () => openDlg(null);
+$("dlgCancel").onclick = () => $("dlg").close();
+$("dlgSave").onclick = () => {
+  const title = $("fTitle").value.trim(); if(!title){ $("fTitle").focus(); return; }
+  const data = { type:$("fType").value, title, by:$("fBy").value.trim(), note:$("fNote").value.trim(), status:$("fStatus").value };
+  if(editing) Object.assign(editing, data);
+  else S.items.push({ id:uid(), rating:0, added:Date.now(), ...data });
+  $("dlg").close(); save();
+};
+$("fTitle").onkeydown = e => { if(e.key==="Enter"){ e.preventDefault(); $("dlgSave").click(); } };
+
+// another tab or a sync pull changed the data
+window.addEventListener("storage", e => { if(e.key===KEY){ S = load(); render(); } });
+render();
+</script>
+</body>
+</html>
