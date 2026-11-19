@@ -1672,8 +1672,35 @@ function cgBoard(b, after, extra = {}){
     drawable: {enabled: true},
   }, extra));
   if(window.ResizeObserver) new ResizeObserver(() => cg.redrawAll()).observe(b);
+  lookSelect(cg, b);
   return cg;
 }
+// Clicking ANY piece lights up its square, even one that can't move right now
+// (your opponent's piece, or yours when it's not your turn). Chessground itself only
+// highlights pieces you can move, so this adds a "look" highlight on top.
+function lookSelect(cg, host) {
+  let look = null, base = new Map();
+  const origSet = cg.set;
+  const apply = () => { const m = new Map(base); if (look) m.set(look, 'selected'); origSet({ highlight: { custom: m } }); };
+  cg.set = (cfg) => {
+    const before = cg.getFen();
+    if (cfg.highlight && cfg.highlight.custom) base = cfg.highlight.custom;
+    origSet(cfg);
+    if (look && cfg.fen !== undefined && cg.getFen() !== before) look = null;   // the position changed
+    if (look || (cfg.highlight && cfg.highlight.custom)) apply();
+  };
+  host.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    const key = cg.getKeyAtDomPos([e.clientX, e.clientY]); if (!key) return;
+    const st = cg.state, p = st.pieces.get(key);
+    const mc = st.movable.color;
+    const own = p && mc && (mc === 'both' || mc === p.color) && (st.turnColor === p.color || st.premovable.enabled) && !st.viewOnly;
+    const target = st.selected && ((st.movable.dests?.get(st.selected) || []).includes(key) || st.premovable.dests?.includes?.(key));
+    if (!p || own || target) { if (look) { look = null; apply(); } return; }
+    look = look === key ? null : key; apply();
+  }, true);
+}
+
 
 /* ---------- board drawing: the squares and piece images stay in place between moves
    (like Lichess/Chess.com); only classes and pieces that changed are updated ---------- */
