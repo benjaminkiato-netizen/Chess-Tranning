@@ -4221,11 +4221,8 @@ async function snTry(from, to){
     z.solved = true; r.correct++;
     $("snPrompt").innerHTML = `<span class="ok">✓ Right: ${esc(m.san)}.</span> ${snLineHtml(z)}`;
     snDraw(); snRunCard(); save();
-    // play the next few moves of the line, then move on, unless you start looking around yourself
-    z.view = 1; let k = 1;
-    const step = () => { if(snPz !== z || z.touched) return; if(k < Math.min(4, z.fens.length - 1)){ snView(z, ++k); z.anim = setTimeout(step, 450); }
-      else z.anim = setTimeout(() => { if(snPz === z && !z.touched && S.sn.set?.run === r){ r.i++; save(); snNext(); } }, 1400); };
-    z.anim = setTimeout(step, 500);
+    // stays on this position: look through the line, then press Next when you're ready
+    z.view = 1; snView(z, 1);
   } else {
     z.failed = true; save();
     g.undo(); z.lastMove = null; z.view = 0;
