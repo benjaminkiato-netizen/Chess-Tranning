@@ -9,7 +9,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="vendor/chessground.base.css">
   <link rel="stylesheet" href="pieces.css?v=6">
-  <link rel="stylesheet" href="app.css?v=st1">
+  <link rel="stylesheet" href="app.css?v=lv1">
 </head>
 <body>
   <div id="err-banner" style="display:none;position:fixed;left:12px;right:12px;bottom:12px;z-index:100;background:#5c1a1a;color:#fff;border:1px solid #ff5e57;border-radius:10px;padding:10px 14px;font:13px/1.4 system-ui,sans-serif;white-space:pre-wrap"></div>
@@ -46,7 +46,10 @@
   <!-- SPARRING -->
   <main id="spar" class="panel active">
     <section class="board-col">
-      <div class="board-wrap"><div id="spar-board" class="cg-wrap-host"></div></div>
+      <div class="board-row">
+        <div class="evalbar" id="spar-evalbar" hidden><div class="evalfill" id="spar-evalfill"></div><span id="spar-evaltext"></span></div>
+        <div class="board-wrap"><div id="spar-board" class="cg-wrap-host"></div></div>
+      </div>
     </section>
     <aside class="side">
       <div class="card">
@@ -88,6 +91,7 @@
         <div class="row">
           <button id="spar-undo">Takeback</button>
           <button id="spar-flip" title="Flip board (F)">⇅ Flip board</button>
+          <button id="spar-evaltoggle" title="Live eval bar plus Best / Blunder marks on the board while you play (no engine lines)">📈 Live eval</button>
           <button id="spar-resign">Resign</button>
         </div>
         <div class="progress hidden" id="maia-progress"><div id="maia-progress-bar"></div></div>
@@ -278,6 +282,6 @@
   </main>
 
   <footer>Engines: <a href="https://github.com/Adam-Kulju/Patricia" target="_blank" rel="noopener">Patricia</a> by Adam Kulju (GPL-3.0) · <a href="https://github.com/CSSLab/maia-platform-frontend" target="_blank" rel="noopener">Maia 3</a> by the CSSLab, University of Toronto (GPL-3.0) · <a href="https://github.com/nescitus/rodent-iv" target="_blank" rel="noopener">Rodent IV</a> by Pawel Koziol (GPL-3.0). Everything runs in your browser.</footer>
-  <script type="module" src="app.js?v=st4"></script>
+  <script type="module" src="app.js?v=lv1"></script>
 </body>
 </html>

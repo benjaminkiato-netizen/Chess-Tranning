@@ -365,3 +365,7 @@ footer { color: var(--muted); font-size: 11px; position: fixed; right: 12px; bot
 .st-explorer:hover { border-color: var(--accent); }
 .st-orow { margin-top: 8px; }
 .st-orow .st-otag { margin-top: 0; width: auto; }
+
+/* Spar: live eval bar (toggled by 📈 Live eval) */
+.evalbar[hidden] { display: none; }
+#spar-evaltoggle.on { border-color: var(--accent); color: var(--accent); }
