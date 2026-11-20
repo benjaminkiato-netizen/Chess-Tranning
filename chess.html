@@ -4245,16 +4245,16 @@ S.sn.speeds ??= (S.gameSpeeds || ["rapid","blitz"]).filter(x => x !== "bullet").
 S.sn.drilled ??= {};      // batch n -> {cycles, best}
 // load your games from every site you have an account on, with the Mistake Drills time controls
 async function snLoadAll(){
-  const keep = {site: S.gameSite, speeds: S.gameSpeeds, max: S.gameMax}, all = [], errs = [];
+  const keep = {site: S.gameSite, speeds: S.gameSpeeds, max: S.gameMax, sel: {...S.gameUserSel}}, all = [], errs = [];
   S.gameSpeeds = S.sn.speeds.slice(); S.gameMax = Math.max(keep.max || 50, 150);
   try {
     for(const site of ["lichess", "chesscom"]){
       if(!(S.accounts[site] || []).length) continue;
-      S.gameSite = site; gList = null;
+      S.gameSite = site; S.gameUserSel[site] = "*"; gList = null;   // every saved account on that site
       try { await loadGames(); } catch(e){ errs.push(e.message); }
       if(gList) all.push(...gList);
     }
-  } finally { S.gameSite = keep.site; S.gameSpeeds = keep.speeds; S.gameMax = keep.max; gList = null; save(); }
+  } finally { S.gameSite = keep.site; S.gameSpeeds = keep.speeds; S.gameMax = keep.max; S.gameUserSel = keep.sel; gList = null; save(); }
   const seen = new Set();
   return {errs, games: all.filter(g => g.moves && g.status !== "started" && !snSkipped(g) && S.sn.speeds.includes(g.speed) && !seen.has(g.id) && seen.add(g.id))
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))};
@@ -4307,7 +4307,7 @@ async function snAnalyseBatch(force){
 function snRenderCollect(msg){
   const it = Object.values(S.sn.items), j = snJob, B = S.sn.batches, next = B.length + 1, p = S.sn.pending;
   const have = p ? p.count : null;
-  $("snCollect").innerHTML = `<div class="eyebrow">Batches of ${SN_BATCH} games · Lichess + Chess.com</div>
+  $("snCollect").innerHTML = `<div class="eyebrow">Batches of ${SN_BATCH} games · all your Lichess + Chess.com accounts</div>
     <div class="sn-stats">
       <div class="sn-stat"><b>${B.length}</b><span>batches</span></div>
       <div class="sn-stat"><b>${it.filter(x => x.kind !== "missed").length}</b><span>mistakes</span></div>
