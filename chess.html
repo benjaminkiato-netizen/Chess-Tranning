@@ -4142,21 +4142,11 @@ function snCollectGame(g, A){
     S.sn.items[`${g.id}:${k}`] = {id:`${g.id}:${k}`, fen, best:e.best, line:e.variation || "", played:sans[k-1],
       kind: missed ? "missed" : e.judgment.name.toLowerCase(), type: snType(fen, e.best, sans[k-1], prev, me, phase, e, e.variation), phase,
       opening: g.opening?.name ? g.opening.name.split(":")[0] : "", gid:g.id, link: gameUrl(g, me, k),
-      label: moveLabelOf(fen, sans[k-1]), date: g.createdAt || Date.now(), vs: playerName(opp), bot: opp?.user?.title === "BOT" || !!opp?.aiLevel,
-      site: isCC(g) ? "chesscom" : "lichess", me, ply: k, moves: isCC(g) ? sans.join(" ") : undefined, initialFen: g.initialFen || undefined};
+      label: moveLabelOf(fen, sans[k-1]), date: g.createdAt || Date.now(), vs: playerName(opp), bot: opp?.user?.title === "BOT" || !!opp?.aiLevel};
     n++;
   }
   S.sn.done[g.id] = Date.now();
   return n;
-}
-/* Where "See the game" goes: Lichess games open on Lichess at that move; Chess.com games open in the Lichess
-   analysis board with the whole game loaded and jumped to that move. */
-function snGameUrl(x, ply){
-  if(x.site !== "chesscom" && !/chess\.com/.test(x.link || "")) return x.link;
-  const col = (x.me || x.fen?.split(" ")[1]) === "b" ? "black" : "white";
-  if(x.moves && !x.initialFen) return `https://lichess.org/analysis/pgn/${encodeURIComponent(x.moves)}?color=${col}${ply ? "#" + ply : ""}`;
-  if(x.fen) return `https://lichess.org/analysis/standard/${x.fen.replace(/ /g, "_")}?color=${col}`;
-  return x.link;
 }
 function moveLabelOf(fen, san){ const [, t, , , , n] = fen.split(" "); return `${n}${t === "w" ? "." : "..."} ${san}`; }
 const snItems = () => Object.values(S.sn.items).filter(it => S.sn.missed || it.kind !== "missed");
@@ -4184,8 +4174,7 @@ function snGameStats(g, A){
   const res = outcome(g, me);
   S.sn.games[g.id] = {date: g.createdAt || Date.now(), res, maxAdv, lostWin: maxAdv >= 300 && res !== "win",
     open, blun, mist, inac, missed, moves, worstPhase: worst && worst.drop > 0.05 ? worst.phase : null,
-    acc: A.players?.[me]?.accuracy ?? null, vs: playerName(me === "w" ? g.players.black : g.players.white), link: gameUrl(g, me),
-    site: isCC(g) ? "chesscom" : "lichess", me, moves: isCC(g) ? sans.join(" ") : undefined, initialFen: g.initialFen || undefined};
+    acc: A.players?.[me]?.accuracy ?? null, vs: playerName(me === "w" ? g.players.black : g.players.white), link: gameUrl(g, me)};
 }
 // rough goals (not real averages for any rating): used only to size the bars and pick your biggest leak
 const SN_LEAKS = [
@@ -4241,7 +4230,7 @@ function snRenderLeaks(){
     el.querySelectorAll(".lk-fix").forEach(f => {
       const L = SN_LEAKS.find(x => x.k === f.dataset.fix), ids = L.ids(G);
       f.innerHTML = `<p>${esc(L.fix)}</p>${ids.length ? `<button data-drill="${L.k}">Drill these ${ids.length} position${ids.length === 1 ? "" : "s"} →</button>` : ""}
-        ${L.k === "lostWin" ? `<div class="sn-note">${G.filter(x => x.lostWin).slice(0, 6).map(x => `<a href="${esc(snGameUrl(x))}" target="_blank" rel="noopener">vs ${esc(x.vs)}</a>`).join(" · ")}</div>` : ""}`;
+        ${L.k === "lostWin" ? `<div class="sn-note">${G.filter(x => x.lostWin).slice(0, 6).map(x => `<a href="${esc(x.link)}" target="_blank" rel="noopener">vs ${esc(x.vs)}</a>`).join(" · ")}</div>` : ""}`;
       f.hidden = false;
     });
     $("snFixBtn").hidden = true;
@@ -4287,16 +4276,7 @@ function snNextPick(games){
 async function snCheckNew(){
   snRenderCollect("Checking Lichess and Chess.com for new games…");
   const {games, errs} = await snLoadAll();
-  S.sn.pending = {count: snNextPick(games).length, at: Date.now()};
-  const byId = new Map(games.map(g => [g.id, g]));
-  for(const it of Object.values(S.sn.items)){
-    const g = byId.get(it.gid); if(!g || it.site) continue;
-    it.site = isCC(g) ? "chesscom" : "lichess"; it.me = myColor(g); it.initialFen = g.initialFen || undefined;
-    if(it.site === "chesscom") it.moves = g.moves.split(" ").filter(Boolean).join(" ");
-    if(!it.ply){ const [, t, , , , n] = it.fen.split(" "); it.ply = (+n - 1) * 2 + (t === "w" ? 1 : 2); }
-  }
-  for(const [id, x] of Object.entries(S.sn.games)){ const g = byId.get(id); if(g && !x.site){ x.site = isCC(g) ? "chesscom" : "lichess"; x.me = myColor(g); if(x.site === "chesscom") x.moves = g.moves.split(" ").filter(Boolean).join(" "); } }
-  save();
+  S.sn.pending = {count: snNextPick(games).length, at: Date.now()}; save();
   snRenderCollect(errs.length ? "Some games didn't load: " + errs.join(" · ") : "");
   return games;
 }
@@ -4536,7 +4516,7 @@ function snRunCard(){
   el.innerHTML = `<div class="sn-row" style="justify-content:space-between"><b>Position ${snPz.pos + 1} of ${r.order.length}</b><span class="sn-note">${r.correct} right · ${fmtT(r.time)}</span></div>
     <div class="sn-prog"><i style="width:${r.i / r.order.length * 100}%"></i></div>
     <div class="sn-note">${esc(SN_TYPES[it.type]?.[0] || "")} · ${esc(SN_PHASE[it.phase] || "")}${it.opening ? " · " + esc(it.opening) : ""}</div>
-    ${snPz.solved || snPz.failed ? `<div class="sn-row"><button class="primary" id="snNextBtn">Next →</button><a class="sn-src" href="${esc(snGameUrl(it, it.ply))}" target="_blank" rel="noopener">See the game ↗</a></div>` : ""}
+    ${snPz.solved || snPz.failed ? `<div class="sn-row"><button class="primary" id="snNextBtn">Next →</button><a class="sn-src" href="${esc(it.link)}" target="_blank" rel="noopener">See the game ↗</a></div>` : ""}
     <div class="sn-row"><button id="snQuit">Pause</button></div>`;
   if($("snNextBtn")) $("snNextBtn").onclick = () => snNext();
   $("snQuit").onclick = () => { snPz = null; el.hidden = true; snRenderSet(); snDrawIdle(); $("snPrompt").textContent = "Paused. Your place in this cycle is saved."; };
