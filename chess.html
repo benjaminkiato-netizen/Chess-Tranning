@@ -3539,11 +3539,11 @@ async function copyText(text, btn){
 }
 /* Hand a game to Chess Lab's Study (same site, so it goes through localStorage), opened at `ply`. */
 function sendToStudy(info){
-  const {name, orientation, ply} = info;
+  const {name, orientation, ply, review} = info;
   const g = buildGame(info);
   let inbox = [];
   try { inbox = JSON.parse(localStorage.getItem("chesslab.inbox") || "[]"); } catch(e){}
-  inbox.push({pgn: g.pgn(), name, orientation, ply});
+  inbox.push({pgn: g.pgn(), name, orientation, ply, review: review || null});
   localStorage.setItem("chesslab.inbox", JSON.stringify(inbox));
   location.href = "chess-lab/";
 }
@@ -3571,8 +3571,45 @@ $("gpStudy").onclick = () => {
     site: gameUrl(g), date: pgnDate(g.createdAt),
     name: `vs ${playerName(opp)} · ${new Date(g.createdAt || Date.now()).toLocaleDateString()}`,
     orientation: color === "b" ? "black" : "white", ply: gPly,
+    review: studyReview(),
   });
 };
+/* The game's analysis in the shape Chess Lab's Study uses for its own reviews (same as after sparring):
+   a tag and comment for every move, best move and line, evals, key moments, counts and accuracy. */
+function studyReview(){
+  const A = gAnalysis(curGame); if(!A?.evals?.length) return null;
+  const evStr = e => !e ? "" : e.mate !== undefined ? (e.mate === 0 ? "#" : (e.mate > 0 ? "#" : "#-") + Math.abs(e.mate))
+    : `${e.eval > 0 ? "+" : ""}${((e.eval || 0)/100).toFixed(1)}`;
+  const TAG = {Inaccuracy:"inaccuracy", Mistake:"mistake", Blunder:"blunder"};
+  const ERR = ["inaccuracy","mistake","blunder"];
+  const counts = {w:{}, b:{}}, moves = [];
+  for(let k = 1; k <= gSan.length; k++){
+    const e = A.evals[k-1]; if(!e) break;
+    const mover = mainline[k-1]?.fen.split(" ")[1] || (k % 2 ? "w" : "b");
+    const tag = e.judgment ? TAG[e.judgment.name] || "ok" : (A.cls?.[k-1] || "ok");
+    counts[mover][tag] = (counts[mover][tag] || 0) + 1;
+    const label = moveLabel(k), line = (e.variation || "").split(" ").filter(Boolean);
+    let text, key = null;
+    if(e.judgment){
+      text = e.judgment.comment.replace(/^(Inaccuracy|Mistake|Blunder)\. /, `${label} was ${e.judgment.name === "Inaccuracy" ? "an inaccuracy" : "a " + e.judgment.name.toLowerCase()}. `);
+      const coach = coachLine(k, e); if(coach) text += " " + coach;
+      if(mover === color && tag !== "inaccuracy") key = "error";
+    } else text = `${label}: ${COACH_TXT[tag] || "a playable move."}`;
+    // your reply right after an opponent's mistake or blunder: punished or missed
+    const prev = moves[k-2];
+    if(mover === color && prev && prev.color !== color && (prev.tag === "mistake" || prev.tag === "blunder")){
+      key = "chance";
+      text = ERR.includes(tag) ? `Your opponent slipped with ${moveLabel(k-1)}, but ${label} let it go. ${line[0] ? line[0] + " was better." : ""}`
+        : `Your opponent slipped with ${moveLabel(k-1)}, and you made the most of it with ${gSan[k-1]}.`;
+    }
+    moves.push({san: gSan[k-1], color: mover, tag, text, best: line[0] || null, line: line.slice(0,5).join(" "),
+      evBefore: evStr(k === 1 ? A.ev0 : A.evals[k-2]), evAfter: evStr(e), key});
+  }
+  const acc = c => A.players?.[c]?.accuracy ?? null;
+  return {engine: "Stockfish", depth: A.depth || LOCAL_DEPTH, side: color, date: Date.now(),
+    names: {w: playerName(curGame.players.white), b: playerName(curGame.players.black)},
+    accuracy: {w: acc("w"), b: acc("b")}, counts, moves};
+}
 /* "Add this move to mistake log" opens a pop-up over the game instead of leaving it. */
 $("dCat").innerHTML = Object.entries(CATS).map(([k,v]) => `<option value="${k}">${v.name}</option>`).join("");
 $("gpLog").onclick = () => {
