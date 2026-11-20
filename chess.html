@@ -4629,7 +4629,31 @@ async function snExplain(it){
     const traded = back && back.captured && back.to === reply.to;
     why.push(`After ${played.san}, they can play ${reply.san}, taking your ${SN_NAME[reply.captured]}${traded ? ` (you'd take back with ${back.san}, but it's their trade, on their terms)` : ""}.`);
   } else if(reply && reply.san.includes("+")) why.push(`After ${played.san}, they get ${reply.san} with check.`);
-  // 2. the best move wins material a few moves later
+  // 2. the best move takes something they can't (safely) take back
+  if(best.captured){
+    const name = SN_NAME[best.captured], c = new Chess(fBest);
+    const recaps = c.moves({verbose:true}).filter(m => m.to === best.to).sort((a, b) => SN_V[a.piece] - SN_V[b.piece]);
+    if(!recaps.length) why.push(`${best.san} takes a free ${name}: nothing can take back.`);
+    else {
+      const between = (a, b) => {   // squares strictly between a and b on a line
+        const fx = a.charCodeAt(0), fy = +a[1], tx = b.charCodeAt(0), ty = +b[1], dx = Math.sign(tx - fx), dy = Math.sign(ty - fy);
+        if(!(fx === tx || fy === ty || Math.abs(tx - fx) === Math.abs(ty - fy))) return [];
+        const out = []; for(let x = fx + dx, y = fy + dy; x !== tx || y !== ty; x += dx, y += dy) out.push(String.fromCharCode(x) + y); return out;
+      };
+      let punished = null;
+      for(const r of recaps){
+        const c2 = new Chess(fBest); c2.move(r);
+        const hits = c2.moves({verbose:true}).filter(m => m.captured && SN_V[m.captured] > SN_V[best.piece]).sort((a, b) => SN_V[b.captured] - SN_V[a.captured]);
+        if(!hits.length){ punished = null; break; }          // at least one safe way to take back
+        if(!punished) punished = {r, p: hits[0], pin: between(hits[0].from, hits[0].to).includes(r.from)};
+      }
+      if(punished){
+        const {r, p, pin} = punished;
+        why.push(`${best.san} wins a ${name}: taking back with ${r.san} loses their ${SN_NAME[p.captured]} to ${p.san}${pin ? ` (their ${SN_NAME[r.piece]} is pinned: moving it opens the line to the ${SN_NAME[p.captured]})` : ""}.`);
+      }
+    }
+  }
+  // 3. the best move wins material a few moves later
   if(gainB >= 2 && gainB > gainP && !(best.captured && SN_V[best.captured] >= gainB)) why.push(`${best.san} wins material a few moves later.`);
   else if(gainP <= -2 && gainB > gainP) why.push(`Your move loses material down the line; ${best.san} doesn't.`);
   // 3. the best move is a trade: say what it removes
@@ -4643,6 +4667,7 @@ async function snExplain(it){
   // 5. activity
   const aB = snMobility(fBest, me), aP = snMobility(fPlayed, me);
   if(why.length < 2 && aB - aP >= 4) why.push(`${best.san} keeps your pieces more active.`);
+  if(!why.length && gainB >= 1 && gainB > gainP) why.push(`${best.san} comes out a pawn up in the line below.`);
   if(!why.length) why.push("No direct tactic here: it's about the better position, not material.");
   const lines = `Expected play after ${best.san}: ${sanList(lineB) || "–"}. After ${played.san}: ${sanList(lineP) || "–"}.`;
   const size = Math.abs(diff) >= 9 ? "" : ` ${best.san} is about ${Math.max(0, diff).toFixed(1)} pawns better.`;
