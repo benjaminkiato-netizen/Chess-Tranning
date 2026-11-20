@@ -3996,7 +3996,15 @@ const SN_TYPES = {
 };
 const SN_PHASE = {opening:"Opening", middlegame:"Middlegame", endgame:"Endgame"};
 let snJob = null, snCg = null, snPz = null;
-snPurge();   // snPz: the puzzle on the board {it, game, from, solved, failed, t0, lastMove}
+snPurge();
+if((S.sn.v || 1) < 2){
+  for(const it of Object.values(S.sn.items)){
+    if(it.type !== "fork") continue;
+    const c = new Chess(it.fen), mv = c.move({from:it.best.slice(0,2), to:it.best.slice(2,4), promotion:it.best[4] || "q"});
+    it.type = snHung(it.fen, it.played) ? "hung" : snFork(it.fen, it.best) ? "fork" : mv?.captured ? "capture" : mv?.san.includes("+") ? "check" : it.phase === "endgame" ? "endgame" : "quiet";
+  }
+  S.sn.v = 2; save();
+}   // snPz: the puzzle on the board {it, game, from, solved, failed, t0, lastMove}
 
 function snPhase(fen, ply){
   if(ply <= 20) return "opening";
@@ -4014,12 +4022,29 @@ function snHung(fen, played){
   }
   return false;
 }
+// a real fork: after the move, the piece attacks two things the opponent can't both save,
+// and the opponent can't just take the forking piece (with something no more valuable, or for free)
 function snFork(fen, best){
   const c = new Chess(fen), mv = c.move({from:best.slice(0,2), to:best.slice(2,4), promotion:best[4] || "q"}); if(!mv) return false;
-  const f = c.fen().split(" "); f[1] = mv.color; f[3] = "-";
-  const c2 = new Chess(); if(!c2.load(f.join(" "))) return false;
-  const hits = c2.moves({square: mv.to, verbose:true}).filter(m => m.captured && SN_V[m.captured] >= 3).length;
-  return hits + (mv.san.includes("+") ? 1 : 0) >= 2;
+  const vP = SN_V[mv.promotion || mv.piece] || 0, sq = mv.to, me = mv.color;
+  // can they simply take the forking piece?
+  for(const m of c.moves({verbose:true})){
+    if(m.to !== sq || !m.captured) continue;
+    const c2 = new Chess(c.fen()); c2.move(m);
+    const weRetake = c2.moves({verbose:true}).some(r => r.to === sq);
+    if(!weRetake || SN_V[m.piece] <= vP) return false;
+  }
+  // what it attacks, as if it were our move again
+  const f = c.fen().split(" "); f[1] = me; f[3] = "-";
+  const c3 = new Chess(); if(!c3.load(f.join(" "))) return false;
+  let targets = mv.san.includes("+") ? 1 : 0;
+  for(const m of c3.moves({square: sq, verbose:true})){
+    if(!m.captured || SN_V[m.captured] < 3) continue;
+    const c4 = new Chess(c3.fen()); c4.move(m);
+    const defended = c4.moves({verbose:true}).some(r => r.to === m.to);
+    if(!defended || SN_V[m.captured] > vP) targets++;   // a real threat: free, or worth more than the attacker
+  }
+  return targets >= 2;
 }
 function snType(fen, best, played, prev, me, phase, after){
   const sg = me === "w" ? 1 : -1;
