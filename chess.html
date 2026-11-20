@@ -589,6 +589,34 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
 .rush-flash.good{color:#7fe3a0} .rush-flash.bad{color:#ff7a70}
 .rush-ghost{position:fixed;z-index:50;pointer-events:none;will-change:transform}
 .rush-panel{padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+/* mistake drills */
+.sn-grid{display:grid;gap:24px;justify-content:center;grid-template-columns:auto;align-items:start}
+@media (min-width: 980px){ .sn-grid{grid-template-columns:auto 360px} }
+#snBoard{width:min(720px, calc(100vw - 32px - 22px), calc(100vh - 170px));max-width:none;min-width:260px}
+.sn-side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.sn-title{margin:2px 0 0;font-size:26px}
+.sn-prompt{margin-top:10px;min-height:44px;font-size:15px}
+.sn-prompt .ok{color:var(--good);font-weight:700} .sn-prompt .bad{color:var(--bad, #e05252);font-weight:700}
+.sn-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sn-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.sn-stat{border:1px solid var(--line);border-radius:10px;padding:8px 10px;text-align:center}
+.sn-stat b{display:block;font-size:20px} .sn-stat span{font-size:12px;color:var(--muted)}
+.sn-chips{display:flex;flex-wrap:wrap;gap:6px}
+.sn-chip{border:1px solid var(--line);background:none;color:inherit;border-radius:999px;padding:5px 10px;font-size:13px;cursor:pointer}
+.sn-chip.on{border-color:var(--accent);background:color-mix(in srgb, var(--accent) 18%, transparent)}
+.sn-chip b{margin-left:4px}
+.sn-bars{display:flex;flex-direction:column;gap:6px}
+.sn-bar{display:grid;grid-template-columns:130px 1fr 30px;gap:8px;align-items:center;font-size:13px}
+.sn-bar i{display:block;height:8px;border-radius:4px;background:var(--accent);min-width:2px}
+.sn-bar em{font-style:normal;color:var(--muted);text-align:right}
+.sn-hist{width:100%;border-collapse:collapse;font-size:13px}
+.sn-hist td,.sn-hist th{padding:4px 6px;border-bottom:1px solid var(--line);text-align:left}
+.sn-hist th{color:var(--muted);font-weight:600}
+.sn-prog{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.sn-prog i{display:block;height:100%;background:var(--accent)}
+.sn-note{font-size:13px;color:var(--muted);margin:0}
+.sn-src{font-size:13px;color:var(--muted)}
+.sn-src a{color:inherit}
 .rush-panel h1{margin:2px 0 0;font-size:24px}
 .rush-rules{margin:0;padding-left:18px;color:var(--muted,#9aa);font-size:14px;line-height:1.6}
 .rush-rules b{color:var(--text,#eee)}
@@ -649,6 +677,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
     <button data-view="train" id="tabTrain">Training</button>
     <button data-view="rated" id="tabRated">Rated</button>
     <button data-view="rush" id="tabRush">Rush</button>
+    <button data-view="sn" id="tabSN">Mistake Drills</button>
     <button data-view="games" id="tabGames">Games</button>
     <button data-view="play" id="tabPlay">Play</button>
     <button class="themebtn" style="margin:0 0 0 auto" title="Board colors" onclick="BoardTheme.open()">🎨</button>
@@ -862,6 +891,27 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
       </aside>
     </div>
     <div class="card rush-hist" id="rushHist"></div>
+  </section>
+
+  <!-- MISTAKE DRILLS: your own mistakes from analysed games, drilled in woodpecker cycles -->
+  <section id="sn" hidden>
+    <div class="sn-grid">
+      <div class="sn-boardcol">
+        <div class="board" id="snBoard" aria-label="Mistake drill board"></div>
+        <div class="sn-prompt" id="snPrompt" aria-live="polite"></div>
+      </div>
+      <aside class="sn-side">
+        <div class="card">
+          <div class="eyebrow">Woodpecker method</div>
+          <h1 class="sn-title">Mistake drills</h1>
+          <p class="summary">Your own mistakes from your games, solved again in cycles until the right move is automatic. The next cycle only unlocks when you beat your accuracy <i>and</i> your time.</p>
+        </div>
+        <div class="card" id="snRun" hidden></div>
+        <div class="card" id="snSet"></div>
+        <div class="card" id="snCollect"></div>
+        <div class="card" id="snSummary"></div>
+      </aside>
+    </div>
   </section>
 
   <section id="dash" hidden>
@@ -1314,6 +1364,7 @@ function show(view){
   $("play").hidden = view!=="play"; $("tabPlay").classList.toggle("on", view==="play");
   $("rush").hidden = view!=="rush"; $("tabRush").classList.toggle("on", view==="rush");
   $("rated").hidden = view!=="rated"; $("tabRated").classList.toggle("on", view==="rated");
+  $("sn").hidden = view!=="sn"; $("tabSN").classList.toggle("on", view==="sn");
   if(view !== "rush" && typeof rushLeave === "function") rushLeave();
   $("tabs").hidden = view==="drill";
   $("tabToday").classList.toggle("on", view==="home"); $("tabDash").classList.toggle("on", view==="dash");
@@ -2202,6 +2253,7 @@ function goTo(view){
   else if(view === "play") playTab();
   else if(view === "rush"){ show("rush"); rushTab(); }
   else if(view === "rated"){ show("rated"); renderRated(); }
+  else if(view === "sn"){ show("sn"); snTab(); }
   else { show("home"); renderHome(); }
 }
 $("tabToday").onclick = () => { show("home"); renderHome(); };
@@ -3636,54 +3688,64 @@ $("dlgForm").onsubmit = e => {
 };
 
 /* full-game analysis with a second Stockfish in the browser */
-function analyzeLocal(g){
-  if(gLocal) return;
-  const fens = mainline.map(p => p.fen), moves = mainline.map(p => p.lm);
+/* Run Stockfish (depth LOCAL_DEPTH, top 3 moves) on every position. Returns the per-position results,
+   or null if job.cancel was set or the engine died (then job.failed is true). */
+async function sfRun(fens, job, onStep){
   let w;
-  try{ w = new Worker(SF_FILE); }
-  catch(e){ $("gpAnalyze").innerHTML = `<p class="err">${location.protocol === "file:" ? "The engine only runs when the site is opened from its web address (Netlify)." : "Couldn't start the engine."}</p>`; return; }
-  const job = gLocal = {id:g.id, done:0, total:fens.length, cancel:false};
-  renderAnalyzeBox();
+  try{ w = new Worker(SF_FILE); }catch(e){ job.failed = true; job.noEngine = true; return null; }
   let waiter = null, buf = [];
   w.onmessage = e => { const s = String(e.data); if(waiter) waiter(s); };
   w.onerror = () => { job.cancel = true; job.failed = true; if(waiter) waiter("bestmove (none)"); };
   const waitFor = pred => new Promise(res => { buf = []; waiter = s => { buf.push(s); if(pred(s)){ waiter = null; res(buf); } }; });
+  w.postMessage("uci"); await waitFor(s => s === "uciok" || s.startsWith("bestmove"));
+  w.postMessage("setoption name MultiPV value 3");
+  w.postMessage("isready"); await waitFor(s => s === "readyok" || s.startsWith("bestmove"));
+  const res = [];
+  for(let i=0; i<fens.length && !job.cancel; i++){
+    const fen = fens[i], ch = new Chess(fen);
+    if(ch.in_checkmate()) res.push({eval: ch.turn()==="w" ? -10000 : 10000, pv:[]});
+    else if(ch.in_draw()) res.push({eval:0, pv:[]});
+    else {
+      const p = waitFor(s => s.startsWith("bestmove"));
+      w.postMessage("position fen " + fen); w.postMessage("go depth " + LOCAL_DEPTH);
+      const lines = await p;
+      const top = {};   // last reported line for each of the top 3 moves
+      for(const l of lines) if(l.startsWith("info") && l.includes(" score ") && l.includes(" pv ")) top[+(l.match(/ multipv (\d+)/)||[,1])[1]] = l;
+      const sgn = fen.split(" ")[1] === "w" ? 1 : -1;
+      const score = l => { const sc = l.match(/ score (cp|mate) (-?\d+)/); return sc ? (sc[1] === "cp" ? {eval: +sc[2]*sgn} : {mate: +sc[2]*sgn}) : {eval:0}; };
+      const pvOf = l => l.split(" pv ")[1].trim().split(" ");
+      const r = top[1] ? score(top[1]) : {eval:0};
+      r.pv = top[1] ? pvOf(top[1]).slice(0,8) : [];
+      r.alts = [1,2,3].filter(m => top[m]).map(m => Object.assign(score(top[m]), {m: pvOf(top[m])[0]}));
+      r.legal = ch.moves().length;
+      res.push(r);
+    }
+    job.done = i+1; if(onStep) onStep(i);
+  }
+  w.terminate();
+  return job.cancel || job.failed ? null : res;
+}
+function analyzeLocal(g){
+  if(gLocal) return;
+  const fens = mainline.map(p => p.fen), moves = mainline.map(p => p.lm);
+  const job = gLocal = {id:g.id, done:0, total:fens.length, cancel:false};
+  renderAnalyzeBox();
   const tick = () => { if(curGame?.id === g.id && mode === "game") renderAnalyzeBox(); };
   (async () => {
-    w.postMessage("uci"); await waitFor(s => s === "uciok" || s.startsWith("bestmove"));
-    w.postMessage("setoption name MultiPV value 3");
-    w.postMessage("isready"); await waitFor(s => s === "readyok" || s.startsWith("bestmove"));
-    const res = [];
-    for(let i=0; i<fens.length && !job.cancel; i++){
-      const fen = fens[i], ch = new Chess(fen);
-      if(ch.in_checkmate()) res.push({eval: ch.turn()==="w" ? -10000 : 10000, pv:[]});
-      else if(ch.in_draw()) res.push({eval:0, pv:[]});
-      else {
-        const p = waitFor(s => s.startsWith("bestmove"));
-        w.postMessage("position fen " + fen); w.postMessage("go depth " + LOCAL_DEPTH);
-        const lines = await p;
-        const top = {};   // last reported line for each of the top 3 moves
-        for(const l of lines) if(l.startsWith("info") && l.includes(" score ") && l.includes(" pv ")) top[+(l.match(/ multipv (\d+)/)||[,1])[1]] = l;
-        const sgn = fen.split(" ")[1] === "w" ? 1 : -1;
-        const score = l => { const sc = l.match(/ score (cp|mate) (-?\d+)/); return sc ? (sc[1] === "cp" ? {eval: +sc[2]*sgn} : {mate: +sc[2]*sgn}) : {eval:0}; };
-        const pvOf = l => l.split(" pv ")[1].trim().split(" ");
-        const r = top[1] ? score(top[1]) : {eval:0};
-        r.pv = top[1] ? pvOf(top[1]).slice(0,8) : [];
-        r.alts = [1,2,3].filter(m => top[m]).map(m => Object.assign(score(top[m]), {m: pvOf(top[m])[0]}));
-        r.legal = ch.moves().length;
-        res.push(r);
-      }
-      job.done = i+1; if(i % 2 === 0) tick();
-    }
-    w.terminate(); gLocal = null;
+    const res = await sfRun(fens, job, i => { if(i % 2 === 0) tick(); });
+    gLocal = null;
+    if(job.noEngine){ $("gpAnalyze").innerHTML = `<p class="err">${location.protocol === "file:" ? "The engine only runs when the site is opened from its web address." : "Couldn't start the engine."}</p>`; return; }
     if(job.failed){ if(curGame?.id === g.id) $("gpAnalyze").innerHTML = '<p class="err">The engine stopped unexpectedly. Try again.</p>'; return; }
-    if(job.cancel){ tick(); return; }
-    S.ganalysis[g.id] = buildAnalysis(fens, moves, res);
-    const ids = Object.keys(S.ganalysis); if(ids.length > 150) delete S.ganalysis[ids[0]];
-    save();
+    if(job.cancel || !res){ tick(); return; }
+    storeAnalysis(g.id, fens, moves, res);
     if(curGame?.id === g.id && mode === "game"){ renderGameTop(); renderMoveList(); gameSync(); }
     if(!$("games").hidden) renderGames();
   })();
+}
+function storeAnalysis(id, fens, moves, res){
+  S.ganalysis[id] = buildAnalysis(fens, moves, res);
+  const ids = Object.keys(S.ganalysis); if(ids.length > 150) delete S.ganalysis[ids[0]];
+  save();
 }
 function sanLine(fen, pv){
   const c = new Chess(fen), out = [];
@@ -3898,6 +3960,290 @@ $("rtReset").onclick = () => {
   save(); renderRated();
 };
 
+/* ---------- Mistake drills (woodpecker method) ----------
+   1. Collect: analyse your recent games (Stockfish in the browser, or Lichess's own analysis when a game has it)
+      and keep every position where you made a mistake or blunder, plus the ones where your opponent blundered
+      and you didn't punish it ("missed wins").
+   2. Each position gets a rough type (missed mate, hung a piece, missed fork, ...) and a game phase.
+   3. Build a fixed set and solve it in cycles. A new cycle unlocks only when you beat your best accuracy AND time. */
+S.sn ??= {items: {}, done: {}, missed: true, set: null};
+const SN_V = {p:1, n:3, b:3, r:5, q:9, k:0};
+const SN_TYPES = {
+  mate:["Missed mate", "You had a forced mate."],
+  allowmate:["Walked into mate", "Your move allowed a forced mate."],
+  hung:["Hung a piece", "Your move left a piece where it could be taken."],
+  fork:["Missed fork", "One move would have attacked two things at once."],
+  capture:["Missed capture", "There was material to take."],
+  check:["Missed check", "A forcing check was the strongest move."],
+  endgame:["Endgame technique", "An endgame where the plan or the precise move mattered."],
+  quiet:["Quiet move / plan", "No tactic: the best move was a quieter, positional one."],
+};
+const SN_PHASE = {opening:"Opening", middlegame:"Middlegame", endgame:"Endgame"};
+let snJob = null, snCg = null, snPz = null;   // snPz: the puzzle on the board {it, game, from, solved, failed, t0, lastMove}
+
+function snPhase(fen, ply){
+  if(ply <= 20) return "opening";
+  let m = 0; for(const ch of fen.split(" ")[0]) if("qrbnQRBN".includes(ch)) m += SN_V[ch.toLowerCase()];
+  return m <= 26 ? "endgame" : "middlegame";
+}
+// a piece of ours worth 3+ that the opponent can take for free (or with something cheaper) after our move
+function snHung(fen, played){
+  const c = new Chess(fen); if(!c.move(played, {sloppy:true})) return false;
+  for(const m of c.moves({verbose:true})){
+    if(!m.captured || SN_V[m.captured] < 3) continue;
+    const c2 = new Chess(c.fen()); c2.move(m);
+    const defended = c2.moves({verbose:true}).some(r => r.to === m.to);
+    if(!defended || SN_V[m.captured] > SN_V[m.piece]) return true;
+  }
+  return false;
+}
+function snFork(fen, best){
+  const c = new Chess(fen), mv = c.move({from:best.slice(0,2), to:best.slice(2,4), promotion:best[4] || "q"}); if(!mv) return false;
+  const f = c.fen().split(" "); f[1] = mv.color; f[3] = "-";
+  const c2 = new Chess(); if(!c2.load(f.join(" "))) return false;
+  const hits = c2.moves({square: mv.to, verbose:true}).filter(m => m.captured && SN_V[m.captured] >= 3).length;
+  return hits + (mv.san.includes("+") ? 1 : 0) >= 2;
+}
+function snType(fen, best, played, prev, me, phase, after){
+  const sg = me === "w" ? 1 : -1;
+  if(prev && prev.mate !== undefined && prev.mate * sg > 0) return "mate";
+  if(after && after.mate !== undefined && after.mate * sg < 0) return "allowmate";
+  if(snHung(fen, played)) return "hung";
+  if(snFork(fen, best)) return "fork";
+  const c = new Chess(fen), mv = c.move({from:best.slice(0,2), to:best.slice(2,4), promotion:best[4] || "q"});
+  if(mv && mv.captured) return "capture";
+  if(mv && mv.san.includes("+")) return "check";
+  return phase === "endgame" ? "endgame" : "quiet";
+}
+// pull the drill positions out of one analysed game
+function snCollectGame(g, A){
+  const me = myColor(g), sans = g.moves.split(" ").filter(Boolean), fens = [];
+  const c = g.initialFen ? new Chess(g.initialFen) : new Chess(); fens.push(c.fen());
+  for(const san of sans){ if(!c.move(san, {sloppy:true})) break; fens.push(c.fen()); }
+  const opp = me === "w" ? g.players.black : g.players.white;
+  const bad = e => e?.judgment && (e.judgment.name === "Mistake" || e.judgment.name === "Blunder");
+  let n = 0;
+  for(let k = 1; k < fens.length; k++){
+    const e = A.evals[k-1], fen = fens[k-1];
+    if(!e || fen.split(" ")[1] !== me || !e.judgment || !e.best) continue;
+    const missed = k >= 2 && bad(A.evals[k-2]);
+    if(!missed && !bad(e)) continue;          // plain inaccuracies aren't drilled
+    const phase = snPhase(fen, k), prev = k >= 2 ? A.evals[k-2] : A.ev0;
+    S.sn.items[`${g.id}:${k}`] = {id:`${g.id}:${k}`, fen, best:e.best, line:e.variation || "", played:sans[k-1],
+      kind: missed ? "missed" : e.judgment.name.toLowerCase(), type: snType(fen, e.best, sans[k-1], prev, me, phase, e), phase,
+      opening: g.opening?.name ? g.opening.name.split(":")[0] : "", gid:g.id, link: gameUrl(g, me, k),
+      label: moveLabelOf(fen, sans[k-1]), date: g.createdAt || Date.now(), vs: playerName(opp)};
+    n++;
+  }
+  S.sn.done[g.id] = Date.now();
+  return n;
+}
+function moveLabelOf(fen, san){ const [, t, , , , n] = fen.split(" "); return `${n}${t === "w" ? "." : "..."} ${san}`; }
+const snItems = () => Object.values(S.sn.items).filter(it => S.sn.missed || it.kind !== "missed");
+
+/* ---- collecting: analyse the most recent games on the Games tab ---- */
+async function snAnalyse(n){
+  if(snJob) return;
+  if(!gList){
+    if(!gUsers().length){ snJob = null; snRenderCollect("Add your chess.com or Lichess username on the Games tab first."); return; }
+    snRenderCollect("Loading your games…"); await loadGames();
+  }
+  const games = (gList || []).filter(g => g.moves && g.status !== "started").slice(0, n);
+  if(!games.length){ snRenderCollect("No finished games found. Check the Games tab."); return; }
+  const job = snJob = {total: games.length, i: 0, cancel: false, found: 0, game: null, pct: 0};
+  snRenderCollect();
+  for(const g of games){
+    if(job.cancel) break;
+    job.i++; job.game = g; job.pct = 0;
+    if(S.sn.done[g.id]) continue;          // already collected
+    let A = gAnalysis(g);
+    if(!A){
+      const fens = [], moves = [null], c = g.initialFen ? new Chess(g.initialFen) : new Chess(); fens.push(c.fen());
+      for(const san of g.moves.split(" ").filter(Boolean)){ const m = c.move(san, {sloppy:true}); if(!m) break; fens.push(c.fen()); moves.push([m.from, m.to]); }
+      const sj = {done:0, total:fens.length, get cancel(){ return job.cancel; }, set cancel(v){ job.cancel = v; }};
+      const res = await sfRun(fens, sj, () => { job.pct = sj.done / fens.length; if(sj.done % 4 === 0) snRenderCollect(); });
+      if(!res){ if(sj.noEngine){ snJob = null; snRenderCollect("Couldn't start the engine in this browser."); return; } break; }
+      storeAnalysis(g.id, fens, moves, res);
+      A = gAnalysis(g);
+    }
+    if(A) job.found += snCollectGame(g, A);
+    save(); snRenderCollect(); snRenderSummary();
+  }
+  snJob = null; save();
+  snRenderCollect(job.cancel ? "Stopped. What was analysed so far is kept." : `Done: ${job.found} new position${job.found === 1 ? "" : "s"} from ${job.total} games.`);
+  snRenderSummary(); snRenderSet();
+}
+function snRenderCollect(msg){
+  const it = Object.values(S.sn.items), games = new Set(it.map(x => x.gid)).size, j = snJob;
+  $("snCollect").innerHTML = `<div class="eyebrow">Your mistakes</div>
+    <div class="sn-stats">
+      <div class="sn-stat"><b>${it.filter(x => x.kind !== "missed").length}</b><span>mistakes</span></div>
+      <div class="sn-stat"><b>${it.filter(x => x.kind === "missed").length}</b><span>missed wins</span></div>
+      <div class="sn-stat"><b>${Object.keys(S.sn.done).length}</b><span>games checked</span></div>
+    </div>
+    ${j ? `<div class="sn-note">Analysing game ${j.i} of ${j.total}${j.game ? ` (vs ${esc(playerName(myColor(j.game) === "w" ? j.game.players.black : j.game.players.white))})` : ""}…</div>
+      <div class="sn-prog"><i style="width:${Math.round(((j.i - 1) + j.pct) / j.total * 100)}%"></i></div>
+      <div class="sn-row"><button id="snStop">Stop</button></div>`
+    : `<div class="sn-row"><button class="primary" id="snGo">Analyse my last games</button>
+        <select id="snN" aria-label="How many games">${[10,20,30,50,100].map(v => `<option${v === (S.sn.n || 30) ? " selected" : ""}>${v}</option>`).join("")}</select></div>
+      <p class="sn-note">${msg ? esc(msg) : `Uses the games on your Games tab (${esc(siteName())}${S.gameSpeeds?.length ? ", " + esc(S.gameSpeeds.join(" / ")) : ""}). Games already checked are skipped. About a minute per game; keep this tab open.`}</p>`}
+    <label class="sn-row sn-note"><input type="checkbox" id="snMissed"${S.sn.missed ? " checked" : ""}> Include missed wins (your opponent blundered and you didn't punish it)</label>
+`;
+  if($("snGo")) $("snGo").onclick = () => { S.sn.n = +$("snN").value; save(); snAnalyse(S.sn.n); };
+  if($("snStop")) $("snStop").onclick = () => { if(snJob) snJob.cancel = true; };
+  $("snMissed").onchange = e => { S.sn.missed = e.target.checked; save(); snRenderSummary(); snRenderSet(); };
+}
+
+/* ---- summary: what kind of mistakes, when, in which openings ---- */
+function snRenderSummary(){
+  const it = snItems();
+  if(!it.length){ $("snSummary").innerHTML = `<div class="eyebrow">Most common mistakes</div><p class="sn-note">Nothing yet. Analyse some games above.</p>`; return; }
+  const count = f => it.reduce((m, x) => (m[f(x)] = (m[f(x)] || 0) + 1, m), {});
+  const bars = (obj, names) => { const e = Object.entries(obj).sort((a,b) => b[1]-a[1]), max = e[0][1];
+    return `<div class="sn-bars">${e.map(([k,v]) => `<div class="sn-bar" title="${esc(SN_TYPES[k]?.[1] || "")}"><span>${esc(names(k))}</span><i style="width:${v/max*100}%"></i><em>${v}</em></div>`).join("")}</div>`; };
+  const op = Object.entries(count(x => x.opening || "")).filter(([k]) => k).sort((a,b) => b[1]-a[1]).slice(0, 4);
+  $("snSummary").innerHTML = `<div class="eyebrow">Most common mistakes</div>
+    ${bars(count(x => x.type), k => SN_TYPES[k]?.[0] || k)}
+    <div class="eyebrow">When</div>${bars(count(x => x.phase), k => SN_PHASE[k] || k)}
+    ${op.length ? `<div class="eyebrow">Openings</div><div class="sn-bars">${op.map(([k,v]) => `<div class="sn-bar"><span title="${esc(k)}">${esc(k.length > 18 ? k.slice(0,17) + "…" : k)}</span><i style="width:${v/op[0][1]*100}%"></i><em>${v}</em></div>`).join("")}</div>` : ""}
+    <p class="sn-note">Types are a best guess from the engine's move, so a few may be in the wrong group.</p>`;
+}
+
+/* ---- the drill set and its cycles ---- */
+const fmtT = ms => { const s = Math.round(ms/1000); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; };
+function snBuild(filter, size){
+  let it = snItems().filter(x => filter === "all" || x.type === filter);
+  it.sort((a,b) => b.date - a.date); if(size) it = it.slice(0, size);
+  S.sn.set = {ids: it.map(x => x.id), filter, created: Date.now(), cycle: 1, best: null, history: [], run: null};
+  save(); snRenderSet(); snDrawIdle();
+}
+function snRenderSet(){
+  const set = S.sn.set, it = snItems();
+  const counts = it.reduce((m, x) => (m[x.type] = (m[x.type] || 0) + 1, m), {});
+  const pick = S.sn.pick || "all";
+  const chips = [["all", "All", it.length], ...Object.entries(counts).sort((a,b) => b[1]-a[1]).map(([k,v]) => [k, SN_TYPES[k]?.[0] || k, v])]
+    .map(([k, name, v]) => `<button class="sn-chip${pick === k ? " on" : ""}" data-k="${k}">${esc(name)}<b>${v}</b></button>`).join("");
+  const builder = `<div class="sn-chips" id="snChips">${chips}</div>
+    <div class="sn-row"><select id="snSize" aria-label="Set size">${[20,40,60,0].map(v => `<option value="${v}"${v === (S.sn.size ?? 40) ? " selected" : ""}>${v ? v + " positions" : "All positions"}</option>`).join("")}</select>
+      <button${set ? "" : ' class="primary"'} id="snBuild"${it.length ? "" : " disabled"}>${set ? "Build a new set" : "Build my drill set"}</button></div>`;
+  if(!set){
+    $("snSet").innerHTML = `<div class="eyebrow">Drill set</div><p class="sn-note">${it.length ? "Pick what to drill, then build a fixed set. Newest mistakes first." : "Analyse some games first."}</p>${builder}`;
+  } else {
+    const live = set.ids.filter(id => S.sn.items[id]), r = set.run;
+    const hist = set.history.length ? `<table class="sn-hist"><tr><th>Cycle</th><th>Accuracy</th><th>Time</th><th></th></tr>${set.history.slice(-8).map(h =>
+      `<tr><td>${h.cycle}</td><td>${h.acc}%</td><td>${fmtT(h.time)}</td><td>${h.beat ? "✓ unlocked" : "try again"}</td></tr>`).join("")}</table>` : "";
+    $("snSet").innerHTML = `<div class="eyebrow">Drill set · ${esc(set.filter === "all" ? "All types" : SN_TYPES[set.filter]?.[0] || set.filter)} · ${live.length} position${live.length === 1 ? "" : "s"}</div>
+      <h3 style="margin:0">Cycle ${set.cycle}</h3>
+      ${set.best ? `<p class="sn-note">To unlock cycle ${set.cycle + 1}: at least <b>${set.best.acc}%</b> and faster than <b>${fmtT(set.best.time)}</b>.</p>` : `<p class="sn-note">First pass: this sets the score to beat.</p>`}
+      <div class="sn-row"><button class="primary" id="snStart"${live.length ? "" : " disabled"}>${r ? `Continue (${r.i} / ${r.order.length})` : `Start cycle ${set.cycle}`}</button>${r ? '<button id="snRestart">Restart cycle</button>' : ""}</div>
+      ${hist}
+      <details><summary class="sn-note">Change the set</summary>${builder}</details>`;
+    $("snStart").onclick = () => snStartCycle(!r);
+    if($("snRestart")) $("snRestart").onclick = () => snStartCycle(true);
+  }
+  $("snChips").onclick = e => { const b = e.target.closest(".sn-chip"); if(!b) return; S.sn.pick = b.dataset.k; save(); snRenderSet(); };
+  $("snBuild").onclick = () => { S.sn.size = +$("snSize").value; if(set && set.history.length && !confirm("Start a new set? This set's cycle history goes with it.")) return; snBuild(S.sn.pick || "all", S.sn.size); };
+}
+function snStartCycle(fresh){
+  const set = S.sn.set; if(!set) return;
+  if(fresh || !set.run){
+    const order = set.ids.filter(id => S.sn.items[id]);
+    for(let i = order.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+    set.run = {order, i: 0, correct: 0, time: 0};
+  }
+  save(); snRenderSet(); snNext();
+}
+function snNext(){
+  const set = S.sn.set, r = set?.run; if(!r) return;
+  if(r.i >= r.order.length){ snFinish(); return; }
+  const it = S.sn.items[r.order[r.i]]; if(!it){ r.i++; snNext(); return; }
+  snPz = {it, game: new Chess(it.fen), solved: false, failed: false, t0: performance.now(), lastMove: null};
+  snRunCard(); snDraw(); snRenderSet();
+  $("snPrompt").innerHTML = `<b>${it.fen.split(" ")[1] === "w" ? "White" : "Black"} to move.</b> Find the best move. <span class="sn-src">In your game vs ${esc(it.vs)} you played ${esc(it.label)}${it.kind === "missed" ? " (your opponent had just blundered)" : ""}.</span>`;
+}
+function snRunCard(){
+  const r = S.sn.set?.run, el = $("snRun");
+  if(!r || !snPz){ el.hidden = true; return; }
+  const it = snPz.it; el.hidden = false;
+  el.innerHTML = `<div class="sn-row" style="justify-content:space-between"><b>Position ${r.i + 1} of ${r.order.length}</b><span class="sn-note">${r.correct} right · ${fmtT(r.time)}</span></div>
+    <div class="sn-prog"><i style="width:${r.i / r.order.length * 100}%"></i></div>
+    <div class="sn-note">${esc(SN_TYPES[it.type]?.[0] || "")} · ${esc(SN_PHASE[it.phase] || "")}${it.opening ? " · " + esc(it.opening) : ""}</div>
+    ${snPz.solved || snPz.failed ? `<div class="sn-row"><button class="primary" id="snNextBtn">Next →</button><a class="sn-src" href="${esc(it.link)}" target="_blank" rel="noopener">See the game ↗</a></div>` : ""}
+    <div class="sn-row"><button id="snQuit">Pause</button></div>`;
+  if($("snNextBtn")) $("snNextBtn").onclick = () => { const r2 = S.sn.set.run; r2.i++; save(); snNext(); };
+  $("snQuit").onclick = () => { snPz = null; el.hidden = true; snRenderSet(); snDrawIdle(); $("snPrompt").textContent = "Paused. Your place in this cycle is saved."; };
+}
+function snDraw(bad){
+  const b = $("snBoard");
+  snCg ||= cgBoard(b, (o, d) => snTry(o, d));
+  if(!snPz){ return; }
+  const g = snPz.game, me = snPz.it.fen.split(" ")[1], can = !snPz.solved && !snPz.failed && g.turn() === me;
+  const custom = new Map(); if(bad) custom.set(bad, "bad");
+  snCg.set({orientation: cgColor(me), fen: g.fen(), turnColor: cgColor(g.turn()), lastMove: snPz.lastMove || undefined,
+    check: g.in_check() ? cgColor(g.turn()) : false, movable: {color: can ? cgColor(me) : undefined, dests: can ? cgDests(g) : new Map()}, highlight: {custom}});
+  if(!can) snCg.selectSquare(null);
+}
+function snDrawIdle(){
+  const b = $("snBoard"); snCg ||= cgBoard(b, (o, d) => snTry(o, d));
+  const set = S.sn.set, it = set && S.sn.items[set.ids[0]];
+  snCg.set({fen: it ? it.fen.split(" ")[0] : "start", orientation: it ? cgColor(it.fen.split(" ")[1]) : "white", lastMove: undefined, check: false, movable: {color: undefined, dests: new Map()}});
+}
+async function snTry(from, to){
+  const z = snPz; if(!z || z.solved || z.failed) return;
+  const g = z.game, p = g.get(from);
+  let promo;
+  if(p?.type === "p" && (to[1] === "8" || to[1] === "1")) promo = "q";
+  const m = g.move({from, to, promotion: promo}); if(!m){ snDraw(); return; }
+  const uci = from + to + (m.promotion || ""), r = S.sn.set.run, it = z.it;
+  const dt = performance.now() - z.t0;
+  const right = uci.slice(0,4) === it.best.slice(0,4) || g.in_checkmate();
+  z.lastMove = [from, to]; r.time += dt;
+  const line = it.line ? it.line.split(" ").slice(0, 6).join(" ") : "";
+  if(right){
+    z.solved = true; r.correct++;
+    $("snPrompt").innerHTML = `<span class="ok">✓ Right: ${esc(m.san)}.</span> ${line ? `<span class="sn-src">The line: ${esc(line)}</span>` : ""}`;
+    snDraw(); snRunCard(); save(); snPlayLine(z);
+    setTimeout(() => { if(snPz === z && S.sn.set?.run === r){ r.i++; save(); snNext(); } }, 1600 + Math.min(4, (it.line || "").split(" ").length) * 450);
+  } else {
+    z.failed = true; save();
+    g.undo(); z.lastMove = null;
+    const bm = g.move({from: it.best.slice(0,2), to: it.best.slice(2,4), promotion: it.best[4] || "q"});
+    g.undo();
+    $("snPrompt").innerHTML = `<span class="bad">✗ Not this time.</span> Best was <b>${esc(bm ? bm.san : it.best)}</b>${line ? ` <span class="sn-src">(${esc(line)})</span>` : ""}. In the game you played ${esc(it.played)}.`;
+    snDraw(to); snRunCard();
+    snCg.setAutoShapes([{orig: it.best.slice(0,2), dest: it.best.slice(2,4), brush: "green"}]);
+    setTimeout(() => snCg?.setAutoShapes([]), 4000);
+  }
+}
+// after a correct move, show the next few moves of the engine's line on the board
+function snPlayLine(z){
+  const moves = (z.it.line || "").split(" ").filter(Boolean).slice(1, 4);
+  let k = 0;
+  const step = () => {
+    if(snPz !== z || k >= moves.length) return;
+    const m = z.game.move(moves[k++], {sloppy:true}); if(!m) return;
+    z.lastMove = [m.from, m.to]; snDraw(); setTimeout(step, 450);
+  };
+  setTimeout(step, 500);
+}
+function snFinish(){
+  const set = S.sn.set, r = set.run, n = r.order.length;
+  const acc = n ? Math.round(r.correct / n * 100) : 0, time = Math.round(r.time);
+  const beat = !set.best || (acc >= set.best.acc && time < set.best.time);
+  set.history.push({cycle: set.cycle, acc, time, date: Date.now(), beat});
+  if(beat){ set.best = {acc, time}; set.cycle++; }
+  set.run = null; snPz = null; save();
+  $("snRun").hidden = true; snDrawIdle(); snRenderSet();
+  $("snPrompt").innerHTML = beat
+    ? `<span class="ok">Cycle done: ${acc}% in ${fmtT(time)}.</span> ${set.history.length > 1 ? "You beat your best. " : ""}Cycle ${set.cycle} is unlocked.`
+    : `<span class="bad">Cycle done: ${acc}% in ${fmtT(time)}.</span> Not quite: you need ${set.best.acc}% or better in under ${fmtT(set.best.time)}. Run it again.`;
+}
+function snTab(){
+  snRenderCollect(); snRenderSummary(); snRenderSet();
+  if(snPz){ snRunCard(); snDraw(); } else snDrawIdle();
+}
+$("tabSN").onclick = () => goTo("sn");
+
 /* after a reload, stay on the tab you were on (a puzzle set restarts with a fresh puzzle of the same theme).
    Runs after the whole script has loaded, so every tab's code is ready. */
 const savedView = (() => { try { return JSON.parse(sessionStorage.getItem("chess.view") || "null"); } catch(e){ return null; } })();
@@ -3916,7 +4262,7 @@ setTimeout(function restoreView(){
   if(v && v.view === "drill" && v.mode === "live"){ goTo("play"); return; }
   if(v && v.view === "drill" && v.mode === "lreplay"){ goTo("dash"); return; }
   if(v && v.view === "drill" && v.mode === "rated"){ returnView = "rated"; show("rated"); renderRated(); ratedStart(); return; }
-  if(v && ["dash", "train", "games", "play", "rush", "rated"].includes(v.view)){ try { goTo(v.view); return; } catch(e){ console.warn(e); } }
+  if(v && ["dash", "train", "games", "play", "rush", "rated", "sn"].includes(v.view)){ try { goTo(v.view); return; } catch(e){ console.warn(e); } }
 }, 0);
 
 /* ---------- play live games on Lichess (Board API) ----------
