@@ -24,6 +24,7 @@
     { id: 'cartoon', name: 'Cartoon' },
     { id: 'geometric', name: 'Geometric' },
     { id: 'outlined', name: 'Outlined' },
+    { id: 'flat', name: 'Flat' },
   ];
   const KEYS = ['w', 'b'].flatMap((c) => [...'kqrbnp'].map((p) => c + p));
   const read = (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } };
