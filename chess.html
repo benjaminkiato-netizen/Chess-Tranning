@@ -626,6 +626,13 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
 .lk-bot .sn-note{font-weight:400;white-space:nowrap}
 .lk-fix{font-size:14px;border-top:1px solid var(--line);padding-top:8px}
 .lk-fix p{margin:0 0 6px}
+.pg-wrap{overflow-x:auto}
+.pg-tab td,.pg-tab th{white-space:nowrap;text-align:center} .pg-tab td:first-child{text-align:left}
+.pg-up{color:var(--good);font-size:10px} .pg-down{color:var(--bad, #e05252);font-size:10px}
+.sp{display:flex;flex-direction:column;gap:2px}
+.sp-head{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.sp-head span{font-size:12px;font-weight:600}
+.sp-svg{width:100%;height:64px;overflow:visible}
 .sn-line{margin-top:6px;font-size:14px;line-height:1.9}
 .sn-mv{background:none;border:1px solid transparent;border-radius:6px;padding:1px 5px;color:inherit;font:inherit;font-weight:600;cursor:pointer}
 .sn-mv:hover{border-color:var(--line)} .sn-mv.on{background:var(--accent);color:var(--accent-fg, #fff)}
@@ -919,6 +926,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
           <p class="summary">Your own mistakes from your games, solved again in cycles until the right move is automatic. The next cycle only unlocks when you beat your accuracy <i>and</i> your time.</p>
         </div>
         <div class="card" id="snRun" hidden></div>
+        <div class="card" id="snProgress" hidden></div>
         <div class="card" id="snLeaks"></div>
         <div class="card" id="snSet"></div>
         <div class="card" id="snCollect"></div>
@@ -4168,23 +4176,25 @@ const SN_LEAKS = [
   {k:"open", name:"Openings", goal:1.0, val: G => G.reduce((a,x) => a + x.open, 0) / G.length,
     text: v => `${v.toFixed(2)} opening mistakes per game (moves 1 to 10)`, goalText: "goal: under 1 per game",
     fix: "Go through your main openings in Study and learn the plan behind the moves, not just the moves.",
-    ids: () => snItems().filter(it => it.phase === "opening").map(it => it.id)},
+    ids: G => snItems().filter(it => it.phase === "opening" && G.some(x => x.id === it.gid)).map(it => it.id)},
   {k:"missed", name:"Missed tactics", goal:0.5, val: G => G.reduce((a,x) => a + x.missed, 0) / G.length,
     text: v => `${v.toFixed(2)} times per game your opponent blundered and you didn't punish it`, goalText: "goal: under 0.5 per game",
     fix: "After every opponent move, ask: what did that move leave undefended? Drill your missed wins.",
-    ids: () => snItems().filter(it => it.kind === "missed").map(it => it.id)},
+    ids: G => snItems().filter(it => it.kind === "missed" && G.some(x => x.id === it.gid)).map(it => it.id)},
   {k:"blun", name:"Blunders", goal:0.5, val: G => G.reduce((a,x) => a + x.blun, 0) / G.length,
     text: v => `${v.toFixed(2)} blunders per game`, goalText: "goal: under 0.5 per game",
     fix: "Before every move, a blunder check: what does my move leave hanging, and what are all their checks and captures?",
-    ids: () => snItems().filter(it => it.kind === "blunder").map(it => it.id)},
+    ids: G => snItems().filter(it => it.kind === "blunder" && G.some(x => x.id === it.gid)).map(it => it.id)},
   {k:"acc", name:"Overall accuracy", goal:85, inv:true, val: G => { const a = G.filter(x => x.acc != null); return a.length ? a.reduce((s,x) => s + x.acc, 0) / a.length : null; },
     text: v => `${v.toFixed(1)}% average accuracy`, goalText: "goal: 85%+",
     fix: "Accuracy rises when the blunders go. Work on the leaks above first.", ids: () => []},
 ];
 function snRenderLeaks(){
-  const G = Object.entries(S.sn.games).map(([id, x]) => ({id, ...x}));
+  const Bs = S.sn.batches, view = Bs.find(b => b.n === S.sn.leakView) ? S.sn.leakView : (Bs.length ? Bs[Bs.length - 1].n : 0);
+  const G = view ? snBatchGames(Bs.find(b => b.n === view)) : Object.entries(S.sn.games).map(([id, x]) => ({id, ...x}));
   const el = $("snLeaks");
-  if(G.length < 3){ el.innerHTML = `<div class="eyebrow">Your leaks</div><p class="sn-note">Analyse at least 3 games to see where you lose the most.${G.length ? ` (${G.length} so far)` : ""}</p>`; return; }
+  const pickB = Bs.length ? `<select id="snLeakView" aria-label="Which games">${Bs.map(b => `<option value="${b.n}"${b.n === view ? " selected" : ""}>Batch ${b.n}</option>`).join("")}<option value="0"${!view ? " selected" : ""}>All games</option></select>` : "";
+  if(G.length < 3){ el.innerHTML = `<div class="eyebrow">Your leaks</div>${pickB}<p class="sn-note">Analyse at least 3 games to see where you lose the most.${G.length ? ` (${G.length} so far)` : ""}</p>`; return; }
   const rows = SN_LEAKS.map(L => {
     const v = L.val(G); if(v == null) return null;
     const sev = L.inv ? (100 - v) / (100 - L.goal) : v / L.goal;     // 1 = right at the goal
@@ -4200,12 +4210,13 @@ function snRenderLeaks(){
       <div class="lk-bot"><span style="color:${col}">${esc(text)}</span><span class="sn-note">${esc(right)}</span></div>
       ${k ? `<div class="lk-fix" data-fix="${k}" hidden></div>` : ""}</div>`;
   const ordered = [...rows].sort((a,b) => (!!a.L.inv - !!b.L.inv) || (b.sev - a.sev));   // accuracy last
-  el.innerHTML = `<div class="eyebrow">Your leaks · ${G.length} games</div>
+  el.innerHTML = `<div class="sn-row" style="justify-content:space-between"><div class="eyebrow">Your leaks · ${G.length} games</div>${pickB}</div>
     ${ordered.map(r => row(r.L.name, r.sev * 50, color(r.sev), r.L.text(r.v, G), r.L.goalText, r === top && r.sev > 1 ? "BIGGEST" : "", r.L.k)).join("")}
     ${phTop ? row("Where your games are decided", phTop[1] / phN * 100, "#f59e0b", `Your worst move came in the ${phTop[0]} in ${Math.round(phTop[1] / phN * 100)}% of games`,
       Object.entries(ph).filter(([k]) => k !== phTop[0]).map(([k,v]) => `${k} ${Math.round(v/phN*100)}%`).join(" · "), "", "") : ""}
     <button class="primary" id="snFixBtn">What can I do about it?</button>
     <p class="sn-note">Goals are rough rules of thumb, not real averages for any rating.</p>`;
+  if($("snLeakView")) $("snLeakView").onchange = e => { S.sn.leakView = +e.target.value; save(); snRenderLeaks(); };
   $("snFixBtn").onclick = () => {
     el.querySelectorAll(".lk-fix").forEach(f => {
       const L = SN_LEAKS.find(x => x.k === f.dataset.fix), ids = L.ids(G);
@@ -4219,32 +4230,59 @@ function snRenderLeaks(){
     const b = e.target.closest("[data-drill]"); if(!b) return;
     const L = SN_LEAKS.find(x => x.k === b.dataset.drill), ids = L.ids(G);
     if(S.sn.set?.history?.length && !confirm("Start a new drill set from these positions? Your current set's cycle history goes with it.")) return;
-    S.sn.set = {ids, filter: "custom", name: L.name, created: Date.now(), cycle: 1, best: null, history: [], run: null};
+    S.sn.set = {ids, filter: "custom", name: view ? `Batch ${view}: ${L.name}` : L.name, batch: view || null, created: Date.now(), cycle: 1, best: null, history: [], run: null};
     save(); snRenderSet(); snDrawIdle();
     $("snSet").scrollIntoView({behavior: "smooth", block: "center"});
   };
 }
 
 /* ---- collecting: analyse the most recent games on the Games tab ---- */
-async function snAnalyse(n){
+/* ---- batches: your games in blocks of 50 (Lichess + Chess.com together), so you can compare yourself over time ----
+   Batch 1 = your newest 50 games when you start. Each next batch = the next 50 games you play after the previous batch. */
+const SN_BATCH = 50;
+S.sn.batches ??= [];      // [{n, ids:[gameId], from, to, created}]
+S.sn.speeds ??= (S.gameSpeeds || ["rapid","blitz"]).filter(x => x !== "bullet").length ? (S.gameSpeeds || []).filter(x => x !== "bullet") : ["rapid","blitz"];
+S.sn.drilled ??= {};      // batch n -> {cycles, best}
+// load your games from every site you have an account on, with the Mistake Drills time controls
+async function snLoadAll(){
+  const keep = {site: S.gameSite, speeds: S.gameSpeeds, max: S.gameMax}, all = [], errs = [];
+  S.gameSpeeds = S.sn.speeds.slice(); S.gameMax = Math.max(keep.max || 50, 150);
+  try {
+    for(const site of ["lichess", "chesscom"]){
+      if(!(S.accounts[site] || []).length) continue;
+      S.gameSite = site; gList = null;
+      try { await loadGames(); } catch(e){ errs.push(e.message); }
+      if(gList) all.push(...gList);
+    }
+  } finally { S.gameSite = keep.site; S.gameSpeeds = keep.speeds; S.gameMax = keep.max; gList = null; save(); }
+  const seen = new Set();
+  return {errs, games: all.filter(g => g.moves && g.status !== "started" && !snSkipped(g) && S.sn.speeds.includes(g.speed) && !seen.has(g.id) && seen.add(g.id))
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))};
+}
+// games that would make up the next batch
+function snNextPick(games){
+  const last = S.sn.batches[S.sn.batches.length - 1];
+  if(!last) return games.slice(0, SN_BATCH);                         // first batch: your newest games
+  return games.filter(g => (g.createdAt || 0) > last.to).reverse().slice(0, SN_BATCH);   // the next ones you played, oldest first
+}
+async function snCheckNew(){
+  snRenderCollect("Checking Lichess and Chess.com for new games…");
+  const {games, errs} = await snLoadAll();
+  S.sn.pending = {count: snNextPick(games).length, at: Date.now()}; save();
+  snRenderCollect(errs.length ? "Some games didn't load: " + errs.join(" · ") : "");
+  return games;
+}
+async function snAnalyseBatch(force){
   if(snJob) return;
-  if(!gUsers().length){ snRenderCollect("Add your chess.com or Lichess username on the Games tab first."); return; }
-  // always fetch a fresh list (so games you played since are included), with at least n games in it
-  if(S.gameMax < n){ S.gameMax = n; save(); }
-  snRenderCollect("Loading your latest games…");
-  try { await loadGames(); } catch(e){ snRenderCollect("Couldn't load your games: " + e.message); return; }
-  const recent = (gList || []).filter(g => g.moves && g.status !== "started" && !snSkipped(g)).slice(0, n);
-  if(!recent.length){ snRenderCollect("No finished games found. Check the Games tab."); return; }
-  for(const g of recent) if(!S.sn.games[g.id]){ const A = gAnalysis(g); if(A) snGameStats(g, A); }
-  save(); snRenderLeaks();
-  const games = recent.filter(g => !S.sn.done[g.id]);
-  if(!games.length){ snRenderCollect(`All of your last ${recent.length} games are already checked. Pick a bigger number, or play some more games first.`); return; }
-  const job = snJob = {total: games.length, i: 0, cancel: false, found: 0, game: null, pct: 0};
+  if(!["lichess","chesscom"].some(s => (S.accounts[s] || []).length)){ snRenderCollect("Add your chess.com or Lichess username on the Games tab first."); return; }
+  const games = await snCheckNew(), pick = snNextPick(games);
+  if(!pick.length){ snRenderCollect("No new games since your last batch yet."); return; }
+  if(pick.length < SN_BATCH && !force){ snRenderCollect(); return; }
+  const job = snJob = {total: pick.length, i: 0, cancel: false, found: 0, game: null, pct: 0};
   snRenderCollect();
-  for(const g of games){
+  for(const g of pick){
     if(job.cancel) break;
     job.i++; job.game = g; job.pct = 0;
-    if(S.sn.done[g.id]) continue;          // already collected
     let A = gAnalysis(g);
     if(!A){
       const fens = [], moves = [null], c = g.initialFen ? new Chess(g.initialFen) : new Chess(); fens.push(c.fen());
@@ -4255,33 +4293,102 @@ async function snAnalyse(n){
       storeAnalysis(g.id, fens, moves, res);
       A = gAnalysis(g);
     }
-    if(A){ job.found += snCollectGame(g, A); snGameStats(g, A); }
-    save(); snRenderCollect(); snRenderSummary(); snRenderLeaks();
+    if(A){ if(!S.sn.done[g.id]) job.found += snCollectGame(g, A); snGameStats(g, A); S.sn.games[g.id].site = isCC(g) ? "chesscom" : "lichess"; S.sn.games[g.id].speed = g.speed; }
+    save(); snRenderCollect(); snRenderSummary();
   }
-  snJob = null; save();
-  snRenderCollect(job.cancel ? "Stopped. What was analysed so far is kept." : `Done: ${job.found} new position${job.found === 1 ? "" : "s"} from ${job.total} new game${job.total === 1 ? "" : "s"}${recent.length > job.total ? ` (${recent.length - job.total} were already checked)` : ""}.`);
-  snRenderSummary(); snRenderSet();
+  snJob = null;
+  if(job.cancel){ save(); snRenderCollect("Stopped. Games analysed so far are kept; click again to finish the batch."); return; }
+  const ids = pick.map(g => g.id).filter(id => S.sn.games[id]), dates = pick.map(g => g.createdAt || 0);
+  const b = {n: S.sn.batches.length + 1, ids, from: Math.min(...dates), to: Math.max(...dates), created: Date.now()};
+  S.sn.batches.push(b); S.sn.pending = {count: 0, at: Date.now()}; S.sn.leakView = b.n; save();
+  snRenderCollect(`Batch ${b.n} done: ${ids.length} games, ${job.found} new positions to drill.`);
+  snRenderSummary(); snRenderSet(); snRenderLeaks(); snRenderProgress();
 }
 function snRenderCollect(msg){
-  const it = Object.values(S.sn.items), games = new Set(it.map(x => x.gid)).size, j = snJob;
-  $("snCollect").innerHTML = `<div class="eyebrow">Your mistakes</div>
+  const it = Object.values(S.sn.items), j = snJob, B = S.sn.batches, next = B.length + 1, p = S.sn.pending;
+  const have = p ? p.count : null;
+  $("snCollect").innerHTML = `<div class="eyebrow">Batches of ${SN_BATCH} games · Lichess + Chess.com</div>
     <div class="sn-stats">
+      <div class="sn-stat"><b>${B.length}</b><span>batches</span></div>
       <div class="sn-stat"><b>${it.filter(x => x.kind !== "missed").length}</b><span>mistakes</span></div>
       <div class="sn-stat"><b>${it.filter(x => x.kind === "missed").length}</b><span>missed wins</span></div>
-      <div class="sn-stat"><b>${Object.keys(S.sn.done).length}</b><span>games checked</span></div>
     </div>
-    ${j ? `<div class="sn-note">Analysing game ${j.i} of ${j.total}${j.game ? ` (vs ${esc(playerName(myColor(j.game) === "w" ? j.game.players.black : j.game.players.white))})` : ""}…</div>
+    ${j ? `<div class="sn-note">Batch ${next}: analysing game ${j.i} of ${j.total}${j.game ? ` (vs ${esc(playerName(myColor(j.game) === "w" ? j.game.players.black : j.game.players.white))})` : ""}…</div>
       <div class="sn-prog"><i style="width:${Math.round(((j.i - 1) + j.pct) / j.total * 100)}%"></i></div>
       <div class="sn-row"><button id="snStop">Stop</button></div>`
-    : `<div class="sn-row"><button class="primary" id="snGo">Analyse my last games</button>
-        <select id="snN" aria-label="How many games">${[10,20,30,50,100].map(v => `<option${v === (S.sn.n || 30) ? " selected" : ""}>${v}</option>`).join("")}</select></div>
-      <p class="sn-note">${msg ? esc(msg) : `Uses the games on your Games tab (${esc(siteName())}${S.gameSpeeds?.length ? ", " + esc(S.gameSpeeds.join(" / ")) : ""}). Games already checked are skipped. About a minute per game; keep this tab open.`}</p>`}
+    : B.length && have != null && have < SN_BATCH ? `
+      <div class="sn-note"><b>Batch ${next}:</b> ${have} / ${SN_BATCH} new games since batch ${B.length}</div>
+      <div class="sn-prog"><i style="width:${have / SN_BATCH * 100}%"></i></div>
+      <div class="sn-row"><button id="snCheck">Check for new games</button>${have ? `<button class="link" id="snForce">Analyse these ${have} now</button>` : ""}</div>
+      <p class="sn-note">${msg ? esc(msg) : `Checked ${new Date(p.at).toLocaleString()}. Keep drilling batch ${B.length} while you play more.`}</p>`
+    : `<div class="sn-row"><button class="primary" id="snGo">${B.length ? `Analyse batch ${next}` : `Analyse my first ${SN_BATCH} games`}</button>${B.length ? '<button id="snCheck">Check for new games</button>' : ""}</div>
+      <p class="sn-note">${msg ? esc(msg) : B.length ? `Takes the next ${SN_BATCH} games you played after batch ${B.length}.` : `Your newest ${SN_BATCH} games from Lichess and Chess.com together. Games already analysed are reused; the rest take about a minute each. Keep this tab open.`}</p>`}
+    <div class="sn-row sn-note">Time controls: ${["bullet","blitz","rapid","classical"].map(s => `<label><input type="checkbox" data-speed="${s}"${S.sn.speeds.includes(s) ? " checked" : ""}> ${s}</label>`).join(" ")}</div>
     <label class="sn-row sn-note"><input type="checkbox" id="snMissed"${S.sn.missed ? " checked" : ""}> Include missed wins (your opponent blundered and you didn't punish it)</label>
     <label class="sn-note">Skip games against (bots are always skipped):<br><input id="snSkip" style="width:100%" value="${esc(S.sn.skip.join(", "))}" placeholder="worstfish, a friend you mess around with"></label>`;
-  if($("snGo")) $("snGo").onclick = () => { S.sn.n = +$("snN").value; save(); snAnalyse(S.sn.n); };
+  if($("snGo")) $("snGo").onclick = () => snAnalyseBatch(false);
+  if($("snForce")) $("snForce").onclick = () => { if(confirm(`Make batch ${next} from only ${have} games? Batches of ${SN_BATCH} compare more fairly.`)) snAnalyseBatch(true); };
+  if($("snCheck")) $("snCheck").onclick = async () => { await snCheckNew(); };
   if($("snStop")) $("snStop").onclick = () => { if(snJob) snJob.cancel = true; };
+  $("snCollect").querySelectorAll("[data-speed]").forEach(c => c.onchange = () => {
+    S.sn.speeds = [...$("snCollect").querySelectorAll("[data-speed]:checked")].map(x => x.dataset.speed);
+    if(!S.sn.speeds.length){ S.sn.speeds = ["rapid"]; c.checked = true; }
+    S.sn.pending = null; save();
+  });
   $("snMissed").onchange = e => { S.sn.missed = e.target.checked; save(); snRenderSummary(); snRenderSet(); };
-  $("snSkip").onchange = e => { S.sn.skip = e.target.value.split(",").map(x => x.trim()).filter(Boolean); snPurge(); snRenderCollect(); snRenderSummary(); snRenderSet(); };
+  $("snSkip").onchange = e => { S.sn.skip = e.target.value.split(",").map(x => x.trim()).filter(Boolean); snPurge(); snRenderCollect(); snRenderSummary(); snRenderSet(); snRenderLeaks(); snRenderProgress(); };
+}
+
+/* ---- progress: each batch's numbers side by side, and a graph per number ---- */
+const SN_MET = [
+  {k:"acc", name:"Accuracy", up:true, fmt: v => v.toFixed(1) + "%"},
+  {k:"blun", name:"Blunders / game", fmt: v => v.toFixed(2)},
+  {k:"missed", name:"Missed tactics / game", fmt: v => v.toFixed(2)},
+  {k:"open", name:"Opening mistakes / game", fmt: v => v.toFixed(2)},
+  {k:"lostWin", name:"Winning positions lost", fmt: v => Math.round(v * 100) + "%"},
+];
+function snBatchGames(b){ return b.ids.map(id => S.sn.games[id] && {id, ...S.sn.games[id]}).filter(Boolean); }
+function snMetrics(G){
+  const out = {}; if(!G.length) return out;
+  for(const L of SN_LEAKS){ const v = L.val(G); if(v != null) out[L.k] = v; }
+  out.score = G.reduce((a, x) => a + (x.res === "win" ? 1 : x.res === "draw" ? .5 : 0), 0) / G.length;
+  return out;
+}
+function snSpark(M, B){
+  const vals = B.map(b => b.m[M.k]).filter(v => v != null);
+  if(!vals.length) return "";
+  const W = 300, H = 64, pad = 14, lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
+  const x = i => B.length === 1 ? W/2 : pad + i * (W - 2*pad) / (B.length - 1), y = v => H - 18 - (v - lo) / span * (H - 32);
+  const pts = B.map((b, i) => b.m[M.k] == null ? null : [x(i), y(b.m[M.k]), b.m[M.k]]).filter(Boolean);
+  const first = pts[0][2], last = pts[pts.length - 1][2], same = Math.abs(last - first) < 1e-9, better = M.up ? last > first : last < first;
+  const col = pts.length < 2 || same ? "var(--accent)" : better ? "var(--good)" : "var(--bad, #e05252)";
+  return `<div class="sp"><div class="sp-head"><b>${esc(M.name)}</b><span style="color:${col}">${M.fmt(last)}${pts.length > 1 ? ` (${same ? "same as" : better ? "better than" : "worse than"} batch 1)` : ""}</span></div>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="sp-svg">
+      <polyline fill="none" stroke="${col}" stroke-width="2" points="${pts.map(p => p[0] + "," + p[1]).join(" ")}"/>
+      ${pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="${col}"><title>Batch ${B[i].n}: ${M.fmt(p[2])}</title></circle><text x="${p[0]}" y="${H - 3}" text-anchor="middle" font-size="10" fill="currentColor" opacity=".6">B${B[i].n}</text>`).join("")}
+    </svg></div>`;
+}
+function snRenderProgress(){
+  const el = $("snProgress"), B = S.sn.batches.map(b => ({...b, m: snMetrics(snBatchGames(b))}));
+  if(!B.length){ el.hidden = true; return; }
+  el.hidden = false;
+  const arrow = (M, cur, prev) => { if(prev == null || cur == null) return ""; const d = cur - prev; if(Math.abs(d) < 1e-9) return "";
+    const good = M.up ? d > 0 : d < 0; return `<span class="${good ? "pg-up" : "pg-down"}">${good ? "▲" : "▼"}</span>`; };
+  el.innerHTML = `<div class="eyebrow">Progress · ${B.length} batch${B.length === 1 ? "" : "es"}</div>
+    <div class="pg-wrap"><table class="sn-hist pg-tab"><tr><th></th>${B.map(b => `<th title="${new Date(b.from).toLocaleDateString()} to ${new Date(b.to).toLocaleDateString()}">B${b.n}<br><span class="sn-note">${b.ids.length} games</span></th>`).join("")}</tr>
+      ${SN_MET.map(M => `<tr><td>${esc(M.name)}</td>${B.map((b, i) => `<td>${b.m[M.k] != null ? M.fmt(b.m[M.k]) : "–"} ${arrow(M, b.m[M.k], B[i-1]?.m[M.k])}</td>`).join("")}</tr>`).join("")}
+      <tr><td>Score</td>${B.map(b => `<td>${Math.round((b.m.score || 0) * 100)}%</td>`).join("")}</tr>
+      <tr><td>Drilled</td>${B.map(b => { const d = S.sn.drilled[b.n]; return `<td>${d ? `cycle ${d.cycles}${d.best != null ? `, ${d.best}%` : ""}` : "–"}</td>`; }).join("")}</tr>
+      <tr><td></td>${B.map(b => `<td><button class="link" data-bdrill="${b.n}">Drill</button></td>`).join("")}</tr>
+    </table></div>
+    ${B.length > 1 ? SN_MET.map(M => snSpark(M, B)).join("") : `<p class="sn-note">After batch 2 you'll see a graph for each number here.</p>`}`;
+  el.querySelectorAll("[data-bdrill]").forEach(btn => btn.onclick = () => {
+    const b = S.sn.batches.find(x => x.n === +btn.dataset.bdrill), ids = snItems().filter(it => b.ids.includes(it.gid)).map(it => it.id);
+    if(!ids.length){ alert("No positions to drill from this batch."); return; }
+    if(S.sn.set?.history?.length && !confirm(`Start a new drill set from batch ${b.n}'s ${ids.length} positions? Your current set's cycle history goes with it.`)) return;
+    S.sn.set = {ids, filter: "custom", name: `Batch ${b.n} mistakes`, batch: b.n, created: Date.now(), cycle: 1, best: null, history: [], run: null};
+    save(); snRenderSet(); snDrawIdle(); $("snSet").scrollIntoView({behavior: "smooth", block: "center"});
+  });
 }
 
 /* ---- summary: what kind of mistakes, when, in which openings ---- */
@@ -4452,6 +4559,7 @@ function snFinish(){
   const beat = !set.best || (acc >= set.best.acc && time < set.best.time);
   set.history.push({cycle: set.cycle, acc, time, date: Date.now(), beat});
   if(beat){ set.best = {acc, time}; set.cycle++; }
+  if(set.batch){ const d = S.sn.drilled[set.batch] ||= {cycles: 0, best: null}; d.cycles++; d.best = Math.max(d.best ?? 0, acc); }
   set.run = null; snPz = null; save();
   $("snRun").hidden = true; snDrawIdle(); snRenderSet();
   $("snPrompt").innerHTML = beat
@@ -4459,7 +4567,7 @@ function snFinish(){
     : `<span class="bad">Cycle done: ${acc}% in ${fmtT(time)}.</span> Not quite: you need ${set.best.acc}% or better in under ${fmtT(set.best.time)}. Run it again.`;
 }
 function snTab(){
-  snRenderLeaks(); snRenderCollect(); snRenderSummary(); snRenderSet();
+  snRenderProgress(); snRenderLeaks(); snRenderCollect(); snRenderSummary(); snRenderSet();
   if(snPz){ snRunCard(); snDraw(); } else snDrawIdle();
 }
 $("tabSN").onclick = () => goTo("sn");
