@@ -593,38 +593,47 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
 .sn-grid{display:grid;gap:24px;justify-content:center;grid-template-columns:auto;align-items:start}
 @media (min-width: 980px){ .sn-grid{grid-template-columns:auto 360px} }
 #snBoard{width:min(720px, calc(100vw - 32px - 22px), calc(100vh - 170px));max-width:none;min-width:260px}
-.sn-side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.sn-side{display:flex;flex-direction:column;gap:10px;min-width:0}
+.sn-head{display:flex;align-items:baseline;gap:8px;font-size:18px}
+.sn-tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto}
+.sn-tabs button{background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);font:600 13px var(--body, inherit);padding:7px 9px;cursor:pointer;white-space:nowrap;border-radius:0}
+.sn-tabs button.on{color:var(--fg);border-bottom-color:var(--accent)}
+.sn-pane{display:flex;flex-direction:column;gap:10px}
+.sn-pane[hidden]{display:none}
+.sn-side .card{padding:12px 14px;gap:8px}
+.sn-side .card .eyebrow{font-size:11px}
+.sn-side .card h3{font-size:16px}
 .sn-title{margin:2px 0 0;font-size:26px}
-.sn-prompt{margin-top:10px;min-height:44px;font-size:15px}
+.sn-prompt{margin-top:8px;min-height:40px;font-size:14px}
 .sn-prompt .ok{color:var(--good);font-weight:700} .sn-prompt .bad{color:var(--bad, #e05252);font-weight:700}
 .sn-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .sn-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .sn-stat{border:1px solid var(--line);border-radius:10px;padding:8px 10px;text-align:center}
-.sn-stat b{display:block;font-size:20px} .sn-stat span{font-size:12px;color:var(--muted)}
+.sn-stat{padding:5px 6px} .sn-stat b{display:block;font-size:17px} .sn-stat span{font-size:11px;color:var(--muted)}
 .sn-chips{display:flex;flex-wrap:wrap;gap:6px}
 .sn-chip{border:1px solid var(--line);background:none;color:inherit;border-radius:999px;padding:5px 10px;font-size:13px;cursor:pointer}
 .sn-chip.on{border-color:var(--accent);background:color-mix(in srgb, var(--accent) 18%, transparent)}
 .sn-chip b{margin-left:4px}
-.sn-bars{display:flex;flex-direction:column;gap:6px}
-.sn-bar{display:grid;grid-template-columns:130px 1fr 30px;gap:8px;align-items:center;font-size:13px}
+.sn-bars{display:flex;flex-direction:column;gap:3px}
+.sn-bar{display:grid;grid-template-columns:130px 1fr 30px;gap:8px;align-items:center;font-size:12px}
 .sn-bar i{display:block;height:8px;border-radius:4px;background:var(--accent);min-width:2px}
 .sn-bar em{font-style:normal;color:var(--muted);text-align:right}
-.sn-hist{width:100%;border-collapse:collapse;font-size:13px}
-.sn-hist td,.sn-hist th{padding:4px 6px;border-bottom:1px solid var(--line);text-align:left}
+.sn-hist{width:100%;border-collapse:collapse;font-size:12px}
+.sn-hist td,.sn-hist th{padding:3px 5px;border-bottom:1px solid var(--line);text-align:left}
 .sn-hist th{color:var(--muted);font-weight:600}
 .sn-prog{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
 .sn-prog i{display:block;height:100%;background:var(--accent)}
 .sn-note{font-size:13px;color:var(--muted);margin:0}
 .sn-src{font-size:13px;color:var(--muted)}
 .sn-src a{color:inherit}
-.lk{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
-.lk-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lk{border:1px solid var(--line);border-radius:8px;padding:7px 10px;display:flex;flex-direction:column;gap:4px}
+.lk-top{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px}
 .lk-tag{font-size:11px;font-weight:700;letter-spacing:.05em;color:#f87171;background:rgba(248,113,113,.15);border-radius:6px;padding:2px 7px}
 .lk-bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
 .lk-bar i{display:block;height:100%;border-radius:3px}
-.lk-bot{display:flex;justify-content:space-between;gap:10px;font-size:13px;font-weight:600}
+.lk-bot{display:flex;justify-content:space-between;gap:10px;font-size:12px;font-weight:600}
 .lk-bot .sn-note{font-weight:400;white-space:nowrap}
-.lk-fix{font-size:14px;border-top:1px solid var(--line);padding-top:8px}
+.lk-fix{font-size:13px;border-top:1px solid var(--line);padding-top:6px}
 .lk-fix p{margin:0 0 6px}
 .pg-wrap{overflow-x:auto}
 .pg-tab td,.pg-tab th{white-space:nowrap;text-align:center} .pg-tab td:first-child{text-align:left}
@@ -632,7 +641,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
 .sp{display:flex;flex-direction:column;gap:2px}
 .sp-head{display:flex;justify-content:space-between;gap:8px;font-size:13px}
 .sp-head span{font-size:12px;font-weight:600}
-.sp-svg{width:100%;height:64px;overflow:visible}
+.sp-svg{width:100%;height:46px;overflow:visible}
 .sn-line{margin-top:6px;font-size:14px;line-height:1.9}
 .sn-mv{background:none;border:1px solid transparent;border-radius:6px;padding:1px 5px;color:inherit;font:inherit;font-weight:600;cursor:pointer}
 .sn-mv:hover{border-color:var(--line)} .sn-mv.on{background:var(--accent);color:var(--accent-fg, #fff)}
@@ -920,17 +929,17 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
         <div class="sn-prompt" id="snPrompt" aria-live="polite"></div>
       </div>
       <aside class="sn-side">
-        <div class="card">
-          <div class="eyebrow">Woodpecker method</div>
-          <h1 class="sn-title">Mistake drills</h1>
-          <p class="summary">Your own mistakes from your games, solved again in cycles until the right move is automatic. The next cycle only unlocks when you beat your accuracy <i>and</i> your time.</p>
+        <div class="sn-head" title="Your own mistakes from your games, solved again in cycles until the right move is automatic. The next cycle only unlocks when you beat your accuracy and your time.">
+          <b>Mistake drills</b><span class="sn-note">woodpecker method</span>
         </div>
-        <div class="card" id="snRun" hidden></div>
-        <div class="card" id="snProgress" hidden></div>
-        <div class="card" id="snLeaks"></div>
-        <div class="card" id="snSet"></div>
-        <div class="card" id="snCollect"></div>
-        <div class="card" id="snSummary"></div>
+        <nav class="sn-tabs" id="snTabs">
+          <button data-pane="drill">Drill</button><button data-pane="progress">Progress</button><button data-pane="leaks">Leaks</button><button data-pane="types">Types</button><button data-pane="batches" id="snTabBatches">Batches</button>
+        </nav>
+        <div class="sn-pane" data-pane="drill"><div class="card" id="snRun" hidden></div><div class="card" id="snSet"></div></div>
+        <div class="sn-pane" data-pane="progress" hidden><div class="card" id="snProgress" hidden></div><p class="sn-note" id="snProgEmpty">Analyse your first batch (Batches tab) to see progress.</p></div>
+        <div class="sn-pane" data-pane="leaks" hidden><div class="card" id="snLeaks"></div></div>
+        <div class="sn-pane" data-pane="types" hidden><div class="card" id="snSummary"></div></div>
+        <div class="sn-pane" data-pane="batches" hidden><div class="card" id="snCollect"></div></div>
       </aside>
     </div>
   </section>
@@ -4207,7 +4216,7 @@ function snRenderLeaks(){
   const row = (name, pct, col, text, right, tag, k) => `<div class="lk">
       <div class="lk-top"><b>${esc(name)}</b>${tag ? `<span class="lk-tag">${tag}</span>` : ""}</div>
       <div class="lk-bar"><i style="width:${Math.max(3, Math.min(100, pct))}%;background:${col}"></i></div>
-      <div class="lk-bot"><span style="color:${col}">${esc(text)}</span><span class="sn-note">${esc(right)}</span></div>
+      <div class="lk-bot" title="${esc(right)}"><span style="color:${col}">${esc(text)}</span></div>
       ${k ? `<div class="lk-fix" data-fix="${k}" hidden></div>` : ""}</div>`;
   const ordered = [...rows].sort((a,b) => (!!a.L.inv - !!b.L.inv) || (b.sev - a.sev));   // accuracy last
   el.innerHTML = `<div class="sn-row" style="justify-content:space-between"><div class="eyebrow">Your leaks · ${G.length} games</div>${pickB}</div>
@@ -4231,8 +4240,7 @@ function snRenderLeaks(){
     const L = SN_LEAKS.find(x => x.k === b.dataset.drill), ids = L.ids(G);
     if(S.sn.set?.history?.length && !confirm("Start a new drill set from these positions? Your current set's cycle history goes with it.")) return;
     S.sn.set = {ids, filter: "custom", name: view ? `Batch ${view}: ${L.name}` : L.name, batch: view || null, created: Date.now(), cycle: 1, best: null, history: [], run: null};
-    save(); snRenderSet(); snDrawIdle();
-    $("snSet").scrollIntoView({behavior: "smooth", block: "center"});
+    save(); snRenderSet(); snDrawIdle(); snPanel("drill");
   };
 }
 
@@ -4305,6 +4313,7 @@ async function snAnalyseBatch(force){
   snRenderSummary(); snRenderSet(); snRenderLeaks(); snRenderProgress();
 }
 function snRenderCollect(msg){
+  if($("snTabBatches")) $("snTabBatches").textContent = snJob ? `Batches ⏳ ${snJob.i}/${snJob.total}` : "Batches";
   const it = Object.values(S.sn.items), j = snJob, B = S.sn.batches, next = B.length + 1, p = S.sn.pending;
   const have = p ? p.count : null;
   $("snCollect").innerHTML = `<div class="eyebrow">Batches of ${SN_BATCH} games · all your Lichess + Chess.com accounts</div>
@@ -4357,8 +4366,8 @@ function snMetrics(G){
 function snSpark(M, B){
   const vals = B.map(b => b.m[M.k]).filter(v => v != null);
   if(!vals.length) return "";
-  const W = 300, H = 64, pad = 14, lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
-  const x = i => B.length === 1 ? W/2 : pad + i * (W - 2*pad) / (B.length - 1), y = v => H - 18 - (v - lo) / span * (H - 32);
+  const W = 300, H = 46, pad = 14, lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
+  const x = i => B.length === 1 ? W/2 : pad + i * (W - 2*pad) / (B.length - 1), y = v => H - 14 - (v - lo) / span * (H - 22);
   const pts = B.map((b, i) => b.m[M.k] == null ? null : [x(i), y(b.m[M.k]), b.m[M.k]]).filter(Boolean);
   const first = pts[0][2], last = pts[pts.length - 1][2], same = Math.abs(last - first) < 1e-9, better = M.up ? last > first : last < first;
   const col = pts.length < 2 || same ? "var(--accent)" : better ? "var(--good)" : "var(--bad, #e05252)";
@@ -4372,7 +4381,7 @@ function snSpark(M, B){
 function snMasteryChart(){
   const L = S.sn.mlog.filter(e => Object.keys(e.b).length);
   if(L.length < 2) return `<p class="sn-note">Mastery over time shows here after you finish a couple of cycles.</p>`;
-  const W = 300, H = 110, padL = 26, padB = 16, cols = ["#60a5fa","#34d399","#f59e0b","#f472b6","#a78bfa","#f87171","#22d3ee","#facc15"];
+  const W = 300, H = 80, padL = 26, padB = 14, cols = ["#60a5fa","#34d399","#f59e0b","#f472b6","#a78bfa","#f87171","#22d3ee","#facc15"];
   const nb = [...new Set(L.flatMap(e => Object.keys(e.b)))].map(Number).sort((a,b) => a-b);
   const x = i => padL + i * (W - padL - 6) / (L.length - 1), y = p => H - padB - p * (H - padB - 8);
   const lines = nb.map((n, k) => { const pts = L.map((e, i) => e.b[n] && e.b[n][1] ? [x(i), y(e.b[n][0] / e.b[n][1]), e] : null).filter(Boolean);
@@ -4404,7 +4413,7 @@ function snRenderProgress(){
     if(!ids.length){ alert("No positions to drill from this batch."); return; }
     if(S.sn.set?.history?.length && !confirm(`Start a new drill set from batch ${b.n}'s ${ids.length} positions? Your current set's cycle history goes with it.`)) return;
     S.sn.set = {ids, filter: "custom", name: `Batch ${b.n} mistakes`, batch: b.n, created: Date.now(), cycle: 1, best: null, history: [], run: null};
-    save(); snRenderSet(); snDrawIdle(); $("snSet").scrollIntoView({behavior: "smooth", block: "center"});
+    save(); snRenderSet(); snDrawIdle(); snPanel("drill");
   });
 }
 
@@ -4484,7 +4493,7 @@ function snStartCycle(fresh){
     for(let i = order.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
     set.run = {order, i: 0, correct: 0, time: 0};
   }
-  save(); snRenderSet(); snNext();
+  save(); snRenderSet(); snPanel("drill"); snNext();
 }
 function snNext(){
   const set = S.sn.set, r = set?.run; if(!r) return;
@@ -4608,7 +4617,15 @@ function snFinish(){
     : `<span class="bad">Cycle done: ${acc}% in ${fmtT(time)}.</span> Not quite: you need ${set.best.acc}% or better at under ${(bestPer/1000).toFixed(1)}s per position. Run it again.`;
   snRenderProgress();
 }
+function snPanel(p){
+  S.sn.panel = p; save();
+  document.querySelectorAll("#sn .sn-pane").forEach(x => x.hidden = x.dataset.pane !== p);
+  document.querySelectorAll("#snTabs button").forEach(b => b.classList.toggle("on", b.dataset.pane === p));
+  if(p === "progress") $("snProgEmpty").hidden = S.sn.batches.length > 0;
+}
+$("snTabs").onclick = e => { const b = e.target.closest("button[data-pane]"); if(b) snPanel(b.dataset.pane); };
 function snTab(){
+  snPanel(snPz ? "drill" : (S.sn.panel || (S.sn.batches.length || Object.keys(S.sn.items).length ? "drill" : "batches")));
   snRenderProgress(); snRenderLeaks(); snRenderCollect(); snRenderSummary(); snRenderSet();
   if(snPz){ snRunCard(); snDraw(); } else snDrawIdle();
 }
