@@ -4300,7 +4300,7 @@ async function snAnalyseBatch(force){
   if(job.cancel){ save(); snRenderCollect("Stopped. Games analysed so far are kept; click again to finish the batch."); return; }
   const ids = pick.map(g => g.id).filter(id => S.sn.games[id]), dates = pick.map(g => g.createdAt || 0);
   const b = {n: S.sn.batches.length + 1, ids, from: Math.min(...dates), to: Math.max(...dates), created: Date.now()};
-  S.sn.batches.push(b); S.sn.pending = {count: 0, at: Date.now()}; S.sn.leakView = b.n; save();
+  S.sn.batches.push(b); S.sn.pending = {count: 0, at: Date.now()}; S.sn.leakView = b.n; snLogMastery(); save();
   snRenderCollect(`Batch ${b.n} done: ${ids.length} games, ${job.found} new positions to drill.`);
   snRenderSummary(); snRenderSet(); snRenderLeaks(); snRenderProgress();
 }
@@ -4368,6 +4368,21 @@ function snSpark(M, B){
       ${pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="${col}"><title>Batch ${B[i].n}: ${M.fmt(p[2])}</title></circle><text x="${p[0]}" y="${H - 3}" text-anchor="middle" font-size="10" fill="currentColor" opacity=".6">B${B[i].n}</text>`).join("")}
     </svg></div>`;
 }
+// % of each batch's positions mastered, after every cycle you finish (one line per batch)
+function snMasteryChart(){
+  const L = S.sn.mlog.filter(e => Object.keys(e.b).length);
+  if(L.length < 2) return `<p class="sn-note">Mastery over time shows here after you finish a couple of cycles.</p>`;
+  const W = 300, H = 110, padL = 26, padB = 16, cols = ["#60a5fa","#34d399","#f59e0b","#f472b6","#a78bfa","#f87171","#22d3ee","#facc15"];
+  const nb = [...new Set(L.flatMap(e => Object.keys(e.b)))].map(Number).sort((a,b) => a-b);
+  const x = i => padL + i * (W - padL - 6) / (L.length - 1), y = p => H - padB - p * (H - padB - 8);
+  const lines = nb.map((n, k) => { const pts = L.map((e, i) => e.b[n] && e.b[n][1] ? [x(i), y(e.b[n][0] / e.b[n][1]), e] : null).filter(Boolean);
+    return pts.length ? `<polyline fill="none" stroke="${cols[k % cols.length]}" stroke-width="2" points="${pts.map(p => p[0]+","+p[1]).join(" ")}"/>` : ""; }).join("");
+  const grid = [0, .5, 1].map(p => `<line x1="${padL}" x2="${W}" y1="${y(p)}" y2="${y(p)}" stroke="currentColor" opacity=".12"/><text x="0" y="${y(p)+3}" font-size="9" fill="currentColor" opacity=".6">${p*100}%</text>`).join("");
+  const d0 = new Date(L[0].t).toLocaleDateString(), d1 = new Date(L[L.length-1].t).toLocaleDateString();
+  return `<div class="sp"><div class="sp-head"><b>Mastered over time</b><span class="sn-note">${d0} to ${d1}</span></div>
+    <svg viewBox="0 0 ${W} ${H}" class="sp-svg" style="height:${H}px">${grid}${lines}</svg>
+    <div class="sn-row sn-note">${nb.map((n, k) => `<span><i style="display:inline-block;width:10px;height:3px;background:${cols[k % cols.length]};vertical-align:middle"></i> B${n}</span>`).join(" ")}</div></div>`;
+}
 function snRenderProgress(){
   const el = $("snProgress"), B = S.sn.batches.map(b => ({...b, m: snMetrics(snBatchGames(b))}));
   if(!B.length){ el.hidden = true; return; }
@@ -4378,9 +4393,11 @@ function snRenderProgress(){
     <div class="pg-wrap"><table class="sn-hist pg-tab"><tr><th></th>${B.map(b => `<th title="${new Date(b.from).toLocaleDateString()} to ${new Date(b.to).toLocaleDateString()}">B${b.n}<br><span class="sn-note">${b.ids.length} games</span></th>`).join("")}</tr>
       ${SN_MET.map(M => `<tr><td>${esc(M.name)}</td>${B.map((b, i) => `<td>${b.m[M.k] != null ? M.fmt(b.m[M.k]) : "–"} ${arrow(M, b.m[M.k], B[i-1]?.m[M.k])}</td>`).join("")}</tr>`).join("")}
       <tr><td>Score</td>${B.map(b => `<td>${Math.round((b.m.score || 0) * 100)}%</td>`).join("")}</tr>
+      <tr><td>Mastered</td>${B.map(b => { const [m, t] = snBatchMastery(b); return `<td>${m}/${t}${t ? ` <span class="sn-note">${Math.round(m/t*100)}%</span>` : ""}</td>`; }).join("")}</tr>
       <tr><td>Drilled</td>${B.map(b => { const d = S.sn.drilled[b.n]; return `<td>${d ? `cycle ${d.cycles}${d.best != null ? `, ${d.best}%` : ""}` : "–"}</td>`; }).join("")}</tr>
       <tr><td></td>${B.map(b => `<td><button class="link" data-bdrill="${b.n}">Drill</button></td>`).join("")}</tr>
     </table></div>
+    ${snMasteryChart()}
     ${B.length > 1 ? SN_MET.map(M => snSpark(M, B)).join("") : `<p class="sn-note">After batch 2 you'll see a graph for each number here.</p>`}`;
   el.querySelectorAll("[data-bdrill]").forEach(btn => btn.onclick = () => {
     const b = S.sn.batches.find(x => x.n === +btn.dataset.bdrill), ids = snItems().filter(it => b.ids.includes(it.gid)).map(it => it.id);
@@ -4407,6 +4424,18 @@ function snRenderSummary(){
 }
 
 /* ---- the drill set and its cycles ---- */
+/* Graduation: a position you solve correctly and quickly (under SN_FAST) in SN_GRAD cycles in a row is "mastered"
+   and leaves your cycles. Mastery is kept per position, so each batch's progress can be tracked over time. */
+const SN_GRAD = 3, SN_FAST = 20000;
+S.sn.mlog ??= [];   // [{t, b:{batchN:[mastered, total]}}] one entry per finished cycle, for the mastery graph
+const snMastered = it => !!it?.grad;
+function snBatchMastery(b){ const it = snItems().filter(x => b.ids.includes(x.gid)); return [it.filter(snMastered).length, it.length]; }
+function snLogMastery(){
+  const b = {}; for(const x of S.sn.batches) b[x.n] = snBatchMastery(x);
+  const last = S.sn.mlog[S.sn.mlog.length - 1];
+  if(last && JSON.stringify(last.b) === JSON.stringify(b)) return;
+  S.sn.mlog.push({t: Date.now(), b}); if(S.sn.mlog.length > 300) S.sn.mlog.shift();
+}
 const fmtT = ms => { const s = Math.round(ms/1000); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; };
 function snBuild(filter, size){
   let it = snItems().filter(x => filter === "all" || x.type === filter);
@@ -4426,16 +4455,22 @@ function snRenderSet(){
   if(!set){
     $("snSet").innerHTML = `<div class="eyebrow">Drill set</div><p class="sn-note">${it.length ? "Pick what to drill, then build a fixed set. Newest mistakes first." : "Analyse some games first."}</p>${builder}`;
   } else {
-    const live = set.ids.filter(id => S.sn.items[id]), r = set.run;
-    const hist = set.history.length ? `<table class="sn-hist"><tr><th>Cycle</th><th>Accuracy</th><th>Time</th><th></th></tr>${set.history.slice(-8).map(h =>
-      `<tr><td>${h.cycle}</td><td>${h.acc}%</td><td>${fmtT(h.time)}</td><td>${h.beat ? "✓ unlocked" : "try again"}</td></tr>`).join("")}</table>` : "";
+    const live = set.ids.filter(id => S.sn.items[id]), r = set.run, done = live.filter(id => snMastered(S.sn.items[id])).length;
+    const bestPer = set.best ? (set.best.per ?? set.best.time / Math.max(1, live.length)) : null;
+    const hist = set.history.length ? `<table class="sn-hist"><tr><th>Cycle</th><th>Positions</th><th>Accuracy</th><th>Time</th><th></th></tr>${set.history.slice(-8).map(h =>
+      `<tr><td>${h.cycle}</td><td>${h.n ?? "–"}</td><td>${h.acc}%</td><td>${fmtT(h.time)}</td><td>${h.beat ? "✓ unlocked" : "try again"}</td></tr>`).join("")}</table>` : "";
+    const mast = `<div class="sn-note">🎓 Mastered <b>${done}</b> of ${live.length} · ${live.length - done} left in your cycles</div>
+      <div class="sn-prog"><i style="width:${live.length ? done / live.length * 100 : 0}%;background:var(--good)"></i></div>
+      <label class="sn-row sn-note"><input type="checkbox" id="snShowM"${S.sn.showMastered ? " checked" : ""}> Keep mastered positions in my cycles</label>`;
     $("snSet").innerHTML = `<div class="eyebrow">Drill set · ${esc(set.name || (set.filter === "all" ? "All types" : SN_TYPES[set.filter]?.[0] || set.filter))} · ${live.length} position${live.length === 1 ? "" : "s"}</div>
       <h3 style="margin:0">Cycle ${set.cycle}</h3>
-      ${set.best ? `<p class="sn-note">To unlock cycle ${set.cycle + 1}: at least <b>${set.best.acc}%</b> and faster than <b>${fmtT(set.best.time)}</b>.</p>` : `<p class="sn-note">First pass: this sets the score to beat.</p>`}
+      ${set.best ? `<p class="sn-note">To unlock cycle ${set.cycle + 1}: at least <b>${set.best.acc}%</b> and under <b>${(bestPer/1000).toFixed(1)}s</b> per position. A position you get right in under ${SN_FAST/1000}s in ${SN_GRAD} cycles in a row is mastered and leaves your cycles.</p>` : `<p class="sn-note">First pass: this sets the score to beat. Get a position right in under ${SN_FAST/1000}s in ${SN_GRAD} cycles in a row and it's mastered.</p>`}
+      ${mast}
       <div class="sn-row"><button class="primary" id="snStart"${live.length ? "" : " disabled"}>${r ? `Continue (${r.i} / ${r.order.length})` : `Start cycle ${set.cycle}`}</button>${r ? '<button id="snRestart">Restart cycle</button>' : ""}</div>
       ${hist}
       <details><summary class="sn-note">Change the set</summary>${builder}</details>`;
     $("snStart").onclick = () => snStartCycle(!r);
+    $("snShowM").onchange = e => { S.sn.showMastered = e.target.checked; save(); };
     if($("snRestart")) $("snRestart").onclick = () => snStartCycle(true);
   }
   $("snChips").onclick = e => { const b = e.target.closest(".sn-chip"); if(!b) return; S.sn.pick = b.dataset.k; save(); snRenderSet(); };
@@ -4444,7 +4479,8 @@ function snRenderSet(){
 function snStartCycle(fresh){
   const set = S.sn.set; if(!set) return;
   if(fresh || !set.run){
-    const order = set.ids.filter(id => S.sn.items[id]);
+    const order = set.ids.filter(id => S.sn.items[id] && (S.sn.showMastered || !snMastered(S.sn.items[id])));
+    if(!order.length){ snRenderSet(); $("snPrompt").innerHTML = '<span class="ok">Every position in this set is mastered.</span> Build a new set or analyse a new batch.'; return; }
     for(let i = order.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
     set.run = {order, i: 0, correct: 0, time: 0};
   }
@@ -4496,9 +4532,12 @@ async function snTry(from, to){
   const right = uci.slice(0,4) === it.best.slice(0,4) || g.in_checkmate();
   z.lastMove = [from, to]; r.time += dt;
   snMakeLine(z);
+  let grad = false;
+  if(right && dt < SN_FAST){ it.streak = (it.streak || 0) + 1; if(it.streak >= SN_GRAD && !it.grad){ it.grad = Date.now(); grad = true; } }
+  else it.streak = 0;
   if(right){
     z.solved = true; r.correct++; r.i = z.pos + 1;
-    $("snPrompt").innerHTML = `<span class="ok">✓ Right: ${esc(m.san)}.</span> ${snLineHtml(z)}`;
+    $("snPrompt").innerHTML = `<span class="ok">✓ Right: ${esc(m.san)}.</span> ${grad ? `<b>🎓 Mastered</b> (${SN_GRAD} cycles in a row, quickly): it leaves your cycles. ` : it.streak && !it.grad ? `<span class="sn-src">${it.streak}/${SN_GRAD} toward mastered${dt >= SN_FAST ? "" : ""}</span> ` : dt >= SN_FAST ? `<span class="sn-src">Right, but over ${SN_FAST/1000}s, so it doesn't count toward mastered.</span> ` : ""}${snLineHtml(z)}`;
     snDraw(); snRunCard(); save();
     // stays on this position: look through the line, then press Next when you're ready
     z.view = 1; snView(z, 1);
@@ -4555,16 +4594,19 @@ document.addEventListener("keydown", e => {
   $("snBoard").addEventListener("wheel", e => { if(!snOver()) return; e.preventDefault(); const t = Date.now(); if(t - wt < 60) return; wt = t; snLook(snPz.view + (e.deltaY > 0 ? 1 : -1)); }, {passive: false}); }
 function snFinish(){
   const set = S.sn.set, r = set.run, n = r.order.length;
-  const acc = n ? Math.round(r.correct / n * 100) : 0, time = Math.round(r.time);
-  const beat = !set.best || (acc >= set.best.acc && time < set.best.time);
-  set.history.push({cycle: set.cycle, acc, time, date: Date.now(), beat});
-  if(beat){ set.best = {acc, time}; set.cycle++; }
+  const acc = n ? Math.round(r.correct / n * 100) : 0, time = Math.round(r.time), per = n ? time / n : 0;
+  const bestPer = set.best ? (set.best.per ?? set.best.time / Math.max(1, set.ids.length)) : null;
+  const beat = !set.best || (acc >= set.best.acc && per < bestPer);
+  set.history.push({cycle: set.cycle, acc, time, n, date: Date.now(), beat});
+  if(beat){ set.best = {acc, time, per}; set.cycle++; }
+  snLogMastery();
   if(set.batch){ const d = S.sn.drilled[set.batch] ||= {cycles: 0, best: null}; d.cycles++; d.best = Math.max(d.best ?? 0, acc); }
   set.run = null; snPz = null; save();
   $("snRun").hidden = true; snDrawIdle(); snRenderSet();
   $("snPrompt").innerHTML = beat
-    ? `<span class="ok">Cycle done: ${acc}% in ${fmtT(time)}.</span> ${set.history.length > 1 ? "You beat your best. " : ""}Cycle ${set.cycle} is unlocked.`
-    : `<span class="bad">Cycle done: ${acc}% in ${fmtT(time)}.</span> Not quite: you need ${set.best.acc}% or better in under ${fmtT(set.best.time)}. Run it again.`;
+    ? `<span class="ok">Cycle done: ${acc}% in ${fmtT(time)} (${(per/1000).toFixed(1)}s per position).</span> ${set.history.length > 1 ? "You beat your best. " : ""}Cycle ${set.cycle} is unlocked.`
+    : `<span class="bad">Cycle done: ${acc}% in ${fmtT(time)}.</span> Not quite: you need ${set.best.acc}% or better at under ${(bestPer/1000).toFixed(1)}s per position. Run it again.`;
+  snRenderProgress();
 }
 function snTab(){
   snRenderProgress(); snRenderLeaks(); snRenderCollect(); snRenderSummary(); snRenderSet();
