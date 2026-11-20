@@ -3967,6 +3967,19 @@ $("rtReset").onclick = () => {
    2. Each position gets a rough type (missed mate, hung a piece, missed fork, ...) and a game phase.
    3. Build a fixed set and solve it in cycles. A new cycle unlocks only when you beat your best accuracy AND time. */
 S.sn ??= {items: {}, done: {}, missed: true, set: null};
+S.sn.skip ??= ["worstfish"];   // opponents whose games don't count (e.g. bots you were trying to lose to)
+// games against any Lichess BOT account, or against a name on the skip list, are left out
+function snSkipped(g){
+  const me = myColor(g), opp = me === "w" ? g.players.black : g.players.white;
+  const name = (opp?.user?.name || opp?.user?.id || "").toLowerCase();
+  return opp?.user?.title === "BOT" || !!opp?.aiLevel || S.sn.skip.some(x => x && name === x.toLowerCase());
+}
+function snPurge(){   // drop positions already collected from games that are now skipped
+  const skip = S.sn.skip.map(x => x.toLowerCase());
+  for(const [id, it] of Object.entries(S.sn.items)) if(it.bot || skip.includes((it.vs || "").toLowerCase())) delete S.sn.items[id];
+  if(S.sn.set) S.sn.set.ids = S.sn.set.ids.filter(id => S.sn.items[id]);
+  save();
+}
 const SN_V = {p:1, n:3, b:3, r:5, q:9, k:0};
 const SN_TYPES = {
   mate:["Missed mate", "You had a forced mate."],
@@ -3979,7 +3992,8 @@ const SN_TYPES = {
   quiet:["Quiet move / plan", "No tactic: the best move was a quieter, positional one."],
 };
 const SN_PHASE = {opening:"Opening", middlegame:"Middlegame", endgame:"Endgame"};
-let snJob = null, snCg = null, snPz = null;   // snPz: the puzzle on the board {it, game, from, solved, failed, t0, lastMove}
+let snJob = null, snCg = null, snPz = null;
+snPurge();   // snPz: the puzzle on the board {it, game, from, solved, failed, t0, lastMove}
 
 function snPhase(fen, ply){
   if(ply <= 20) return "opening";
@@ -4032,7 +4046,7 @@ function snCollectGame(g, A){
     S.sn.items[`${g.id}:${k}`] = {id:`${g.id}:${k}`, fen, best:e.best, line:e.variation || "", played:sans[k-1],
       kind: missed ? "missed" : e.judgment.name.toLowerCase(), type: snType(fen, e.best, sans[k-1], prev, me, phase, e), phase,
       opening: g.opening?.name ? g.opening.name.split(":")[0] : "", gid:g.id, link: gameUrl(g, me, k),
-      label: moveLabelOf(fen, sans[k-1]), date: g.createdAt || Date.now(), vs: playerName(opp)};
+      label: moveLabelOf(fen, sans[k-1]), date: g.createdAt || Date.now(), vs: playerName(opp), bot: opp?.user?.title === "BOT" || !!opp?.aiLevel};
     n++;
   }
   S.sn.done[g.id] = Date.now();
@@ -4048,7 +4062,7 @@ async function snAnalyse(n){
     if(!gUsers().length){ snJob = null; snRenderCollect("Add your chess.com or Lichess username on the Games tab first."); return; }
     snRenderCollect("Loading your games…"); await loadGames();
   }
-  const games = (gList || []).filter(g => g.moves && g.status !== "started").slice(0, n);
+  const games = (gList || []).filter(g => g.moves && g.status !== "started" && !snSkipped(g)).slice(0, n);
   if(!games.length){ snRenderCollect("No finished games found. Check the Games tab."); return; }
   const job = snJob = {total: games.length, i: 0, cancel: false, found: 0, game: null, pct: 0};
   snRenderCollect();
@@ -4088,10 +4102,11 @@ function snRenderCollect(msg){
         <select id="snN" aria-label="How many games">${[10,20,30,50,100].map(v => `<option${v === (S.sn.n || 30) ? " selected" : ""}>${v}</option>`).join("")}</select></div>
       <p class="sn-note">${msg ? esc(msg) : `Uses the games on your Games tab (${esc(siteName())}${S.gameSpeeds?.length ? ", " + esc(S.gameSpeeds.join(" / ")) : ""}). Games already checked are skipped. About a minute per game; keep this tab open.`}</p>`}
     <label class="sn-row sn-note"><input type="checkbox" id="snMissed"${S.sn.missed ? " checked" : ""}> Include missed wins (your opponent blundered and you didn't punish it)</label>
-`;
+    <label class="sn-note">Skip games against (bots are always skipped):<br><input id="snSkip" style="width:100%" value="${esc(S.sn.skip.join(", "))}" placeholder="worstfish, a friend you mess around with"></label>`;
   if($("snGo")) $("snGo").onclick = () => { S.sn.n = +$("snN").value; save(); snAnalyse(S.sn.n); };
   if($("snStop")) $("snStop").onclick = () => { if(snJob) snJob.cancel = true; };
   $("snMissed").onchange = e => { S.sn.missed = e.target.checked; save(); snRenderSummary(); snRenderSet(); };
+  $("snSkip").onchange = e => { S.sn.skip = e.target.value.split(",").map(x => x.trim()).filter(Boolean); snPurge(); snRenderCollect(); snRenderSummary(); snRenderSet(); };
 }
 
 /* ---- summary: what kind of mistakes, when, in which openings ---- */
