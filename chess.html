@@ -4501,6 +4501,12 @@ function snNext(){
   const it = S.sn.items[r.order[r.i]]; if(!it){ r.i++; snNext(); return; }
   snPz = {it, pos: r.i, game: new Chess(it.fen), solved: false, failed: false, t0: performance.now(), lastMove: null};
   snRunCard(); snDraw(); snRenderSet();
+  if(it.type === "mate"){
+    snPz.expect = it.best; snPz.userMoves = 0;
+    const z = snPz; snMatePrompt(z, `In your game vs ${esc(it.vs)} you played ${esc(it.label)}. Play it all the way to checkmate.`);
+    SFQ.eval(it.fen, 800).then(x => { if(snPz === z && !z.userMoves && x.mate > 0){ z.mateIn = x.mate; snMatePrompt(z, `In your game vs ${esc(it.vs)} you played ${esc(it.label)}. Play it all the way to checkmate.`); } }).catch(() => {});
+    return;
+  }
   $("snPrompt").innerHTML = `<b>${it.fen.split(" ")[1] === "w" ? "White" : "Black"} to move.</b> Find the best move. <span class="sn-src">In your game vs ${esc(it.vs)} you played ${esc(it.label)}${it.kind === "missed" ? " (your opponent had just blundered)" : ""}.</span>`;
 }
 function snRunCard(){
@@ -4519,7 +4525,7 @@ function snDraw(bad){
   const b = $("snBoard");
   snCg ||= cgBoard(b, (o, d) => snTry(o, d));
   if(!snPz){ return; }
-  const g = snPz.game, me = snPz.it.fen.split(" ")[1], can = !snPz.solved && !snPz.failed && g.turn() === me;
+  const g = snPz.game, me = snPz.it.fen.split(" ")[1], can = !snPz.solved && !snPz.failed && !snPz.busy && g.turn() === me;
   const custom = new Map(); if(bad) custom.set(bad, "bad");
   snCg.set({orientation: cgColor(me), fen: g.fen(), turnColor: cgColor(g.turn()), lastMove: snPz.lastMove || undefined,
     check: g.in_check() ? cgColor(g.turn()) : false, movable: {color: can ? cgColor(me) : undefined, dests: can ? cgDests(g) : new Map()}, highlight: {custom}});
@@ -4538,6 +4544,7 @@ async function snTry(from, to){
   const m = g.move({from, to, promotion: promo}); if(!m){ snDraw(); return; }
   const uci = from + to + (m.promotion || ""), r = S.sn.set.run, it = z.it;
   const dt = performance.now() - z.t0;
+  if(it.type === "mate") return snMateTry(z, m, uci, dt);
   const right = uci.slice(0,4) === it.best.slice(0,4) || g.in_checkmate();
   z.lastMove = [from, to]; r.time += dt;
   snMakeLine(z);
@@ -4558,6 +4565,79 @@ async function snTry(from, to){
     snDraw(to); snRunCard();
     snCg.setAutoShapes([{orig: it.best.slice(0,2), dest: it.best.slice(2,4), brush: "green"}]);
   }
+}
+/* Missed-mate positions are played all the way to checkmate: after each of your moves Stockfish checks the mate
+   is still forced (any mating move counts, not only the engine's), then plays the toughest defence. */
+const SFQ = {
+  w: null, waiter: null, q: Promise.resolve(),
+  async init(){
+    if(this.w) return;
+    this.w = new Worker(SF_FILE);
+    this.w.onmessage = e => { if(this.waiter) this.waiter(String(e.data)); };
+    await this.cmd("uci", s => s === "uciok"); await this.cmd("isready", s => s === "readyok");
+  },
+  cmd(c, pred){ return new Promise(res => { const buf = []; this.waiter = s => { buf.push(s); if(pred(s)){ this.waiter = null; res(buf); } }; this.w.postMessage(c); }); },
+  // {best, mate, cp}; mate and cp are from the side to move's point of view
+  eval(fen, ms){
+    const run = async () => {
+      await this.init(); this.w.postMessage("position fen " + fen);
+      const lines = await this.cmd("go movetime " + ms, s => s.startsWith("bestmove"));
+      let mate = null, cp = null;
+      for(const l of lines){ const m = l.match(/ score (cp|mate) (-?\d+)/); if(m && l.includes(" pv ")){ if(m[1] === "mate"){ mate = +m[2]; cp = null; } else { cp = +m[2]; mate = null; } } }
+      return {best: lines[lines.length - 1].split(" ")[1], mate, cp};
+    };
+    const p = this.q.then(run); this.q = p.catch(() => {}); return p;
+  },
+};
+function snMatePrompt(z, extra){
+  const n = z.mateIn ? `Mate in ${z.mateIn}` : "Forced mate";
+  $("snPrompt").innerHTML = `<b>${n}.</b> ${extra || "Play it all the way to checkmate."} <span class="sn-src">Move ${z.userMoves + 1}${z.mateIn ? ` of ${z.userMoves + z.mateIn}` : ""}.</span>`;
+}
+async function snMateTry(z, m, uci, dt){
+  const g = z.game, r = S.sn.set.run, it = z.it;
+  z.lastMove = [m.from, m.to]; r.time += dt; z.think = (z.think || 0) + dt; z.userMoves = (z.userMoves || 0) + 1;
+  const finish = ok => {
+    // the whole sequence becomes the line you can step through
+    const c = new Chess(it.fen); z.fens = [c.fen()]; z.moves = [null]; z.sans = [];
+    for(const h of g.history({verbose:true})){ c.move(h); z.fens.push(c.fen()); z.moves.push([h.from, h.to]); z.sans.push(h.san); }
+    const fast = z.think / z.userMoves < SN_FAST;
+    let grad = false;
+    if(ok && fast){ it.streak = (it.streak || 0) + 1; if(it.streak >= SN_GRAD && !it.grad){ it.grad = Date.now(); grad = true; } } else it.streak = 0;
+    if(ok){ z.solved = true; r.correct++; } else z.failed = true;
+    r.i = z.pos + 1; save();
+    return grad;
+  };
+  if(g.in_checkmate()){
+    const grad = finish(true);
+    $("snPrompt").innerHTML = `<span class="ok">✓ Checkmate in ${z.userMoves} move${z.userMoves === 1 ? "" : "s"}!</span> ${grad ? `<b>🎓 Mastered.</b> ` : it.streak && !it.grad ? `<span class="sn-src">${it.streak}/${SN_GRAD} toward mastered</span> ` : ""}${snLineHtml(z)}`;
+    z.view = z.fens.length - 1; snDraw(); snRunCard(); return;
+  }
+  z.busy = true; snDraw(); snMatePrompt(z, "Checking…");
+  const expected = z.expect && uci.slice(0, 4) === z.expect.slice(0, 4);
+  let res;
+  try { res = await SFQ.eval(g.fen(), expected ? 700 : 1500); } catch(e){ res = null; }
+  if(snPz !== z) return;
+  // the engine's own move is trusted even if a short search hasn't re-found the (long) mate yet
+  const stillMate = res && (expected || (res.mate !== null && res.mate < 0));   // the side to move (your opponent) is getting mated
+  if(!stillMate){
+    g.undo(); z.lastMove = null;
+    let best = null; try { best = (await SFQ.eval(g.fen(), 1000)).best; } catch(e){}
+    if(snPz !== z) return;
+    finish(false); z.busy = false;
+    const bm = best && new Chess(g.fen()).move({from: best.slice(0,2), to: best.slice(2,4), promotion: best[4] || "q"});
+    $("snPrompt").innerHTML = `<span class="bad">✗ ${esc(m.san)} lets the mate slip.</span> ${bm ? `<b>${esc(bm.san)}</b> kept it going.` : ""} ${z.userMoves > 1 ? `You got ${z.userMoves - 1} move${z.userMoves === 2 ? "" : "s"} of it right.` : `In the game you played ${esc(it.played)}.`} ${snLineHtml(z)}`;
+    z.view = z.fens.length - 1; snDraw(m.to); snRunCard();
+    if(best) snCg.setAutoShapes([{orig: best.slice(0,2), dest: best.slice(2,4), brush: "green"}]);
+    return;
+  }
+  // their toughest defence, then your move again
+  const d = g.move({from: res.best.slice(0,2), to: res.best.slice(2,4), promotion: res.best[4] || "q"});
+  z.mateIn = -res.mate;   // moves you still need (counted from their side, so this is yours after their reply)
+  await new Promise(q => setTimeout(q, 350));
+  if(snPz !== z) return;
+  z.lastMove = d ? [d.from, d.to] : null; z.busy = false; z.t0 = performance.now();
+  snDraw(); snMatePrompt(z, `✓ ${esc(m.san)}${d ? `, they reply ${esc(d.san)}` : ""}. Keep going.`);
+  SFQ.eval(g.fen(), 600).then(x => { if(snPz === z && !z.solved && !z.failed){ z.expect = x.best; if(x.mate > 0){ z.mateIn = x.mate; snMatePrompt(z, `✓ ${esc(m.san)}${d ? `, they reply ${esc(d.san)}` : ""}. Keep going.`); } } }).catch(() => {});
 }
 // the engine's best line from the puzzle position, as positions you can step through
 function snMakeLine(z){
