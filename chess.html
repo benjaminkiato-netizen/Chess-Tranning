@@ -3987,6 +3987,7 @@ const SN_V = {p:1, n:3, b:3, r:5, q:9, k:0};
 const SN_TYPES = {
   mate:["Missed mate", "You had a forced mate."],
   allowmate:["Walked into mate", "Your move allowed a forced mate."],
+  damage:["Limit the damage", "You were already losing material (a fork, pin or attack). The task: lose as little as possible."],
   hung:["Hung a piece", "Your move left a piece where it could be taken."],
   fork:["Missed fork", "One move would have attacked two things at once."],
   capture:["Missed capture", "There was material to take."],
@@ -4011,6 +4012,10 @@ if((S.sn.v || 1) < 2){
     it.type = snHung(it.fen, it.played) ? "hung" : snFork(it.fen, it.best) ? "fork" : mv?.captured ? "capture" : mv?.san.includes("+") ? "check" : it.phase === "endgame" ? "endgame" : "quiet";
   }
   S.sn.v = 2; save();
+}
+if(S.sn.v < 3){   // new group: positions where you were already losing material
+  for(const it of Object.values(S.sn.items)) if(it.type !== "mate" && it.type !== "allowmate" && snDamage(it.fen, it.line)) it.type = "damage";
+  S.sn.v = 3; save();
 }   // snPz: the puzzle on the board {it, game, from, solved, failed, t0, lastMove}
 
 function snPhase(fen, ply){
@@ -4053,10 +4058,26 @@ function snFork(fen, best){
   }
   return targets >= 2;
 }
-function snType(fen, best, played, prev, me, phase, after){
+// already in trouble: before your move the opponent threatens to win a piece, and even the engine's best line still loses one
+function snDamage(fen, line){
+  const f = fen.split(" "), me = f[1]; f[1] = me === "w" ? "b" : "w"; f[3] = "-";
+  const t = new Chess(); if(!t.load(f.join(" "))) return false;
+  const threat = t.moves({verbose:true}).some(m => {
+    if(!m.captured || SN_V[m.captured] < 3) return false;
+    const c2 = new Chess(t.fen()); c2.move(m);
+    return !c2.moves({verbose:true}).some(r => r.to === m.to) || SN_V[m.captured] > SN_V[m.piece];
+  });
+  if(!threat) return false;
+  const c = new Chess(fen), mv = (line || "").split(" ").filter(Boolean);
+  if(!mv[0] || !c.move(mv[0], {sloppy:true}) || !mv[1]) return false;
+  const reply = c.move(mv[1], {sloppy:true});
+  return !!(reply && reply.captured && SN_V[reply.captured] >= 3);
+}
+function snType(fen, best, played, prev, me, phase, after, line){
   const sg = me === "w" ? 1 : -1;
   if(prev && prev.mate !== undefined && prev.mate * sg > 0) return "mate";
   if(after && after.mate !== undefined && after.mate * sg < 0) return "allowmate";
+  if(snDamage(fen, line)) return "damage";
   if(snHung(fen, played)) return "hung";
   if(snFork(fen, best)) return "fork";
   const c = new Chess(fen), mv = c.move({from:best.slice(0,2), to:best.slice(2,4), promotion:best[4] || "q"});
@@ -4079,7 +4100,7 @@ function snCollectGame(g, A){
     if(!missed && !bad(e)) continue;          // plain inaccuracies aren't drilled
     const phase = snPhase(fen, k), prev = k >= 2 ? A.evals[k-2] : A.ev0;
     S.sn.items[`${g.id}:${k}`] = {id:`${g.id}:${k}`, fen, best:e.best, line:e.variation || "", played:sans[k-1],
-      kind: missed ? "missed" : e.judgment.name.toLowerCase(), type: snType(fen, e.best, sans[k-1], prev, me, phase, e), phase,
+      kind: missed ? "missed" : e.judgment.name.toLowerCase(), type: snType(fen, e.best, sans[k-1], prev, me, phase, e, e.variation), phase,
       opening: g.opening?.name ? g.opening.name.split(":")[0] : "", gid:g.id, link: gameUrl(g, me, k),
       label: moveLabelOf(fen, sans[k-1]), date: g.createdAt || Date.now(), vs: playerName(opp), bot: opp?.user?.title === "BOT" || !!opp?.aiLevel};
     n++;
