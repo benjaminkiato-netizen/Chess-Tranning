@@ -4622,13 +4622,13 @@ async function snExplain(it){
   const gainB = (lineB.length ? snMat(lineB[lineB.length - 1].fen, me) : snMat(fBest, me)) - m0;
   const gainP = (lineP.length ? snMat(lineP[lineP.length - 1].fen, me) : snMat(fPlayed, me)) - m0;
   const sanList = l => l.slice(0, 4).map(x => x.san).join(" ");
-  const why = [], reply = lineP[0]?.m, back = lineP[1]?.m;
+  const why = [], you = [], reply = lineP[0]?.m, back = lineP[1]?.m;   // why: about the best move · you: about your move
   if(rb.mate !== null && rb.mate < 0) why.push(`${best.san} leads to a forced mate.`);
   // 1. what your move allowed: their best reply takes something, or checks
   if(reply?.captured){
     const traded = back && back.captured && back.to === reply.to;
-    why.push(`After ${played.san}, they can play ${reply.san}, taking your ${SN_NAME[reply.captured]}${traded ? ` (you'd take back with ${back.san}, but it's their trade, on their terms)` : ""}.`);
-  } else if(reply && reply.san.includes("+")) why.push(`After ${played.san}, they get ${reply.san} with check.`);
+    you.push(`it lets them play ${reply.san}, taking your ${SN_NAME[reply.captured]}${traded ? ` (you can take back with ${back.san}, but it's their trade, on their terms)` : ""}`);
+  } else if(reply && reply.san.includes("+")) you.push(`it allows ${reply.san} with check`);
   // 2. the best move takes something they can't (safely) take back
   if(best.captured){
     const name = SN_NAME[best.captured], c = new Chess(fBest);
@@ -4655,7 +4655,7 @@ async function snExplain(it){
   }
   // 3. the best move wins material a few moves later
   if(gainB >= 2 && gainB > gainP && !(best.captured && SN_V[best.captured] >= gainB)) why.push(`${best.san} wins material a few moves later.`);
-  else if(gainP <= -2 && gainB > gainP) why.push(`Your move loses material down the line; ${best.san} doesn't.`);
+  if(gainP <= -1 && gainB > gainP && !reply?.captured) you.push(`it loses material a few moves later (${sanList(lineP)})`);
   // 3. the best move is a trade: say what it removes
   if(best.captured && lineB[0]?.m.captured && lineB[0].m.to === best.to && SN_V[best.captured] === SN_V[best.piece]){
     const heat = snKingHeat(it.fen, me), heatAfter = snKingHeat(lineB[0].fen, me);
@@ -4663,15 +4663,20 @@ async function snExplain(it){
   }
   // 4. king safety
   const hB = snKingHeat(fBest, me), hP = snKingHeat(fPlayed, me);
-  if(hP - hB >= 3) why.push(`${played.san} lets more of their pieces reach your king.`);
+  if(hP - hB >= 3) you.push("it lets their pieces close in on your king");
   // 5. activity
   const aB = snMobility(fBest, me), aP = snMobility(fPlayed, me);
   if(why.length < 2 && aB - aP >= 4) why.push(`${best.san} keeps your pieces more active.`);
   if(!why.length && gainB >= 1 && gainB > gainP) why.push(`${best.san} comes out a pawn up in the line below.`);
-  if(!why.length) why.push("No direct tactic here: it's about the better position, not material.");
+  if(!why.length && !you.length) why.push("No direct tactic here: it's about the better position, not material.");
+  // your move first: what kind of mistake, and why
+  const kind = it.kind === "blunder" ? "a blunder" : it.kind === "mistake" ? "a mistake" : it.kind === "missed" ? "a missed chance (your opponent had just slipped)" : "an inaccuracy";
+  const cost = Math.abs(diff) >= 9 ? "" : diff > 0.05 ? `, about ${diff.toFixed(1)} pawns worse than ${best.san}` : "";
+  const because = you.length ? `, because ${you.slice(0, 2).join(", and ")}` : best.captured ? `, because it misses ${best.san}`
+    : `, because it gives away ground: Stockfish expects ${sanList(lineP) || "–"}`;
+  const yourLine = `Your move ${played.san} was ${kind}${cost}${because}.`;
   const lines = `Expected play after ${best.san}: ${sanList(lineB) || "–"}. After ${played.san}: ${sanList(lineP) || "–"}.`;
-  const size = Math.abs(diff) >= 9 ? "" : ` ${best.san} is about ${Math.max(0, diff).toFixed(1)} pawns better.`;
-  return {text: why.slice(0, 2).join(" ") + size, lines};
+  return {text: yourLine + (why.length ? " " + why.slice(0, 2).join(" ") : ""), lines};
 }
 function snShowWhy(z){
   const box = document.createElement("div"); box.className = "sn-why"; box.textContent = "Working out why…";
