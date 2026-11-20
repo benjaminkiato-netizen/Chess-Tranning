@@ -3653,9 +3653,25 @@ function sanLine(fen, pv){
   for(const u of pv){ const m = c.move({from:u.slice(0,2), to:u.slice(2,4), promotion:u[4]}); if(!m) break; out.push(m.san); }
   return out;
 }
+function lichessAcc(wp, mv){
+  // Lichess game accuracy: average of a volatility-weighted mean and a harmonic mean of the per-move accuracies.
+  // wp = White's win % for every position (plies + 1 values); mv = [{i: ply index, acc}] for one player.
+  // The harmonic mean makes a few big errors count properly instead of being diluted by many easy moves.
+  if(!mv.length) return null;
+  const n = wp.length - 1, ws = Math.max(2, Math.min(8, Math.floor(n / 10)));
+  const wins = [], first = wp.slice(0, ws);
+  for(let k = 0; k < Math.min(ws - 2, n); k++) wins.push(first);
+  for(let k = 0; k + ws <= wp.length; k++) wins.push(wp.slice(k, k + ws));
+  const sd = xs => { const m = xs.reduce((a,b) => a+b, 0) / xs.length; return Math.sqrt(xs.reduce((a,b) => a + (b-m)**2, 0) / xs.length); };
+  const wts = wins.map(xs => Math.max(0.5, Math.min(12, sd(xs))));
+  let sw = 0, swx = 0, inv = 0;
+  for(const m of mv){ const w = wts[m.i] ?? 1; sw += w; swx += w * m.acc; inv += 1 / Math.max(m.acc, 1); }
+  return (swx / sw + mv.length / inv) / 2;
+}
 function buildAnalysis(fens, moves, res){
   const cp = r => r.mate !== undefined ? (r.mate > 0 ? 1000 : -1000) : Math.max(-1000, Math.min(1000, r.eval));
-  const P = {w:{n:0,acc:0,loss:0,inaccuracy:0,mistake:0,blunder:0}, b:{n:0,acc:0,loss:0,inaccuracy:0,mistake:0,blunder:0}};
+  const P = {w:{n:0,acc:0,loss:0,list:[],inaccuracy:0,mistake:0,blunder:0}, b:{n:0,acc:0,loss:0,list:[],inaccuracy:0,mistake:0,blunder:0}};
+  const wp = res.map(r => 50 + 50*wcOf(r));
   const evals = [], cls = [];
   for(let k=1; k<fens.length; k++){
     const side = fens[k-1].split(" ")[1], s = side === "w" ? 1 : -1, st = P[side];
@@ -3668,7 +3684,7 @@ function buildAnalysis(fens, moves, res){
     const before = wcOf(top)*s, after = wcOf(got)*s, drop = before - after;
     const e = res[k].mate !== undefined ? {mate: res[k].mate} : {eval: res[k].eval};
     const acc = Math.max(0, Math.min(100, 103.1668*Math.exp(-0.04354*((50+50*before)-(50+50*after))) - 3.1669));
-    st.n++; st.acc += acc; st.loss += Math.max(0, cp(top)*s - cp(got)*s);
+    st.n++; st.acc += acc; st.list.push({i: k-1, acc}); st.loss += Math.max(0, cp(top)*s - cp(got)*s);
     if(drop >= 0.1 && best && best.slice(0,4) !== played){
       const name = drop >= 0.3 ? "Blunder" : drop >= 0.2 ? "Mistake" : "Inaccuracy";
       st[name.toLowerCase()]++;
@@ -3687,7 +3703,7 @@ function buildAnalysis(fens, moves, res){
     } else if(idx === 1) c = "good";
     cls.push(c);
   }
-  const sum = x => ({accuracy: x.n ? Math.round(x.acc/x.n) : null, acpl: x.n ? Math.round(x.loss/x.n) : 0,
+  const sum = x => ({accuracy: x.n ? Math.round(lichessAcc(wp, x.list)) : null, acpl: x.n ? Math.round(x.loss/x.n) : 0,
     inaccuracy:x.inaccuracy, mistake:x.mistake, blunder:x.blunder});
   const r0 = res[0];
   return {evals, cls, ev0: r0.mate !== undefined ? {mate:r0.mate} : {eval:r0.eval}, players:{w:sum(P.w), b:sum(P.b)}, depth: LOCAL_DEPTH};
