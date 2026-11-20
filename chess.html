@@ -3997,6 +3997,13 @@ const SN_TYPES = {
 const SN_PHASE = {opening:"Opening", middlegame:"Middlegame", endgame:"Endgame"};
 let snJob = null, snCg = null, snPz = null;
 snPurge();
+if(S.sn.set){   // repair scores from the old double-counting bug (could exceed 100%)
+  const st = S.sn.set;
+  if(st.best && st.best.acc > 100) st.best.acc = 100;
+  st.history.forEach(h => { if(h.acc > 100) h.acc = 100; });
+  if(st.run && st.run.correct > st.run.i) st.run.correct = st.run.i;
+  save();
+}
 if((S.sn.v || 1) < 2){
   for(const it of Object.values(S.sn.items)){
     if(it.type !== "fork") continue;
@@ -4200,7 +4207,7 @@ function snNext(){
   const set = S.sn.set, r = set?.run; if(!r) return;
   if(r.i >= r.order.length){ snFinish(); return; }
   const it = S.sn.items[r.order[r.i]]; if(!it){ r.i++; snNext(); return; }
-  snPz = {it, game: new Chess(it.fen), solved: false, failed: false, t0: performance.now(), lastMove: null};
+  snPz = {it, pos: r.i, game: new Chess(it.fen), solved: false, failed: false, t0: performance.now(), lastMove: null};
   snRunCard(); snDraw(); snRenderSet();
   $("snPrompt").innerHTML = `<b>${it.fen.split(" ")[1] === "w" ? "White" : "Black"} to move.</b> Find the best move. <span class="sn-src">In your game vs ${esc(it.vs)} you played ${esc(it.label)}${it.kind === "missed" ? " (your opponent had just blundered)" : ""}.</span>`;
 }
@@ -4208,12 +4215,12 @@ function snRunCard(){
   const r = S.sn.set?.run, el = $("snRun");
   if(!r || !snPz){ el.hidden = true; return; }
   const it = snPz.it; el.hidden = false;
-  el.innerHTML = `<div class="sn-row" style="justify-content:space-between"><b>Position ${r.i + 1} of ${r.order.length}</b><span class="sn-note">${r.correct} right · ${fmtT(r.time)}</span></div>
+  el.innerHTML = `<div class="sn-row" style="justify-content:space-between"><b>Position ${snPz.pos + 1} of ${r.order.length}</b><span class="sn-note">${r.correct} right · ${fmtT(r.time)}</span></div>
     <div class="sn-prog"><i style="width:${r.i / r.order.length * 100}%"></i></div>
     <div class="sn-note">${esc(SN_TYPES[it.type]?.[0] || "")} · ${esc(SN_PHASE[it.phase] || "")}${it.opening ? " · " + esc(it.opening) : ""}</div>
     ${snPz.solved || snPz.failed ? `<div class="sn-row"><button class="primary" id="snNextBtn">Next →</button><a class="sn-src" href="${esc(it.link)}" target="_blank" rel="noopener">See the game ↗</a></div>` : ""}
     <div class="sn-row"><button id="snQuit">Pause</button></div>`;
-  if($("snNextBtn")) $("snNextBtn").onclick = () => { const r2 = S.sn.set.run; r2.i++; save(); snNext(); };
+  if($("snNextBtn")) $("snNextBtn").onclick = () => snNext();
   $("snQuit").onclick = () => { snPz = null; el.hidden = true; snRenderSet(); snDrawIdle(); $("snPrompt").textContent = "Paused. Your place in this cycle is saved."; };
 }
 function snDraw(bad){
@@ -4243,13 +4250,13 @@ async function snTry(from, to){
   z.lastMove = [from, to]; r.time += dt;
   snMakeLine(z);
   if(right){
-    z.solved = true; r.correct++;
+    z.solved = true; r.correct++; r.i = z.pos + 1;
     $("snPrompt").innerHTML = `<span class="ok">✓ Right: ${esc(m.san)}.</span> ${snLineHtml(z)}`;
     snDraw(); snRunCard(); save();
     // stays on this position: look through the line, then press Next when you're ready
     z.view = 1; snView(z, 1);
   } else {
-    z.failed = true; save();
+    z.failed = true; r.i = z.pos + 1; save();
     g.undo(); z.lastMove = null; z.view = 0;
     const bm = z.sans[0] || it.best;
     $("snPrompt").innerHTML = `<span class="bad">✗ Not this time.</span> Best was <b>${esc(bm)}</b>. In the game you played ${esc(it.played)}. ${snLineHtml(z)}`;
