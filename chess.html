@@ -3989,6 +3989,7 @@ const SN_TYPES = {
   allowmate:["Walked into mate", "Your move allowed a forced mate."],
   damage:["Limit the damage", "You were already losing material (a fork, pin or attack). The task: lose as little as possible."],
   hung:["Hung a piece", "Your move left a piece where it could be taken."],
+  allowfork:["Allowed a fork", "Your move let your opponent fork two of your pieces next."],
   fork:["Missed fork", "One move would have attacked two things at once."],
   capture:["Missed capture", "There was material to take."],
   check:["Missed check", "A forcing check was the strongest move."],
@@ -4016,6 +4017,10 @@ if((S.sn.v || 1) < 2){
 if(S.sn.v < 3){   // new group: positions where you were already losing material
   for(const it of Object.values(S.sn.items)) if(it.type !== "mate" && it.type !== "allowmate" && snDamage(it.fen, it.line)) it.type = "damage";
   S.sn.v = 3; save();
+}
+if(S.sn.v < 4){   // new group: your move let the opponent fork you
+  for(const it of Object.values(S.sn.items)) if(["quiet","capture","check","endgame","fork"].includes(it.type) && snAllowedFork(it.fen, it.played)) it.type = "allowfork";
+  S.sn.v = 4; save();
 }   // snPz: the puzzle on the board {it, game, from, solved, failed, t0, lastMove}
 
 function snPhase(fen, ply){
@@ -4073,12 +4078,19 @@ function snDamage(fen, line){
   const reply = c.move(mv[1], {sloppy:true});
   return !!(reply && reply.captured && SN_V[reply.captured] >= 3);
 }
+// after your move, can your opponent play a real fork (same strict rule as snFork)?
+function snAllowedFork(fen, played){
+  const c = new Chess(fen); if(!c.move(played, {sloppy:true})) return false;
+  const after = c.fen();
+  return c.moves({verbose:true}).some(m => snFork(after, m.from + m.to + (m.promotion || "")));
+}
 function snType(fen, best, played, prev, me, phase, after, line){
   const sg = me === "w" ? 1 : -1;
   if(prev && prev.mate !== undefined && prev.mate * sg > 0) return "mate";
   if(after && after.mate !== undefined && after.mate * sg < 0) return "allowmate";
   if(snDamage(fen, line)) return "damage";
   if(snHung(fen, played)) return "hung";
+  if(snAllowedFork(fen, played)) return "allowfork";
   if(snFork(fen, best)) return "fork";
   const c = new Chess(fen), mv = c.move({from:best.slice(0,2), to:best.slice(2,4), promotion:best[4] || "q"});
   if(mv && mv.captured) return "capture";
