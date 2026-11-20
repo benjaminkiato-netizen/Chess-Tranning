@@ -617,6 +617,9 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
 .sn-note{font-size:13px;color:var(--muted);margin:0}
 .sn-src{font-size:13px;color:var(--muted)}
 .sn-src a{color:inherit}
+.sn-line{margin-top:6px;font-size:14px;line-height:1.9}
+.sn-mv{background:none;border:1px solid transparent;border-radius:6px;padding:1px 5px;color:inherit;font:inherit;font-weight:600;cursor:pointer}
+.sn-mv:hover{border-color:var(--line)} .sn-mv.on{background:var(--accent);color:var(--accent-fg, #fff)}
 .rush-panel h1{margin:2px 0 0;font-size:24px}
 .rush-rules{margin:0;padding-left:18px;color:var(--muted,#9aa);font-size:14px;line-height:1.6}
 .rush-rules b{color:var(--text,#eee)}
@@ -4213,34 +4216,67 @@ async function snTry(from, to){
   const dt = performance.now() - z.t0;
   const right = uci.slice(0,4) === it.best.slice(0,4) || g.in_checkmate();
   z.lastMove = [from, to]; r.time += dt;
-  const line = it.line ? it.line.split(" ").slice(0, 6).join(" ") : "";
+  snMakeLine(z);
   if(right){
     z.solved = true; r.correct++;
-    $("snPrompt").innerHTML = `<span class="ok">✓ Right: ${esc(m.san)}.</span> ${line ? `<span class="sn-src">The line: ${esc(line)}</span>` : ""}`;
-    snDraw(); snRunCard(); save(); snPlayLine(z);
-    setTimeout(() => { if(snPz === z && S.sn.set?.run === r){ r.i++; save(); snNext(); } }, 1600 + Math.min(4, (it.line || "").split(" ").length) * 450);
+    $("snPrompt").innerHTML = `<span class="ok">✓ Right: ${esc(m.san)}.</span> ${snLineHtml(z)}`;
+    snDraw(); snRunCard(); save();
+    // play the next few moves of the line, then move on, unless you start looking around yourself
+    z.view = 1; let k = 1;
+    const step = () => { if(snPz !== z || z.touched) return; if(k < Math.min(4, z.fens.length - 1)){ snView(z, ++k); z.anim = setTimeout(step, 450); }
+      else z.anim = setTimeout(() => { if(snPz === z && !z.touched && S.sn.set?.run === r){ r.i++; save(); snNext(); } }, 1400); };
+    z.anim = setTimeout(step, 500);
   } else {
     z.failed = true; save();
-    g.undo(); z.lastMove = null;
-    const bm = g.move({from: it.best.slice(0,2), to: it.best.slice(2,4), promotion: it.best[4] || "q"});
-    g.undo();
-    $("snPrompt").innerHTML = `<span class="bad">✗ Not this time.</span> Best was <b>${esc(bm ? bm.san : it.best)}</b>${line ? ` <span class="sn-src">(${esc(line)})</span>` : ""}. In the game you played ${esc(it.played)}.`;
+    g.undo(); z.lastMove = null; z.view = 0;
+    const bm = z.sans[0] || it.best;
+    $("snPrompt").innerHTML = `<span class="bad">✗ Not this time.</span> Best was <b>${esc(bm)}</b>. In the game you played ${esc(it.played)}. ${snLineHtml(z)}`;
     snDraw(to); snRunCard();
     snCg.setAutoShapes([{orig: it.best.slice(0,2), dest: it.best.slice(2,4), brush: "green"}]);
-    setTimeout(() => snCg?.setAutoShapes([]), 4000);
   }
 }
-// after a correct move, show the next few moves of the engine's line on the board
-function snPlayLine(z){
-  const moves = (z.it.line || "").split(" ").filter(Boolean).slice(1, 4);
-  let k = 0;
-  const step = () => {
-    if(snPz !== z || k >= moves.length) return;
-    const m = z.game.move(moves[k++], {sloppy:true}); if(!m) return;
-    z.lastMove = [m.from, m.to]; snDraw(); setTimeout(step, 450);
-  };
-  setTimeout(step, 500);
+// the engine's best line from the puzzle position, as positions you can step through
+function snMakeLine(z){
+  const c = new Chess(z.it.fen); z.fens = [c.fen()]; z.moves = [null]; z.sans = [];
+  for(const san of (z.it.line || "").split(" ").filter(Boolean)){
+    const m = c.move(san, {sloppy:true}); if(!m) break;
+    z.fens.push(c.fen()); z.moves.push([m.from, m.to]); z.sans.push(m.san);
+  }
+  if(!z.sans.length){   // no stored line: at least the best move
+    const m = c.move({from: z.it.best.slice(0,2), to: z.it.best.slice(2,4), promotion: z.it.best[4] || "q"});
+    if(m){ z.fens.push(c.fen()); z.moves.push([m.from, m.to]); z.sans.push(m.san); }
+  }
 }
+function snLineHtml(z){
+  if(!z.sans?.length) return "";
+  const [, t, , , , n] = z.it.fen.split(" ");
+  let num = +n, white = t === "w", out = "";
+  z.sans.forEach((san, i) => {
+    if(white) out += `${num}. `; else if(i === 0) out += `${num}... `;
+    out += `<button class="sn-mv${z.view === i + 1 ? " on" : ""}" data-k="${i + 1}">${esc(san)}</button> `;
+    if(!white) num++; white = !white;
+  });
+  return `<div class="sn-line"><button class="sn-mv${z.view === 0 ? " on" : ""}" data-k="0" title="Back to the puzzle position">⟲</button> Best line: ${out}<span class="sn-note">(click a move, or use ← → / scroll on the board)</span></div>`;
+}
+// show position k of the best line (0 = the puzzle position)
+function snView(z, k){
+  k = Math.max(0, Math.min(z.fens.length - 1, k)); z.view = k;
+  const c = new Chess(z.fens[k]);
+  snCg.set({fen: z.fens[k], turnColor: cgColor(c.turn()), lastMove: z.moves[k] || undefined, check: c.in_check() ? cgColor(c.turn()) : false,
+    movable: {color: undefined, dests: new Map()}, highlight: {custom: new Map()}});
+  if(k) snCg.setAutoShapes([]);
+  document.querySelectorAll("#snPrompt .sn-mv").forEach(b => b.classList.toggle("on", +b.dataset.k === k));
+}
+const snOver = () => snPz && (snPz.solved || snPz.failed) && snPz.fens && !$("sn").hidden;
+function snLook(k){ const z = snPz; z.touched = true; clearTimeout(z.anim); snView(z, k); }
+$("snPrompt").addEventListener("click", e => { const b = e.target.closest(".sn-mv"); if(b && snOver()) snLook(+b.dataset.k); });
+document.addEventListener("keydown", e => {
+  if(!snOver() || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
+  const z = snPz, k = {ArrowLeft: z.view - 1, ArrowRight: z.view + 1, Home: 0, End: z.fens.length - 1}[e.key];
+  if(k === undefined) return; e.preventDefault(); snLook(k);
+});
+{ let wt = 0;
+  $("snBoard").addEventListener("wheel", e => { if(!snOver()) return; e.preventDefault(); const t = Date.now(); if(t - wt < 60) return; wt = t; snLook(snPz.view + (e.deltaY > 0 ? 1 : -1)); }, {passive: false}); }
 function snFinish(){
   const set = S.sn.set, r = set.run, n = r.order.length;
   const acc = n ? Math.round(r.correct / n * 100) : 0, time = Math.round(r.time);
