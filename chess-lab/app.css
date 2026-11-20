@@ -356,3 +356,12 @@ footer { color: var(--muted); font-size: 11px; position: fixed; right: 12px; bot
 .rv-keys li.on { border-color: var(--accent); background: rgba(108,92,231,.1); }
 .rv-keys .rv-tag { margin-right: 4px; }
 
+
+/* Study: opening name + link to the Lichess opening explorer for the current position */
+.st-orow { display: flex; align-items: stretch; gap: 8px; }
+.st-orow .st-otag { flex: 1; min-width: 0; }
+.st-explorer { flex: none; display: flex; align-items: center; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px;
+  font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; white-space: nowrap; }
+.st-explorer:hover { border-color: var(--accent); }
+.st-orow { margin-top: 8px; }
+.st-orow .st-otag { margin-top: 0; width: auto; }
