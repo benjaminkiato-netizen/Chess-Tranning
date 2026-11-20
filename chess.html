@@ -4126,12 +4126,15 @@ const snItems = () => Object.values(S.sn.items).filter(it => S.sn.missed || it.k
 /* ---- collecting: analyse the most recent games on the Games tab ---- */
 async function snAnalyse(n){
   if(snJob) return;
-  if(!gList){
-    if(!gUsers().length){ snJob = null; snRenderCollect("Add your chess.com or Lichess username on the Games tab first."); return; }
-    snRenderCollect("Loading your games…"); await loadGames();
-  }
-  const games = (gList || []).filter(g => g.moves && g.status !== "started" && !snSkipped(g)).slice(0, n);
-  if(!games.length){ snRenderCollect("No finished games found. Check the Games tab."); return; }
+  if(!gUsers().length){ snRenderCollect("Add your chess.com or Lichess username on the Games tab first."); return; }
+  // always fetch a fresh list (so games you played since are included), with at least n games in it
+  if(S.gameMax < n){ S.gameMax = n; save(); }
+  snRenderCollect("Loading your latest games…");
+  try { await loadGames(); } catch(e){ snRenderCollect("Couldn't load your games: " + e.message); return; }
+  const recent = (gList || []).filter(g => g.moves && g.status !== "started" && !snSkipped(g)).slice(0, n);
+  if(!recent.length){ snRenderCollect("No finished games found. Check the Games tab."); return; }
+  const games = recent.filter(g => !S.sn.done[g.id]);
+  if(!games.length){ snRenderCollect(`All of your last ${recent.length} games are already checked. Pick a bigger number, or play some more games first.`); return; }
   const job = snJob = {total: games.length, i: 0, cancel: false, found: 0, game: null, pct: 0};
   snRenderCollect();
   for(const g of games){
@@ -4152,7 +4155,7 @@ async function snAnalyse(n){
     save(); snRenderCollect(); snRenderSummary();
   }
   snJob = null; save();
-  snRenderCollect(job.cancel ? "Stopped. What was analysed so far is kept." : `Done: ${job.found} new position${job.found === 1 ? "" : "s"} from ${job.total} games.`);
+  snRenderCollect(job.cancel ? "Stopped. What was analysed so far is kept." : `Done: ${job.found} new position${job.found === 1 ? "" : "s"} from ${job.total} new game${job.total === 1 ? "" : "s"}${recent.length > job.total ? ` (${recent.length - job.total} were already checked)` : ""}.`);
   snRenderSummary(); snRenderSet();
 }
 function snRenderCollect(msg){
