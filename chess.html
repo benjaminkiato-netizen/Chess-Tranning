@@ -2463,7 +2463,11 @@ function rushTick(){
   $("rushClock").textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
   $("rushClock").classList.toggle("low", sec <= 20);
   if(ms <= 0){ rushEnd("time"); return; }
-  requestAnimationFrame(rushTick);
+  // The clock shows whole seconds, so ~5 updates/sec is plenty. It used to reschedule with
+  // requestAnimationFrame (~60/sec), repainting every single frame for the whole run and
+  // stealing frames from chessground's piece dragging -- which is why dragging on Rush felt
+  // less smooth than the idle Study board. A timer frees the main thread between ticks.
+  setTimeout(rushTick, 200);
 }
 function rushUpdateHud(){
   $("rushScore").textContent = R.score;
