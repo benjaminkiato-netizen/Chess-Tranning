@@ -2172,7 +2172,7 @@ const SND_BASE = "sounds/";
 // recorded wooden piece sounds (two takes for moves, picked at random; a double knock for captures)
 const SAMPLES = {}; let samplesLoading = null;
 function loadSamples(ac){
-  samplesLoading ||= Promise.all(["move1", "move2", "capture"].map(n =>
+  samplesLoading ||= Promise.all(["cc-move", "cc-capture", "cc-check", "cc-promote"].map(n =>
     fetch(SND_BASE + n + ".mp3").then(r => r.arrayBuffer())
       .then(b => new Promise((res, rej) => ac.decodeAudioData(b, res, rej)))
       .then(buf => { SAMPLES[n] = buf; }).catch(() => {})));
@@ -2184,7 +2184,7 @@ function sample(ac, t, name, vol = 1){
   s.connect(g).connect(ac.destination); s.start(t);
   return true;
 }
-const pickMove = () => Math.random() < .5 ? "move1" : "move2";
+const pickMove = () => "cc-move";
 // get the sounds ready on your first click, so the very first move already uses them
 document.addEventListener("pointerdown", () => { if(S.sound) try{ ctx(); }catch(e){} }, {once: true, capture: true});
 function knock(ac, t, freq, len, vol){
@@ -2211,8 +2211,9 @@ function sound(kind){
   try{
     const ac = ctx(), t = ac.currentTime;
     if(kind==="move"){ if(!sample(ac, t, pickMove())) knock(ac, t, 1400, .06, 1.2); }
-    else if(kind==="capture"){ if(!sample(ac, t, "capture")){ knock(ac, t, 1000, .08, 1.6); knock(ac, t+.045, 1700, .05, .9); } }
-    else if(kind==="check"){ if(!sample(ac, t, pickMove())) knock(ac, t, 1400, .06, 1.2); tone(ac, t+.03, 880, .18, .12, "triangle"); }
+    else if(kind==="promote"){ if(!sample(ac, t, "cc-promote")) knock(ac, t, 1400, .06, 1.2); }
+    else if(kind==="capture"){ if(!sample(ac, t, "cc-capture")){ knock(ac, t, 1000, .08, 1.6); knock(ac, t+.045, 1700, .05, .9); } }
+    else if(kind==="check"){ if(!sample(ac, t, "cc-check")){ knock(ac, t, 1400, .06, 1.2); tone(ac, t+.03, 880, .18, .12, "triangle"); } }
     else if(kind==="error") tone(ac, t, 160, .22, .25, "square");
     else if(kind==="solved") [523, 659, 784].forEach((f,i) => tone(ac, t+i*.09, f, .3, .18, "triangle"));
     else if(kind==="win") [523, 659, 784, 1047].forEach((f,i) => tone(ac, t+i*.11, f, i===3 ? .6 : .3, .2, "triangle"));
@@ -2220,7 +2221,7 @@ function sound(kind){
     else if(kind==="draw") [587, 587].forEach((f,i) => tone(ac, t+i*.18, f, .35, .16, "triangle"));
   }catch(e){}
 }
-function moveSound(mv){ if(!mv) return; sound(mv.san.includes("+") || mv.san.includes("#") ? "check" : mv.captured ? "capture" : "move"); }
+function moveSound(mv){ if(!mv) return; sound(mv.san.includes("+") || mv.san.includes("#") ? "check" : mv.promotion ? "promote" : mv.captured ? "capture" : "move"); }
 function soundLabel(){ $("snd").textContent = S.sound ? "Sound: on" : "Sound: off"; }
 
 function complete(revealed){
