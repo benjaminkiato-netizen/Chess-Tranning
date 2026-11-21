@@ -3837,7 +3837,8 @@ function buildAnalysis(fens, moves, res){
     }
     // Lichess's mate rules: a move that walks into a forced mate (even when already lost), or
     // one that throws away a forced mate you had, is an error even if the win chances barely move
-    if(!e.judgment && best && best.slice(0,4) !== played){
+    const gaveMate = new Chess(fens[k]).in_checkmate();   // delivering checkmate is never an error
+    if(!e.judgment && !gaveMate && best && best.slice(0,4) !== played){
       let name = null, why = "";
       if(mb === null && ma !== null && ma < 0){
         const cpb = (res[k-1].eval || 0)*s;
