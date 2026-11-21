@@ -349,17 +349,20 @@ button.mv{white-space:nowrap;overflow:hidden}
 /* coach column: left of the move list on wide screens (game review) */
 .gcoach{display:none}
 @media (min-width:1500px){
-  /* left side becomes two columns: coach card beside the move buttons, move list full width underneath */
+  /* left: move buttons with the move list underneath, same width; under the board: the game
+     report (half width) with the move commentary beside it; the whole layout centred */
   .wrap.wide{max-width:1880px}
-  .drill-grid.gm{grid-template-columns:584px auto 300px}
-  .drill-grid.gm .gleft{display:grid;grid-template-columns:270px 290px;grid-template-areas:"coach nav" "moves moves";gap:14px 24px;align-items:stretch}
-  .drill-grid.gm .gleft > .nav{grid-area:nav}
-  .drill-grid.gm .gcoach{display:flex;grid-area:coach}
+  .drill-grid.gm{grid-template-columns:300px auto 300px;justify-content:center}
+  .drill-grid.gm .gleft{display:flex;flex-direction:column;gap:14px;width:300px}
+  .drill-grid.gm .gunder{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch}
+  .drill-grid.gm .gunder .gp-report{grid-template-columns:1fr 1fr;gap:10px;padding:14px}
+  .drill-grid.gm .gunder .gp-report .rp-rate b{font-size:22px}
+  .drill-grid.gm .gunder .gp-report .rp-rows{font-size:13px;gap:4px 8px}
+  .drill-grid.gm .gunder:has(> .gp-report[hidden]), .drill-grid.gm .gunder:has(> .gcoach[hidden]){grid-template-columns:1fr}
+  .drill-grid.gm .gcoach{display:flex}
   .drill-grid.gm .gcoach[hidden]{display:none}
   .drill-grid.gm .gcoach .coach-card{flex:1}
-  .drill-grid.gm .gleft > .gp-movebox{grid-area:moves}
-  .drill-grid.gm .gp-moves{grid-template-columns:44px minmax(0,1fr) minmax(0,1fr);font-size:15px;gap:4px 10px}
-  .drill-grid.gm .board{width:min(900px, calc(100vw - 32px - 48px - 584px - 300px - 22px), calc(100vh - 48px))}
+  .drill-grid.gm .board{width:min(900px, calc(100vw - 32px - 48px - 300px - 300px - 22px), calc(100vh - 48px))}
   .drill-grid.gm .gp-comment{display:none}
   .drill-grid.gm .coach-card{padding:20px}
   .drill-grid.gm .coach-badge{width:42px;height:42px;font-size:18px}
@@ -1032,9 +1035,6 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
   <!-- DRILL -->
   <section id="drill" class="drill-grid" hidden>
     <div class="gleft" id="gleft" hidden>
-      <div class="gcoach" id="gcoach" hidden>
-        <div class="gp coach-card" id="gpCoach"></div>
-      </div>
       <div class="gp gp-movebox">
         <div class="gp-moves" id="gpMoves"></div>
         <div class="gp-comment" id="gpComment"></div>
@@ -1045,7 +1045,12 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
       <div class="evalbar" id="evalbar" aria-hidden="true"><i id="evalFill"></i><span id="evalTxt"></span></div>
       <div class="board" id="board"></div>
     </div>
-    <div class="gp-report" id="gpReport" hidden></div>
+    <div class="gunder">
+      <div class="gp-report" id="gpReport" hidden></div>
+      <div class="gcoach" id="gcoach" hidden>
+        <div class="gp coach-card" id="gpCoach"></div>
+      </div>
+    </div>
     </div>
     <div class="side">
     <div class="drill-top">
