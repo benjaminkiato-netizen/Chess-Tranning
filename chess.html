@@ -3844,6 +3844,9 @@ function buildAnalysis(fens, moves, res){
       // only move: every alternative loses a lot, and it isn't just an obvious recapture
       if(res[k-1].legal > 1 && alts[1] && (wcOf(alts[0])*s - wcOf(alts[1])*s) >= 0.2 && !recapture) c = "only";
     } else if(idx === 1) c = "good";
+    // just as good as the engine's first choice (e.g. two different mates in 1) = best too
+    const same = (a, b) => a && b && (a.mate !== undefined ? a.mate === b.mate : a.eval === b.eval);
+    if(c !== "best" && c !== "only" && !e.judgment && ((idx > 0 && same(alts[idx], alts[0])) || (moves[k] && new Chess(fens[k]).in_checkmate()))) c = "best";
     cls.push(c);
   }
   const sum = x => ({accuracy: x.n ? Math.round(lichessAcc(wp, x.list)) : null, acpl: x.n ? Math.round(x.loss/x.n) : 0,
