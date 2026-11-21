@@ -1805,7 +1805,22 @@ function cgBoard(b, after, extra = {}){
     highlight: {lastMove: true, check: true},
     drawable: {enabled: true},
   }, extra));
-  if(window.ResizeObserver) new ResizeObserver(() => cg.redrawAll()).observe(b);
+  // Rebuild the board only on a real width change, and never mid-drag. redrawAll() tears
+  // down and rebuilds every piece; chessground already handles its own resizing internally,
+  // so this extra observer was redundant AND would fire on cosmetic reflows (the ticking
+  // clock repainting each frame, the eval bar, a growing move list) — including in the
+  // middle of a drag, which rebuilt the piece you were holding and made dragging stutter.
+  // Guarding it to genuine width changes is what makes the busy boards (Rush, Mistake
+  // Drills, live games) feel as smooth to drag as the idle Study board.
+  if(window.ResizeObserver){
+    let lastW = Math.round(b.getBoundingClientRect().width);
+    new ResizeObserver(() => {
+      if(cg.state.draggable.current) return;              // don't interrupt an active drag
+      const w = Math.round(b.getBoundingClientRect().width);
+      if(w === lastW) return;                             // ignore height-only / sub-pixel reflows
+      lastW = w; cg.redrawAll();
+    }).observe(b);
+  }
   lookSelect(cg, b);
   return cg;
 }
