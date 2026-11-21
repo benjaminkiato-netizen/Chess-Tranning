@@ -59,8 +59,8 @@ a { color: var(--accent-2); }
 .pmeta { color: var(--muted); font-size: 13px; }
 
 /* board: same look as the puzzle trainer (chess.html) */
-cg-board { background-color: var(--sq-l,#eed5a4);
-  background-image: conic-gradient(var(--sq-d,#355a31) 0 25%, transparent 0 50%, var(--sq-d,#355a31) 0 75%, transparent 0);
+cg-board { background-color: #eed5a4;
+  background-image: conic-gradient(#355a31 0 25%, transparent 0 50%, #355a31 0 75%, transparent 0);
   background-size: 25% 25%; box-shadow: 0 0 0 2px #1d2b1b; border-radius: 2px; }
 .cg-wrap piece { background-size: 92% 92%; background-position: center; background-repeat: no-repeat; }
 cg-board square.last-move { background-color: rgba(214, 40, 40, .55); }
@@ -77,14 +77,14 @@ cg-board square.check { background: radial-gradient(ellipse at center, rgba(255,
 .cg-wrap coords { font: 600 11px "IBM Plex Sans", system-ui, sans-serif; text-shadow: none; }
 .cg-wrap coords coord { text-transform: lowercase !important; }
 /* each label takes the colour of the opposite square so it's always readable */
-.cg-wrap coords.ranks coord:nth-child(2n+1) { color: var(--sq-l,#eed5a4); }
-.cg-wrap coords.ranks coord:nth-child(2n) { color: var(--sq-d,#355a31); }
-.cg-wrap coords.files coord:nth-child(2n+1) { color: var(--sq-l,#eed5a4); }
-.cg-wrap coords.files coord:nth-child(2n) { color: var(--sq-d,#355a31); }
+.cg-wrap coords.ranks coord:nth-child(2n+1) { color: #eed5a4; }
+.cg-wrap coords.ranks coord:nth-child(2n) { color: #355a31; }
+.cg-wrap coords.files coord:nth-child(2n+1) { color: #eed5a4; }
+.cg-wrap coords.files coord:nth-child(2n) { color: #355a31; }
 .cg-wrap.orientation-black coords.ranks coord:nth-child(2n+1),
-.cg-wrap.orientation-black coords.files coord:nth-child(2n+1) { color: var(--sq-d,#355a31); }
+.cg-wrap.orientation-black coords.files coord:nth-child(2n+1) { color: #355a31; }
 .cg-wrap.orientation-black coords.ranks coord:nth-child(2n),
-.cg-wrap.orientation-black coords.files coord:nth-child(2n) { color: var(--sq-l,#eed5a4); }
+.cg-wrap.orientation-black coords.files coord:nth-child(2n) { color: #eed5a4; }
 
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
 .card h2 { margin: 0 0 12px; font-size: 17px; }
@@ -297,8 +297,8 @@ footer { color: var(--muted); font-size: 11px; position: fixed; right: 12px; bot
 .op-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-top: 16px; }
 .op-card { display: flex; flex-direction: column; gap: 10px; text-align: left; padding: 16px; cursor: pointer; color: var(--text); font: inherit; border: 1px solid var(--line); transition: border-color .15s, transform .15s; }
 .op-card:hover { border-color: var(--accent); transform: translateY(-2px); }
-.op-board { position: relative; width: 100%; aspect-ratio: 1; border-radius: 3px; overflow: hidden; background-color: var(--sq-l,#eed5a4);
-  background-image: conic-gradient(var(--sq-d,#355a31) 0 25%, transparent 0 50%, var(--sq-d,#355a31) 0 75%, transparent 0); background-size: 25% 25%; }
+.op-board { position: relative; width: 100%; aspect-ratio: 1; border-radius: 3px; overflow: hidden; background-color: #eed5a4;
+  background-image: conic-gradient(#355a31 0 25%, transparent 0 50%, #355a31 0 75%, transparent 0); background-size: 25% 25%; }
 .op-board piece { position: absolute; top: 0; left: 0; width: 12.5%; height: 12.5%; }
 .op-info { display: flex; flex-direction: column; gap: 3px; }
 .op-name { font-weight: 700; font-size: 16px; }
@@ -355,17 +355,3 @@ footer { color: var(--muted); font-size: 11px; position: fixed; right: 12px; bot
 .rv-keys li:hover { border-color: var(--line); }
 .rv-keys li.on { border-color: var(--accent); background: rgba(108,92,231,.1); }
 .rv-keys .rv-tag { margin-right: 4px; }
-
-
-/* Study: opening name + link to the Lichess opening explorer for the current position */
-.st-orow { display: flex; align-items: stretch; gap: 8px; }
-.st-orow .st-otag { flex: 1; min-width: 0; }
-.st-explorer { flex: none; display: flex; align-items: center; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px;
-  font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; white-space: nowrap; }
-.st-explorer:hover { border-color: var(--accent); }
-.st-orow { margin-top: 8px; }
-.st-orow .st-otag { margin-top: 0; width: auto; }
-
-/* Spar: live eval bar (toggled by 📈 Live eval) */
-.evalbar[hidden] { display: none; }
-#spar-evaltoggle.on { border-color: var(--accent); color: var(--accent); }
