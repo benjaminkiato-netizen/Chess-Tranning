@@ -2176,7 +2176,7 @@ const SND_BASE = "sounds/";
 // recorded wooden piece sounds (two takes for moves, picked at random; a double knock for captures)
 const SAMPLES = {}; let samplesLoading = null;
 function loadSamples(ac){
-  samplesLoading ||= Promise.all(["cc-move", "cc-capture", "cc-check", "cc-promote"].map(n =>
+  samplesLoading ||= Promise.all(["cc-move", "cc-capture", "cc-check", "cc-promote", "cc-castle"].map(n =>
     fetch(SND_BASE + n + ".mp3?v=2").then(r => r.arrayBuffer())
       .then(b => new Promise((res, rej) => ac.decodeAudioData(b, res, rej)))
       .then(buf => { SAMPLES[n] = buf; }).catch(() => {})));
@@ -2215,6 +2215,7 @@ function sound(kind){
   try{
     const ac = ctx(), t = ac.currentTime;
     if(kind==="move"){ if(!sample(ac, t, pickMove())) knock(ac, t, 1400, .06, 1.2); }
+    else if(kind==="castle"){ if(!sample(ac, t, "cc-castle")) knock(ac, t, 1400, .06, 1.2); }
     else if(kind==="promote"){ if(!sample(ac, t, "cc-promote")) knock(ac, t, 1400, .06, 1.2); }
     else if(kind==="capture"){ if(!sample(ac, t, "cc-capture")){ knock(ac, t, 1000, .08, 1.6); knock(ac, t+.045, 1700, .05, .9); } }
     else if(kind==="check"){ if(!sample(ac, t, "cc-check")){ knock(ac, t, 1400, .06, 1.2); tone(ac, t+.03, 880, .18, .12, "triangle"); } }
@@ -2225,7 +2226,7 @@ function sound(kind){
     else if(kind==="draw") [587, 587].forEach((f,i) => tone(ac, t+i*.18, f, .35, .16, "triangle"));
   }catch(e){}
 }
-function moveSound(mv){ if(!mv) return; sound(mv.san.includes("+") || mv.san.includes("#") ? "check" : mv.promotion ? "promote" : mv.captured ? "capture" : "move"); }
+function moveSound(mv){ if(!mv) return; sound(mv.san.includes("+") || mv.san.includes("#") ? "check" : mv.san.startsWith("O-O") ? "castle" : mv.promotion ? "promote" : mv.captured ? "capture" : "move"); }
 function soundLabel(){ $("snd").textContent = S.sound ? "Sound: on" : "Sound: off"; }
 
 function complete(revealed){
