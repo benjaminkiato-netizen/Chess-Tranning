@@ -3835,6 +3835,24 @@ function buildAnalysis(fens, moves, res){
         e.judgment = {name, comment: `${name}. This lets your opponent mate in ${N}. ${line[0] || best} held out longer (mate in ${M}).`};
       }
     }
+    // Lichess's mate rules: a move that walks into a forced mate (even when already lost), or
+    // one that throws away a forced mate you had, is an error even if the win chances barely move
+    if(!e.judgment && best && best.slice(0,4) !== played){
+      let name = null, why = "";
+      if(mb === null && ma !== null && ma < 0){
+        const cpb = (res[k-1].eval || 0)*s;
+        name = cpb > -700 ? "Blunder" : "Mistake"; why = `This allows mate in ${-ma}.`;
+      } else if(mb !== null && mb > 0 && ma === null){
+        const cpa = (res[k].eval || 0)*s;
+        name = cpa > 999 ? "Inaccuracy" : cpa > 700 ? "Mistake" : "Blunder"; why = `You had a forced mate (mate in ${mb}).`;
+      }
+      if(name){
+        st[name.toLowerCase()]++;
+        const line = sanLine(fens[k-1], res[k-1].pv);
+        e.best = best; e.variation = line.join(" ");
+        e.judgment = {name, comment: `${name}. ${why} ${line[0] || best} was best.`};
+      }
+    }
     evals.push(e);
     // rating vs the engine's top 3: best = star, 2nd = thumbs up, anything else that isn't an error = check
     let c = "ok";
