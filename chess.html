@@ -348,6 +348,8 @@ button.mv{white-space:nowrap;overflow:hidden}
 }
 /* coach column: left of the move list on wide screens (game review) */
 .gcoach{display:none}
+/* room to the left of the move buttons: "← All games" goes there */
+@media (min-width:1750px){ .drill-grid.gm #gleft > #back{position:absolute;right:calc(100% + 16px);top:0} }
 @media (min-width:1500px){
   /* left: move buttons with the move list underneath, same width; under the board: the game
      report (half width) with the move commentary beside it; the whole layout centred */
@@ -359,6 +361,8 @@ button.mv{white-space:nowrap;overflow:hidden}
   .drill-grid.gm .gunder .gp-report .rp-rate b{font-size:22px}
   .drill-grid.gm .gunder .gp-report .rp-rows{font-size:13px;gap:4px 8px}
   .drill-grid.gm .gunder:has(> .gp-report[hidden]), .drill-grid.gm .gunder:has(> .gcoach[hidden]){grid-template-columns:1fr}
+  .drill-grid.gm .gleft{position:relative}
+  .drill-grid.gm #gleft > #back{align-self:flex-start;white-space:nowrap}
   .drill-grid.gm .gcoach{display:flex}
   .drill-grid.gm .gcoach[hidden]{display:none}
   .drill-grid.gm .gcoach .coach-card{flex:1}
@@ -2946,6 +2950,8 @@ function setDrillMode(m){
   $("drill").classList.toggle("gm", g); $("gleft").hidden = !g; $("gcoach").hidden = !g; $("matBox").hidden = !g;
   document.querySelector(".wrap").classList.toggle("wide", g);
   if(g) $("gleft").prepend($("nav")); else $("gpBottom").before($("nav"));
+  // wide screens: "← All games" sits top-left, beside the move buttons
+  if(g && matchMedia("(min-width:1500px)").matches) $("gleft").prepend($("back")); else if($("back").parentElement.id === "gleft") $("matBox").before($("back"));
   const L = m === "live";
   $("live").hidden = !L;
   $("status").hidden = g; $("meta").hidden = g || L;
