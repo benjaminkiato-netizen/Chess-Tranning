@@ -109,6 +109,7 @@ summary{cursor:pointer;font-weight:600}
 .board.cgb cg-board{background-color:var(--sq-l,#eed5a4);background-image:conic-gradient(var(--sq-d,#355a31) 0 25%, transparent 0 50%, var(--sq-d,#355a31) 0 75%, transparent 0);background-size:25% 25%}
 .board.cgb piece{background-size:92% 92%;background-position:center;background-repeat:no-repeat}
 .board.cgb cg-board square.last-move{background-color:rgba(214,40,40,.55)}
+.board.cgb cg-board square.last-move.great{background-color:rgba(60,140,235,.55)}
 .board.cgb cg-board square.selected{background-color:rgba(190,220,50,.85)}
 .board.cgb cg-board square.move-dest{background:radial-gradient(rgba(20,30,20,.28) 26%, transparent 27%)}
 .board.cgb cg-board square.oc.move-dest{background:radial-gradient(transparent 0%, transparent 78%, rgba(20,30,20,.28) 79%)}
@@ -1726,6 +1727,9 @@ function draw(badSq){
   const custom = new Map();
   if(hintSq) custom.set(hintSq, "hint");
   if(badSq) custom.set(badSq, "bad");
+  // a great ("only") move in game review: its from/to squares turn blue instead of the usual last-move colour
+  if(mode === "game" && analysis && viewIdx > 0 && mainline && mainline[viewIdx] && positions[viewIdx]?.fen === mainline[viewIdx].fen
+     && moveKind(viewIdx) === "only" && positions[viewIdx].lm) for(const q of positions[viewIdx].lm) custom.set(q, "great");
   mainCg.set({
     orientation: cgColor(color), fen: game.fen(), turnColor: cgColor(game.turn()),
     lastMove: lastMove || undefined, check: game.in_check() ? cgColor(game.turn()) : false,
