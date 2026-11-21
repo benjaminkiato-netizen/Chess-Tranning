@@ -3822,6 +3822,19 @@ function buildAnalysis(fens, moves, res){
       e.best = best; e.variation = line.join(" ");
       e.judgment = {name, comment: `${name}. ${line[0] || best} was best.`};
     }
+    // already getting mated: a move that lets the mate come much sooner is still a mistake
+    // (win chances are 0% before and after, so the check above can't see it)
+    const mb = res[k-1].mate !== undefined ? res[k-1].mate*s : null, ma = res[k].mate !== undefined ? res[k].mate*s : null;
+    if(!e.judgment && mb !== null && mb < 0 && ma !== null && ma < 0 && best && best.slice(0,4) !== played){
+      const M = -mb, N = -ma;
+      const name = N <= 2 && M - N >= 2 ? "Blunder" : M - N >= 3 ? "Mistake" : null;
+      if(name){
+        st[name.toLowerCase()]++;
+        const line = sanLine(fens[k-1], res[k-1].pv);
+        e.best = best; e.variation = line.join(" ");
+        e.judgment = {name, comment: `${name}. This lets your opponent mate in ${N}. ${line[0] || best} held out longer (mate in ${M}).`};
+      }
+    }
     evals.push(e);
     // rating vs the engine's top 3: best = star, 2nd = thumbs up, anything else that isn't an error = check
     let c = "ok";
