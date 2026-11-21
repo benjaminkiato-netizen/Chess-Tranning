@@ -2177,7 +2177,7 @@ const SND_BASE = "sounds/";
 const SAMPLES = {}; let samplesLoading = null;
 function loadSamples(ac){
   samplesLoading ||= Promise.all(["cc-move", "cc-capture", "cc-check", "cc-promote"].map(n =>
-    fetch(SND_BASE + n + ".mp3").then(r => r.arrayBuffer())
+    fetch(SND_BASE + n + ".mp3?v=2").then(r => r.arrayBuffer())
       .then(b => new Promise((res, rej) => ac.decodeAudioData(b, res, rej)))
       .then(buf => { SAMPLES[n] = buf; }).catch(() => {})));
 }
