@@ -271,6 +271,20 @@ a.playon:focus-visible{outline:2px solid var(--sel);outline-offset:2px}
 .lv-clock{font-size:26px;font-weight:500;padding:2px 10px;border-radius:6px;background:var(--bg);color:var(--muted)}
 .lv-clock.run{color:var(--fg);background:var(--line)}
 .lv-clock.low.run{color:#fff;background:var(--bad)}
+/* live game: presence dots glow green (in game) / red (left); material + 3-column layout */
+.lv-player .dot.on{background:#35d07f;border-color:#2aa866;box-shadow:0 0 7px rgba(53,208,127,.9)}
+.lv-player .dot.off{background:#e5484d;border-color:#c0393d;box-shadow:0 0 7px rgba(229,72,77,.9)}
+.lv-mat{display:flex;align-items:center;justify-content:center;gap:8px;min-height:34px;padding:6px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-weight:600;font-size:16px}
+.lv-mat .adv.up{color:var(--good)} .lv-mat .adv.down{color:var(--bad)} .lv-mat .adv.even{color:var(--muted);font-weight:500}
+.live-left{display:flex;flex-direction:column;gap:14px;min-width:0}
+.drill-grid.livemode{grid-template-columns:minmax(0,1fr)}
+.drill-grid.livemode .bcol{order:1} .drill-grid.livemode .side{order:2} .drill-grid.livemode .gleft{order:3}
+.drill-grid.livemode .gleft .gp-movebox,.drill-grid.livemode .gleft .gcoach{display:none}
+@media(min-width:980px){
+  .drill-grid.livemode{grid-template-columns:300px auto 300px}
+  .drill-grid.livemode .gleft{order:1} .drill-grid.livemode .bcol{order:2} .drill-grid.livemode .side{order:3}
+  .drill-grid.livemode .board{width:min(820px, calc(100vw - 32px - 48px - 300px - 300px - 22px), calc(100vh - 48px));max-width:none;min-width:260px}
+}
 .lv-moves{display:grid;grid-template-columns:30px minmax(0,1fr) minmax(0,1fr);gap:2px 6px;max-height:220px;overflow-y:auto;font-size:14px;
   padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);align-content:start}
 .lmv{padding:3px 6px;font-weight:500;border:0;border-radius:5px;background:none;text-align:left}
@@ -1043,6 +1057,14 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
         <div class="gp-moves" id="gpMoves"></div>
         <div class="gp-comment" id="gpComment"></div>
       </div>
+      <div class="live-left" id="liveLeft" hidden>
+        <div class="lv-moves" id="lvMoves"></div>
+        <div class="lv-nav nav-btns">
+          <button id="lvFirst" aria-label="First move">⏮</button><button id="lvPrev" aria-label="Previous move">◀</button>
+          <button id="lvNext" aria-label="Next move">▶</button><button id="lvLast" aria-label="Back to the current position">⏭</button>
+        </div>
+        <div class="lv-actions" id="lvActions"></div>
+      </div>
     </div>
     <div class="bcol">
     <div class="bw">
@@ -1068,12 +1090,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
     <div class="status" id="status">Loading puzzle…</div>
     <div class="live" id="live" hidden>
       <div class="lv-player" id="lvOpp"><span class="lv-name" id="lvOppName"></span><span class="lv-clock num" id="lvOppClock">–</span></div>
-      <div class="lv-moves" id="lvMoves"></div>
-      <div class="lv-nav nav-btns">
-        <button id="lvFirst" aria-label="First move">⏮</button><button id="lvPrev" aria-label="Previous move">◀</button>
-        <button id="lvNext" aria-label="Next move">▶</button><button id="lvLast" aria-label="Back to the current position">⏭</button>
-      </div>
-      <div class="lv-actions" id="lvActions"></div>
+      <div class="lv-mat" id="lvMat" hidden></div>
       <div class="lv-player me" id="lvMe"><span class="lv-name" id="lvMeName">You</span><span class="lv-clock num" id="lvMeClock">–</span></div>
     </div>
     <div class="gp" id="gpTop" hidden>
@@ -2946,16 +2963,18 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;
 
 function setDrillMode(m){
   const g = m === "game";
+  const L = m === "live";
   $("gpTop").hidden = !g; $("gpBottom").hidden = !g;
   document.querySelector("#drill .side").classList.toggle("gm", g);
-  $("drill").classList.toggle("gm", g); $("gleft").hidden = !g; $("gcoach").hidden = !g; $("matBox").hidden = !g;
-  document.querySelector(".wrap").classList.toggle("wide", g);
+  $("drill").classList.toggle("gm", g); $("drill").classList.toggle("livemode", L);
+  $("gleft").hidden = !(g || L); $("gcoach").hidden = !g; $("matBox").hidden = !g;
+  $("liveLeft").hidden = !L;
+  document.querySelector(".wrap").classList.toggle("wide", g || L);
   if(g) $("gleft").prepend($("nav")); else $("gpBottom").before($("nav"));
   // wide screens: "← All games" sits top-left, beside the move buttons
   if(g && matchMedia("(min-width:1500px)").matches) $("gleft").prepend($("back")); else if($("back").parentElement.id === "gleft") $("matBox").before($("back"));
-  const L = m === "live";
   $("live").hidden = !L;
-  $("status").hidden = g; $("meta").hidden = g || L;
+  $("status").hidden = g || L; $("meta").hidden = g || L;
   document.querySelector("#drill .controls").hidden = g || L;
   $("back").textContent = g ? "← All games" : L ? "← Play" : "← All themes";
   $("navReset").textContent = g ? "Back to the game" : "Back to the solution";
@@ -5085,14 +5104,14 @@ function onLive(id, e){
     if(mode === "live"){ color = live.myColor; liveHeader(); }
     applyLive(e.state, true);
   } else if(e.type === "gameState") applyLive(e);
-  else if(e.type === "opponentGone"){ live.gone = e; if(mode === "live") renderLiveActions(); }
+  else if(e.type === "opponentGone"){ live.gone = e; if(mode === "live"){ renderLiveActions(); liveHeader(); } }
 }
 function liveHeader(){
   const f = live.full, opp = live.myColor === "w" ? f.black : f.white, me = live.myColor === "w" ? f.white : f.black;
   $("d-theme").textContent = `vs ${pname(opp)}`;
   $("d-count").textContent = `${f.rated ? "Rated" : "Casual"} ${f.speed} · ${f.clock ? `${f.clock.initial/60000}+${f.clock.increment/1000}` : ""}`;
-  $("lvOppName").innerHTML = `<i class="dot ${live.myColor === "w" ? "b" : "w"}"></i>${esc(pname(opp))} <span class="muted num">${opp?.rating ?? ""}</span>`;
-  $("lvMeName").innerHTML = `<i class="dot ${live.myColor}"></i>${esc(pname(me))} <span class="muted num">${me?.rating ?? ""}</span>`;
+  $("lvOppName").innerHTML = `<i class="dot ${live.gone?.gone ? "off" : "on"}" title="${live.gone?.gone ? "Opponent left the game" : "Opponent is in the game"}"></i>${esc(pname(opp))} <span class="muted num">${opp?.rating ?? ""}</span>`;
+  $("lvMeName").innerHTML = `<i class="dot on" title="You're in the game"></i>${esc(pname(me))} <span class="muted num">${me?.rating ?? ""}</span>`;
 }
 function applyLive(st, force){
   if(!st) return;
@@ -5112,7 +5131,7 @@ function applyLive(st, force){
   if(fresh && hist.length > 1 && !force) moveSound(hist[hist.length-1].mv);
   if(live.over && !wasOver && !force) setTimeout(endSound, fresh ? 300 : 0);
   if(live.premove && (live.over || live.view != null)) live.premove = null;
-  draw(); renderLiveMoves(); liveStatus(); renderLiveActions(); tickClocks();
+  draw(); renderLiveMoves(); renderLiveMat(); liveStatus(); renderLiveActions(); tickClocks();
   if(live.over) clearInterval(liveTick);
   if(fresh && !force && live.premove && live.view == null && game.turn() === color){
     const p = live.premove; live.premove = null;
@@ -5137,7 +5156,7 @@ function liveNav(i){
   game = live.view == null ? live.game : new Chess(e.fen);
   lastMove = e.lm; selected = null;
   if(i > 0 && e.mv) moveSound(e.mv);
-  draw(); renderLiveMoves(); liveStatus();
+  draw(); renderLiveMoves(); renderLiveMat(); liveStatus();
 }
 function liveMove(from, to, legal){
   if(!live || live.over) return;
@@ -5150,6 +5169,14 @@ function liveMove(from, to, legal){
   fetch(`${LI}/api/board/game/${id}/move/${from}${to}${promo || ""}`, {method:"POST", headers: authHeaders()}).then(r => {
     if(!r.ok && live && live.id === id){ setStatus("Lichess didn't accept that move. Try again.", "bad"); applyLive(live.state, true); }
   }).catch(() => { if(live && live.id === id){ setStatus("That move didn't reach Lichess. Check your connection.", "bad"); applyLive(live.state, true); } });
+}
+function renderLiveMat(){
+  const box = $("lvMat"); if(!box) return;
+  if(!live || !live.state || !game){ box.hidden = true; return; }
+  const adv = matOf(game.fen()) * (live.myColor === "w" ? 1 : -1);
+  const cls = adv > 0 ? "up" : adv < 0 ? "down" : "even";
+  box.hidden = false;
+  box.innerHTML = `<span class="adv ${cls}">${adv > 0 ? "+" + adv : adv < 0 ? "−" + (-adv) : "Even"}</span>`;
 }
 function renderLiveMoves(){
   const H = live.hist || [], cur = live.view == null ? H.length - 1 : live.view;
@@ -5169,6 +5196,10 @@ const RESULT = {mate:"by checkmate", resign:"by resignation", outoftime:"on time
   stalemate:"by stalemate", insufficientMaterialClaim:"by insufficient material", cheat:"", noStart:"because the game didn't start", variantEnd:""};
 function liveStatus(){
   const st = live.state; if(!st) return;
+  // The "Your move / Waiting" box was removed; show the status line only when it carries
+  // something worth reading — a finished game, a viewed past position, or a draw offer.
+  const oppDrawNow = live.myColor === "w" ? st.bdraw : st.wdraw;
+  $("status").hidden = !(live.over || live.view != null || oppDrawNow);
   if(live.view != null && !live.over){
     const k = live.view;
     return setStatus(k === 0 ? "Viewing the start position. Press → or End to go back to the game."
