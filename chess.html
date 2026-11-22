@@ -280,15 +280,18 @@ a.playon:focus-visible{outline:2px solid var(--sel);outline-offset:2px}
 /* opponent / my clock bars flank the board (hidden outside the live game) */
 .lv-board-player{display:none}
 .drill-grid.livemode .lv-board-player{display:flex}
+.lv-adv{font-weight:700;font-size:16px;color:var(--good);padding:0 10px;white-space:nowrap}  /* material edge, shown by whoever is ahead */
 .drill-grid.livemode{grid-template-columns:minmax(0,1fr)}
 .drill-grid.livemode .bcol{order:1} .drill-grid.livemode .side{order:2} .drill-grid.livemode .gleft{order:3}
 .drill-grid.livemode .gleft .gp-movebox,.drill-grid.livemode .gleft .gcoach{display:none}
 .drill-grid.livemode .evalbar{display:none}                          /* so the player bars line up with the board, not the eval column */
 @media(min-width:980px){
-  /* symmetric 300px side columns + centered grid keep the board centered on the page */
+  /* symmetric 300px columns keep the board centered; left column is an empty spacer, moves live on the right */
   .drill-grid.livemode{grid-template-columns:300px auto 300px;align-items:stretch}
-  .drill-grid.livemode .gleft{order:1;justify-content:center}        /* left block (moves/actions) vertically centered */
-  .drill-grid.livemode .bcol{order:2} .drill-grid.livemode .side{order:3}
+  .drill-grid.livemode .gleft{order:1} .drill-grid.livemode .bcol{order:2} .drill-grid.livemode .side{order:3}
+  .drill-grid.livemode #live{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+  .drill-grid.livemode #liveLeft{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+  .drill-grid.livemode #lvMoves{flex:1 1 auto;max-height:none;min-height:0}  /* move list fills the column height */
   .drill-grid.livemode .board{width:min(820px, calc(100vw - 32px - 48px - 300px - 300px - 22px), calc(100vh - 48px));max-width:none;min-width:260px}
 }
 .lv-moves{display:grid;grid-template-columns:30px minmax(0,1fr) minmax(0,1fr);gap:2px 6px;max-height:220px;overflow-y:auto;font-size:14px;
@@ -1063,22 +1066,14 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
         <div class="gp-moves" id="gpMoves"></div>
         <div class="gp-comment" id="gpComment"></div>
       </div>
-      <div class="live-left" id="liveLeft" hidden>
-        <div class="lv-moves" id="lvMoves"></div>
-        <div class="lv-nav nav-btns">
-          <button id="lvFirst" aria-label="First move">⏮</button><button id="lvPrev" aria-label="Previous move">◀</button>
-          <button id="lvNext" aria-label="Next move">▶</button><button id="lvLast" aria-label="Back to the current position">⏭</button>
-        </div>
-        <div class="lv-actions" id="lvActions"></div>
-      </div>
     </div>
     <div class="bcol">
-    <div class="lv-player lv-board-player" id="lvOpp"><span class="lv-name" id="lvOppName"></span><span class="lv-clock num" id="lvOppClock">–</span></div>
+    <div class="lv-player lv-board-player" id="lvOpp"><span class="lv-name" id="lvOppName"></span><span class="lv-adv" id="lvAdvOpp"></span><span class="lv-clock num" id="lvOppClock">–</span></div>
     <div class="bw">
       <div class="evalbar" id="evalbar" aria-hidden="true"><i id="evalFill"></i><span id="evalTxt"></span></div>
       <div class="board" id="board"></div>
     </div>
-    <div class="lv-player me lv-board-player" id="lvMe"><span class="lv-name" id="lvMeName">You</span><span class="lv-clock num" id="lvMeClock">–</span></div>
+    <div class="lv-player me lv-board-player" id="lvMe"><span class="lv-name" id="lvMeName">You</span><span class="lv-adv" id="lvAdvMe"></span><span class="lv-clock num" id="lvMeClock">–</span></div>
     <div class="gunder">
       <div class="gp-report" id="gpReport" hidden></div>
       <div class="gcoach" id="gcoach" hidden>
@@ -1097,7 +1092,14 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
     </div>
     <div class="status" id="status">Loading puzzle…</div>
     <div class="live" id="live" hidden>
-      <div class="lv-mat" id="lvMat" hidden></div>
+      <div class="live-left" id="liveLeft" hidden>
+        <div class="lv-moves" id="lvMoves"></div>
+        <div class="lv-nav nav-btns">
+          <button id="lvFirst" aria-label="First move">⏮</button><button id="lvPrev" aria-label="Previous move">◀</button>
+          <button id="lvNext" aria-label="Next move">▶</button><button id="lvLast" aria-label="Back to the current position">⏭</button>
+        </div>
+        <div class="lv-actions" id="lvActions"></div>
+      </div>
     </div>
     <div class="gp" id="gpTop" hidden>
       <div class="gp-players" id="gpPlayers"></div>
@@ -5178,12 +5180,14 @@ function liveMove(from, to, legal){
   }).catch(() => { if(live && live.id === id){ setStatus("That move didn't reach Lichess. Check your connection.", "bad"); applyLive(live.state, true); } });
 }
 function renderLiveMat(){
-  const box = $("lvMat"); if(!box) return;
-  if(!live || !live.state || !game){ box.hidden = true; return; }
-  const adv = matOf(game.fen()) * (live.myColor === "w" ? 1 : -1);
-  const cls = adv > 0 ? "up" : adv < 0 ? "down" : "even";
-  box.hidden = false;
-  box.innerHTML = `<span class="adv ${cls}">${adv > 0 ? "+" + adv : adv < 0 ? "−" + (-adv) : "Even"}</span>`;
+  const ao = $("lvAdvOpp"), am = $("lvAdvMe");
+  if(!ao || !am) return;
+  if(!live || !live.state || !game){ ao.textContent = am.textContent = ""; return; }
+  const w = matOf(game.fen());                 // white minus black
+  const meAdv = live.myColor === "w" ? w : -w;
+  const fmt = n => n > 0 ? "+" + n : "";        // each bar shows its own edge; the side that's behind shows nothing
+  am.textContent = fmt(meAdv);
+  ao.textContent = fmt(-meAdv);
 }
 function renderLiveMoves(){
   const H = live.hist || [], cur = live.view == null ? H.length - 1 : live.view;
