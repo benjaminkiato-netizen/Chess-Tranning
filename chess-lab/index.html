@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="vendor/chessground.base.css">
   <link rel="stylesheet" href="pieces.css?v=6">
   <link rel="stylesheet" href="app.css?v=lv1">
+  <link rel="stylesheet" href="drills.css?v=1">
 </head>
 <body>
   <div id="err-banner" style="display:none;position:fixed;left:12px;right:12px;bottom:12px;z-index:100;background:#5c1a1a;color:#fff;border:1px solid #ff5e57;border-radius:10px;padding:10px 14px;font:13px/1.4 system-ui,sans-serif;white-space:pre-wrap"></div>
@@ -37,6 +38,7 @@
       <button class="tab" data-tab="review" role="tab">Game Review</button>
       <button class="tab" data-tab="openings" role="tab">Openings</button>
       <button class="tab" data-tab="study" role="tab">Study</button>
+      <button class="tab" data-tab="drills" role="tab">Drills</button>
     </nav>
     <button class="snd" id="theme-btn" title="Board colors" onclick="BoardTheme.open()">🎨</button>
     <button class="snd" id="sync-btn" title="Sync between browsers" onclick="window.HubSync && HubSync.openPanel()">☁</button>
@@ -199,6 +201,49 @@
     </div>
   </main>
 
+  <main id="drills" class="panel">
+    <div class="op-page" id="drill-home">
+      <div class="card op-head">
+        <div>
+          <div class="op-eyebrow">Lines from your studies</div>
+          <h1>Drills</h1>
+          <p class="muted">Play your lines over and over until they stick. Click an opening to start. A wrong move resets your streak; after 3 misses on a move, its squares light up.</p>
+        </div>
+        <div class="op-total"><b id="drill-count">0</b><span>lines</span></div>
+        <div class="op-total"><b id="drill-best">0</b><span>best streak</span></div>
+      </div>
+      <div class="op-grid" id="drill-grid"></div>
+    </div>
+    <div id="drill-run" hidden>
+      <div class="dr-board-col"><div id="drill-board"></div></div>
+      <div class="dr-side">
+        <div class="card">
+          <button class="link" id="dr-back">← All drills</button>
+          <h2 class="dr-title" id="dr-title"></h2>
+          <div class="dr-sub" id="dr-sub"></div>
+          <div class="dr-prog" id="dr-prog"></div>
+        </div>
+        <div class="dr-stats">
+          <div class="dr-stat"><b id="dr-streak">0</b><span>🔥 streak</span></div>
+          <div class="dr-stat"><b id="dr-best">0</b><span>best streak</span></div>
+        </div>
+        <div class="card">
+          <div class="dr-status" id="dr-status"></div>
+          <div class="dr-line" id="dr-line"></div>
+          <div class="dr-btns" style="margin-top:12px">
+            <button id="dr-show" title="Light up the move (counts as a miss)">Show move</button>
+            <button id="dr-restart">Restart line</button>
+            <button id="dr-next">Next line ▸</button>
+          </div>
+        </div>
+        <div class="card">
+          <b>Lines in this opening</b>
+          <ul class="dr-list" id="dr-list"></ul>
+        </div>
+      </div>
+    </div>
+  </main>
+
   <main id="study" class="panel">
     <section class="board-col">
       <div class="board-row">
@@ -267,6 +312,7 @@
           <button id="st-promote" title="Move this line up one level">Promote</button>
           <button id="st-mainline" title="Make this the main line">Make main line</button>
           <button id="st-losing" class="losing-btn">Mark losing</button>
+          <button id="st-to-drills" title="Practise the line up to this move over and over in Drills">🎯 Send to Drills</button>
           <button id="st-hold" title="Save this position to the chess page's Training tab, to practise holding the draw against the engine">🤝 Hold a draw</button>
           <button id="st-delete" class="danger" title="Delete this move and everything after it">Delete from here</button>
         </div>
@@ -283,5 +329,6 @@
 
   <footer>Engines: <a href="https://github.com/Adam-Kulju/Patricia" target="_blank" rel="noopener">Patricia</a> by Adam Kulju (GPL-3.0) · <a href="https://github.com/CSSLab/maia-platform-frontend" target="_blank" rel="noopener">Maia 3</a> by the CSSLab, University of Toronto (GPL-3.0) · <a href="https://github.com/nescitus/rodent-iv" target="_blank" rel="noopener">Rodent IV</a> by Pawel Koziol (GPL-3.0). Everything runs in your browser.</footer>
   <script type="module" src="app.js?v=lv3"></script>
+  <script type="module" src="drills.js?v=1"></script>
 </body>
 </html>

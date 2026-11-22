@@ -1,0 +1,41 @@
+/* Chess Lab · Drills */
+#drills .op-page { width: 100%; }
+.dr-empty { padding: 24px; max-width: 640px; }
+.dr-due { color: var(--orange); }
+#drill-run { display: flex; gap: 24px; align-items: flex-start; justify-content: center; width: 100%; }
+#drill-run[hidden], #drill-home[hidden] { display: none; }
+.dr-board-col { width: min(820px, calc(100vh - 110px), calc(100vw - 420px)); flex: 0 0 auto; }
+#drill-board { width: 100%; aspect-ratio: 1; }
+.dr-side { width: 340px; display: flex; flex-direction: column; gap: 14px; }
+.dr-side .card { padding: 16px; }
+.dr-title { font-size: 22px; font-weight: 800; margin: 0; }
+.dr-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.dr-prog { font-size: 13px; color: var(--muted); margin-top: 8px; }
+.dr-stats { display: flex; gap: 12px; }
+.dr-stat { flex: 1; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.dr-stat b { font-size: 28px; display: block; line-height: 1.1; }
+.dr-stat span { font-size: 12px; color: var(--muted); }
+.dr-status { min-height: 22px; font-weight: 600; }
+.dr-status.good { color: var(--green); }
+.dr-status.bad { color: var(--red); }
+.dr-line { font-size: 14px; line-height: 1.8; }
+.dr-num { color: var(--muted); margin-right: 2px; }
+.dr-mv.done { color: var(--text); }
+.dr-mv.now { background: var(--accent); color: #fff; border-radius: 4px; padding: 0 6px; }
+.dr-mv.todo { color: var(--muted); }
+.dr-mv.missed { text-decoration: underline wavy var(--red); }
+.dr-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.dr-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
+.dr-list li { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 5px 8px; border-radius: 8px; border: 1px solid transparent; }
+.dr-list li.on { border-color: var(--accent); background: rgba(108,92,231,.1); }
+.dr-li-txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dr-del { color: var(--muted); }
+.dr-del:hover { color: var(--red); }
+/* wrong move flash, and the move shown after 3 misses (or "Show move") */
+#drill-board cg-board square.dr-bad { background: rgba(255, 70, 60, .55); }
+#drill-board cg-board square.dr-hint { background: rgba(255, 190, 40, .75); box-shadow: inset 0 0 0 4px rgba(255, 140, 0, .9); }
+#drill-toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; z-index: 1000;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 18px; box-shadow: 0 10px 30px rgba(0,0,0,.4); transition: .25s; max-width: 90vw; }
+#drill-toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+#drill-toast a { color: var(--accent-2); margin-left: 6px; }
+@media (max-width: 900px) { #drill-run { flex-direction: column; align-items: center; } .dr-board-col { width: min(96vw, 70vh); } .dr-side { width: min(96vw, 520px); } }
