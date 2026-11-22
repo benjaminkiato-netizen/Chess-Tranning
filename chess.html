@@ -281,8 +281,12 @@ a.playon:focus-visible{outline:2px solid var(--sel);outline-offset:2px}
 .drill-grid.livemode .bcol{order:1} .drill-grid.livemode .side{order:2} .drill-grid.livemode .gleft{order:3}
 .drill-grid.livemode .gleft .gp-movebox,.drill-grid.livemode .gleft .gcoach{display:none}
 @media(min-width:980px){
-  .drill-grid.livemode{grid-template-columns:300px auto 300px}
-  .drill-grid.livemode .gleft{order:1} .drill-grid.livemode .bcol{order:2} .drill-grid.livemode .side{order:3}
+  /* symmetric 300px side columns + centered grid keep the board centered on the page */
+  .drill-grid.livemode{grid-template-columns:300px auto 300px;align-items:stretch}
+  .drill-grid.livemode .gleft{order:1;justify-content:center}        /* left block (moves/actions) vertically centered */
+  .drill-grid.livemode .bcol{order:2} .drill-grid.livemode .side{order:3}
+  .drill-grid.livemode #live{flex:1 1 auto;display:flex;flex-direction:column;gap:14px}
+  .drill-grid.livemode #lvMe{margin-top:auto}                        /* my name+clock sits at the board's base */
   .drill-grid.livemode .board{width:min(820px, calc(100vw - 32px - 48px - 300px - 300px - 22px), calc(100vh - 48px));max-width:none;min-width:260px}
 }
 .lv-moves{display:grid;grid-template-columns:30px minmax(0,1fr) minmax(0,1fr);gap:2px 6px;max-height:220px;overflow-y:auto;font-size:14px;
