@@ -277,16 +277,18 @@ a.playon:focus-visible{outline:2px solid var(--sel);outline-offset:2px}
 .lv-mat{display:flex;align-items:center;justify-content:center;gap:8px;min-height:34px;padding:6px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-weight:600;font-size:16px}
 .lv-mat .adv.up{color:var(--good)} .lv-mat .adv.down{color:var(--bad)} .lv-mat .adv.even{color:var(--muted);font-weight:500}
 .live-left{display:flex;flex-direction:column;gap:14px;min-width:0}
+/* opponent / my clock bars flank the board (hidden outside the live game) */
+.lv-board-player{display:none}
+.drill-grid.livemode .lv-board-player{display:flex}
 .drill-grid.livemode{grid-template-columns:minmax(0,1fr)}
 .drill-grid.livemode .bcol{order:1} .drill-grid.livemode .side{order:2} .drill-grid.livemode .gleft{order:3}
 .drill-grid.livemode .gleft .gp-movebox,.drill-grid.livemode .gleft .gcoach{display:none}
+.drill-grid.livemode .evalbar{display:none}                          /* so the player bars line up with the board, not the eval column */
 @media(min-width:980px){
   /* symmetric 300px side columns + centered grid keep the board centered on the page */
   .drill-grid.livemode{grid-template-columns:300px auto 300px;align-items:stretch}
   .drill-grid.livemode .gleft{order:1;justify-content:center}        /* left block (moves/actions) vertically centered */
   .drill-grid.livemode .bcol{order:2} .drill-grid.livemode .side{order:3}
-  .drill-grid.livemode #live{flex:1 1 auto;display:flex;flex-direction:column;gap:14px}
-  .drill-grid.livemode #lvMe{margin-top:auto}                        /* my name+clock sits at the board's base */
   .drill-grid.livemode .board{width:min(820px, calc(100vw - 32px - 48px - 300px - 300px - 22px), calc(100vh - 48px));max-width:none;min-width:260px}
 }
 .lv-moves{display:grid;grid-template-columns:30px minmax(0,1fr) minmax(0,1fr);gap:2px 6px;max-height:220px;overflow-y:auto;font-size:14px;
@@ -1071,10 +1073,12 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
       </div>
     </div>
     <div class="bcol">
+    <div class="lv-player lv-board-player" id="lvOpp"><span class="lv-name" id="lvOppName"></span><span class="lv-clock num" id="lvOppClock">–</span></div>
     <div class="bw">
       <div class="evalbar" id="evalbar" aria-hidden="true"><i id="evalFill"></i><span id="evalTxt"></span></div>
       <div class="board" id="board"></div>
     </div>
+    <div class="lv-player me lv-board-player" id="lvMe"><span class="lv-name" id="lvMeName">You</span><span class="lv-clock num" id="lvMeClock">–</span></div>
     <div class="gunder">
       <div class="gp-report" id="gpReport" hidden></div>
       <div class="gcoach" id="gcoach" hidden>
@@ -1093,9 +1097,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
     </div>
     <div class="status" id="status">Loading puzzle…</div>
     <div class="live" id="live" hidden>
-      <div class="lv-player" id="lvOpp"><span class="lv-name" id="lvOppName"></span><span class="lv-clock num" id="lvOppClock">–</span></div>
       <div class="lv-mat" id="lvMat" hidden></div>
-      <div class="lv-player me" id="lvMe"><span class="lv-name" id="lvMeName">You</span><span class="lv-clock num" id="lvMeClock">–</span></div>
     </div>
     <div class="gp" id="gpTop" hidden>
       <div class="gp-players" id="gpPlayers"></div>
@@ -2978,6 +2980,7 @@ function setDrillMode(m){
   // wide screens: "← All games" sits top-left, beside the move buttons
   if(g && matchMedia("(min-width:1500px)").matches) $("gleft").prepend($("back")); else if($("back").parentElement.id === "gleft") $("matBox").before($("back"));
   $("live").hidden = !L;
+  $("d-count").hidden = L; $("d-theme").hidden = L;   // live game: drop the "Casual Rapid · vs Stockfish" header text
   $("status").hidden = g || L; $("meta").hidden = g || L;
   document.querySelector("#drill .controls").hidden = g || L;
   $("back").textContent = g ? "← All games" : L ? "← Play" : "← All themes";
