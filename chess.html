@@ -280,6 +280,7 @@ a.playon:focus-visible{outline:2px solid var(--sel);outline-offset:2px}
 /* opponent / my clock bars flank the board (hidden outside the live game) */
 .lv-board-player{display:none}
 .drill-grid.livemode .lv-board-player{display:flex}
+.drill-grid.livemode .gleft > #back{align-self:flex-start}   /* "← Play" sits as a compact chip at the top-left, level with the opponent bar */
 .lv-adv{font-weight:700;font-size:16px;color:var(--good);padding:0 10px;white-space:nowrap}  /* material edge, shown by whoever is ahead */
 .drill-grid.livemode{grid-template-columns:minmax(0,1fr)}
 .drill-grid.livemode .bcol{order:1} .drill-grid.livemode .side{order:2} .drill-grid.livemode .gleft{order:3}
@@ -2979,8 +2980,9 @@ function setDrillMode(m){
   $("liveLeft").hidden = !L;
   document.querySelector(".wrap").classList.toggle("wide", g || L);
   if(g) $("gleft").prepend($("nav")); else $("gpBottom").before($("nav"));
-  // wide screens: "← All games" sits top-left, beside the move buttons
-  if(g && matchMedia("(min-width:1500px)").matches) $("gleft").prepend($("back")); else if($("back").parentElement.id === "gleft") $("matBox").before($("back"));
+  // wide screens: "← All games" sits top-left, beside the move buttons; live: "← Play" goes to the empty left column
+  if((g && matchMedia("(min-width:1500px)").matches) || L) $("gleft").prepend($("back")); else if($("back").parentElement.id === "gleft") $("matBox").before($("back"));
+  document.querySelector("#drill .drill-top").hidden = L;   // live: header row goes away so the move panel fills from the top
   $("live").hidden = !L;
   $("d-count").hidden = L; $("d-theme").hidden = L;   // live game: drop the "Casual Rapid · vs Stockfish" header text
   $("status").hidden = g || L; $("meta").hidden = g || L;
