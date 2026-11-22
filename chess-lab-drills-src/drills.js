@@ -101,6 +101,32 @@ function groups() {
   }
   return [...G.values()].sort((a, b) => b.lines.length - a.lines.length || a.family.localeCompare(b.family));
 }
+let managing = false;
+function renderManage() {
+  const box = $('drill-manage');
+  box.hidden = !managing;
+  $('drill-manage-btn').textContent = managing ? 'Done' : '✎ Manage lines';
+  $('drill-grid').hidden = managing;
+  if (!managing) return;
+  const G = groups();
+  box.innerHTML = G.length ? G.map((g) => `<div class="card dm-group">
+      <div class="dm-head"><b>${esc(g.family)}</b> <span class="muted">· you play ${g.color} · ${g.lines.length} line${g.lines.length === 1 ? '' : 's'}</span>
+        <button class="dm-del-all" data-fam="${esc(g.family)}" data-color="${g.color}">Delete all</button></div>
+      <ul class="dm-lines">${g.lines.map((l) => `<li><span class="dm-txt">${esc(lineText(l.sans))}</span>
+        <span class="muted">${l.tries ? `${l.clean}/${l.tries} clean` : 'new'}</span>
+        <button class="dm-del" data-id="${l.id}">Delete</button></li>`).join('')}</ul></div>`).join('')
+    : '<div class="card dr-empty">No lines to manage.</div>';
+  box.querySelectorAll('.dm-del').forEach((b) => b.addEventListener('click', () => {
+    const l = D.lines.find((x) => x.id === b.dataset.id); if (!l) return;
+    if (!confirm(`Delete this line from your drills?\n\n${lineText(l.sans)}`)) return;
+    D.lines = D.lines.filter((x) => x.id !== l.id); save(); renderHome();
+  }));
+  box.querySelectorAll('.dm-del-all').forEach((b) => b.addEventListener('click', () => {
+    const n = D.lines.filter((x) => x.family === b.dataset.fam && x.color === b.dataset.color).length;
+    if (!confirm(`Delete all ${n} ${b.dataset.fam} line${n === 1 ? '' : 's'} (you play ${b.dataset.color})?`)) return;
+    D.lines = D.lines.filter((x) => !(x.family === b.dataset.fam && x.color === b.dataset.color)); save(); renderHome();
+  }));
+}
 function renderHome() {
   practice = null;
   $('drill-home').hidden = false; $('drill-run').hidden = true;
@@ -130,6 +156,9 @@ function renderHome() {
       <p class="muted">In <b>Study</b>, step to the last move of a line you want to know by heart and click <b>🎯 Send to Drills</b>.
       Lines are grouped by opening here, and you play the side the Study board is turned to.</p></div>`;
   $('drill-grid').querySelectorAll('.op-card').forEach((c) => c.addEventListener('click', () => startFamily(c.dataset.fam, c.dataset.color)));
+  if (!D.lines.length) managing = false;
+  $('drill-manage-btn').hidden = !D.lines.length;
+  renderManage();
 }
 
 // ---------- practice ----------
@@ -288,7 +317,7 @@ function renderSide() {
   $('dr-list').innerHTML = lines.map((x, j) => `<li class="${x.id === l.id ? 'on' : ''}">
       <span class="dr-li-txt" title="${esc(lineText(x.sans))}">${esc(lineText(x.sans).slice(0, 70))}${lineText(x.sans).length > 70 ? '…' : ''}</span>
       <span class="muted">${x.tries ? `${x.clean}/${x.tries}` : 'new'}</span>
-      <button class="link dr-del" data-id="${x.id}" title="Remove this line from your drills">✕</button></li>`).join('');
+      <button class="dr-del" data-id="${x.id}" title="Delete this line from your drills">Delete</button></li>`).join('');
   $('dr-list').querySelectorAll('.dr-del').forEach((b) => b.addEventListener('click', (e) => {
     e.stopPropagation();
     const x = D.lines.find((y) => y.id === b.dataset.id);
@@ -305,6 +334,7 @@ function renderSide() {
 // ---------- wire up ----------
 function init() {
   hookStudy();
+  $('drill-manage-btn').addEventListener('click', () => { managing = !managing; renderManage(); });
   $('dr-back').addEventListener('click', () => { if (practice) clearTimeout(practice.timer); renderHome(); });
   $('dr-next').addEventListener('click', () => { if (practice) nextLine(); });
   $('dr-restart').addEventListener('click', () => { if (practice) { clearTimeout(practice.timer); startLine(); } });

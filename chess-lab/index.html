@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="vendor/chessground.base.css">
   <link rel="stylesheet" href="pieces.css?v=6">
   <link rel="stylesheet" href="app.css?v=lv1">
-  <link rel="stylesheet" href="drills.css?v=1">
+  <link rel="stylesheet" href="drills.css?v=2">
 </head>
 <body>
   <div id="err-banner" style="display:none;position:fixed;left:12px;right:12px;bottom:12px;z-index:100;background:#5c1a1a;color:#fff;border:1px solid #ff5e57;border-radius:10px;padding:10px 14px;font:13px/1.4 system-ui,sans-serif;white-space:pre-wrap"></div>
@@ -211,8 +211,10 @@
         </div>
         <div class="op-total"><b id="drill-count">0</b><span>lines</span></div>
         <div class="op-total"><b id="drill-best">0</b><span>best streak</span></div>
+        <button class="dr-manage-btn" id="drill-manage-btn">✎ Manage lines</button>
       </div>
       <div class="op-grid" id="drill-grid"></div>
+      <div id="drill-manage" hidden></div>
     </div>
     <div id="drill-run" hidden>
       <div class="dr-board-col"><div id="drill-board"></div></div>
@@ -329,6 +331,6 @@
 
   <footer>Engines: <a href="https://github.com/Adam-Kulju/Patricia" target="_blank" rel="noopener">Patricia</a> by Adam Kulju (GPL-3.0) · <a href="https://github.com/CSSLab/maia-platform-frontend" target="_blank" rel="noopener">Maia 3</a> by the CSSLab, University of Toronto (GPL-3.0) · <a href="https://github.com/nescitus/rodent-iv" target="_blank" rel="noopener">Rodent IV</a> by Pawel Koziol (GPL-3.0). Everything runs in your browser.</footer>
   <script type="module" src="app.js?v=lv3"></script>
-  <script type="module" src="drills.js?v=1"></script>
+  <script type="module" src="drills.js?v=2"></script>
 </body>
 </html>
