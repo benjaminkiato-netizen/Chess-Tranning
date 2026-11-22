@@ -2228,7 +2228,14 @@ function sample(ac, t, name, vol = 1){
 }
 const pickMove = () => "cc-move";
 // get the sounds ready on your first click, so the very first move already uses them
-document.addEventListener("pointerdown", () => { if(S.sound) try{ ctx(); }catch(e){} }, {once: true, capture: true});
+// Firefox / Brave / Safari only let a page start audio from a full click, tap or key press (not a bare
+// mouse-down), so keep trying on every such event until the audio engine is really running
+const AUDIO_EVENTS = ["pointerdown", "pointerup", "click", "keydown", "touchend"];
+function unlockAudio(){
+  if(!S.sound) return;
+  try{ const ac = ctx(); if(ac.state === "running") AUDIO_EVENTS.forEach(t => document.removeEventListener(t, unlockAudio, true)); }catch(e){}
+}
+AUDIO_EVENTS.forEach(t => document.addEventListener(t, unlockAudio, true));
 function knock(ac, t, freq, len, vol){
   // short filtered noise burst = the "clack" of wood on wood
   const n = Math.floor(ac.sampleRate*len), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
