@@ -507,6 +507,11 @@ a.link{color:var(--accent);font-weight:600;font-size:14px}
 .tabs .homelink{margin:0 10px 0 0}
 .tabs button{background:none;border-color:transparent;color:var(--muted);font-weight:600}
 .tabs button.on{background:var(--surface);border-color:var(--line);color:var(--fg)}
+/* Puzzles sub-menu: Today / Dashboard / Training / Rated / Rush */
+.tabs.subtabs{margin-top:8px;padding:4px;gap:4px;width:auto;max-width:1080px;justify-content:flex-start;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.tabs.subtabs button{font-size:14px;padding:6px 14px}
+.tabs.subtabs button.on{background:var(--accent, #6c5ce7);border-color:transparent;color:#fff}
+.tabs.subtabs[hidden]{display:none}
 
 /* dashboard */
 :root{--teal:#1f9fae;--teal-2:#167784;--gold:#c9a227;--gold-fg:#1c1606;--miss:#c9374f}
@@ -733,16 +738,19 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
 
   <nav class="tabs" id="tabs" aria-label="Chess sections">
     <a href="index.html" class="homelink">← Home</a>
-    <button data-view="home" class="on" id="tabToday">Today</button>
-    <button data-view="dash" id="tabDash">Dashboard</button>
-    <button data-view="train" id="tabTrain">Training</button>
-    <button data-view="rated" id="tabRated">Rated</button>
-    <button data-view="rush" id="tabRush">Rush</button>
+    <button id="tabPuz" class="on">Puzzles</button>
     <button data-view="sn" id="tabSN">Mistake Drills</button>
     <button data-view="games" id="tabGames">Games</button>
     <button data-view="play" id="tabPlay">Play</button>
     <button class="themebtn" style="margin:0 0 0 auto" title="Board colors" onclick="BoardTheme.open()">🎨</button>
     <a href="chess-lab/" class="homelink">Spar &amp; Review →</a>
+  </nav>
+  <nav class="tabs subtabs" id="puzTabs" aria-label="Puzzles">
+    <button data-view="home" class="on" id="tabToday">Today</button>
+    <button data-view="dash" id="tabDash">Dashboard</button>
+    <button data-view="train" id="tabTrain">Training</button>
+    <button data-view="rated" id="tabRated">Rated</button>
+    <button data-view="rush" id="tabRush">Rush</button>
   </nav>
 
   <!-- PLAY -->
@@ -1434,6 +1442,10 @@ function show(view){
   $("sn").hidden = view!=="sn"; $("tabSN").classList.toggle("on", view==="sn");
   if(view !== "rush" && typeof rushLeave === "function") rushLeave();
   $("tabs").hidden = view==="drill";
+  const inPuz = ["home", "dash", "train", "rated", "rush"].includes(view);
+  $("tabPuz").classList.toggle("on", inPuz);
+  $("puzTabs").hidden = !inPuz;
+  if(inPuz) try { localStorage.setItem("chess.puzSub", view); } catch(e){}
   $("tabToday").classList.toggle("on", view==="home"); $("tabDash").classList.toggle("on", view==="dash");
   if(view !== "drill") window.scrollTo(0,0);
 }
@@ -2344,6 +2356,11 @@ function goTo(view){
   else { show("home"); renderHome(); }
 }
 $("tabToday").onclick = () => { show("home"); renderHome(); };
+// "Puzzles" opens the puzzle section you were last on (Today by default)
+$("tabPuz").onclick = () => {
+  let v = "home"; try { v = localStorage.getItem("chess.puzSub") || "home"; } catch(e){}
+  ({home: $("tabToday"), dash: $("tabDash"), train: $("tabTrain"), rated: $("tabRated"), rush: $("tabRush")}[v] || $("tabToday")).click();
+};
 $("tabDash").onclick = () => { show("dash"); renderRushDash(); loadDash(); };
 $("sendLichess").checked = S.submit;
 $("sendLichess").onchange = e => { S.submit = e.target.checked; save(); renderSendNote(); if(S.submit) flushOutbox().catch(()=>{}); };
