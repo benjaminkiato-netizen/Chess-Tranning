@@ -68,6 +68,9 @@ button.ghost{font:600 14px var(--body);color:var(--fg);background:var(--panel);b
 .item.has-p .note,.item.has-p .review{grid-column:2/-1}
 .poster{width:72px;aspect-ratio:2/3;border-radius:8px;overflow:hidden;background:var(--panel2);border:1px solid var(--line);display:grid;place-items:center;color:var(--muted);font:600 22px var(--body)}
 .poster img{width:100%;height:100%;object-fit:cover;display:block}
+.item .by{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.genres{display:inline-flex;flex-wrap:wrap;gap:4px}
+.genre{font:500 11.5px var(--body);color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
 .poster.loading{animation:pl 1.2s ease-in-out infinite}
 @keyframes pl{50%{opacity:.5}}
 .item .side{display:flex;gap:8px;align-items:center;justify-content:flex-end;grid-row:1/3;grid-column:2}
@@ -144,6 +147,8 @@ dialog .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
   <input id="fTitle" autocomplete="off">
   <label for="fBy" id="fByLabel">Author</label>
   <input id="fBy" autocomplete="off">
+  <label for="fGenre">Genre <small style="color:var(--muted)">(filled in automatically if left empty)</small></label>
+  <input id="fGenre" autocomplete="off" placeholder="e.g. Comedy, Romance">
   <label for="fNote">Note</label>
   <textarea id="fNote" rows="3"></textarea>
   <label for="fPoster">Poster / cover image <small style="color:var(--muted)">(optional: paste an image link if the automatic one is wrong)</small></label>
@@ -295,7 +300,7 @@ function render(){
   // list
   const q = view.q.trim().toLowerCase();
   let items = S.items.filter(i => (view.type==="all"||i.type===view.type) && (view.status==="all"||i.status===view.status||(view.status==="rated"&&i.rating))
-    && (!q || (i.title+" "+i.by+" "+i.note).toLowerCase().includes(q)));
+    && (!q || (i.title+" "+i.by+" "+(i.genre||"")+" "+i.note).toLowerCase().includes(q)));
   const byTitle = (a,b) => a.title.localeCompare(b.title);
   items.sort({
     status:(a,b)=>STATUS_ORDER.indexOf(a.status)-STATUS_ORDER.indexOf(b.status) || b.added-a.added,
@@ -312,7 +317,7 @@ function render(){
         <button class="icon" data-act="edit" title="Edit">✎</button>
         <button class="icon" data-act="del" title="Delete">✕</button>
       </div>
-      ${i.by ? `<div class="by">${esc(i.by)}</div>` : ""}
+      ${metaHTML(i)}
       ${i.note ? `<p class="note">${esc(i.note)}</p>` : ""}
       ${i.review ? `<p class="review"><b>My take</b>${esc(i.review)}</p>` : ""}
     </div>`).join("") : `<div class="empty">Nothing here${q?" for that search":""}.</div>`;
@@ -330,27 +335,43 @@ if(!PC){   // first run of v2: keep the book and anime covers, look movies up ag
     localStorage.removeItem("library.posters.v1"); localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){} }
 const pKey = i => `${i.type}|${i.title.toLowerCase()}|${(i.by||"").toLowerCase()}`;
 const ICON = {book:"📖", movie:"🎬", anime:"📺"};
+function metaHTML(i){
+  if(!i.by && !i.genre) return "";
+  const g = (i.genre || "").split(",").map(x => x.trim()).filter(Boolean).map(x => `<span class="genre">${esc(x)}</span>`).join("");
+  return `<div class="by">${i.by ? esc(i.by) : ""}${g ? `<span class="genres">${g}</span>` : ""}</div>`;
+}
 function posterHTML(i){
   const url = i.poster || PC[pKey(i)]?.url;
   if(url) return `<div class="poster"><img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.textContent='${ICON[i.type]||"🎞"}'"></div>`;
   const looking = !PC[pKey(i)];
   return `<div class="poster${looking ? " loading" : ""}" title="${looking ? "Looking for a cover…" : "No cover found. Edit to paste an image link."}">${ICON[i.type]||"🎞"}</div>`;
 }
+const BOOK_GENRES = [["Science fiction",/science fiction|sci-fi/],["Fantasy",/\bfantasy\b/],["Horror",/\bhorror\b/],["Mystery",/\bmystery|detective/],
+  ["Thriller",/thriller|suspense/],["Romance",/\bromance\b|love stories/],["Humor",/humou?r|comic|satire/],["Historical fiction",/historical fiction/],
+  ["Adventure",/adventure/],["Dystopia",/dystopia/],["Space opera",/space opera/],["Cyberpunk",/cyberpunk/],["Biography",/biograph|memoir/],
+  ["Philosophy",/philosophy/],["Self-help",/self-help|self help/],["Short stories",/short stories/],["Young adult",/young adult/],["Nonfiction",/nonfiction|non-fiction/]];
 const yearOf = by => (String(by||"").match(/\b(19|20)\d{2}\b/)||[])[0] || "";
 async function getJSON(u){ const r = await fetch(u); if(!r.ok) throw new Error(r.status); return r.json(); }   // busy / rate-limited: try again later
 async function findPoster(i){
   const t = i.title.replace(/\s*\(.*?\)\s*/g, " ").trim();
   if(i.type === "book"){
-    const u = `https://openlibrary.org/search.json?title=${encodeURIComponent(t)}${i.by ? "&author=" + encodeURIComponent(i.by) : ""}&limit=5&fields=cover_i`;
+    const F = "&limit=5&fields=cover_i,subject,first_publish_year";
+    const u = `https://openlibrary.org/search.json?title=${encodeURIComponent(t)}${i.by ? "&author=" + encodeURIComponent(i.by) : ""}${F}`;
     let j = await getJSON(u);
     let d = (j.docs||[]).find(x => x.cover_i);
-    if(!d && i.by){ j = await getJSON(`https://openlibrary.org/search.json?q=${encodeURIComponent(t)}&limit=5&fields=cover_i`); d = (j.docs||[]).find(x => x.cover_i); }
-    return d ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : null;
+    if(!d && i.by){ j = await getJSON(`https://openlibrary.org/search.json?q=${encodeURIComponent(t)}${F}`); d = (j.docs||[]).find(x => x.cover_i); }
+    d ||= (j.docs||[])[0];
+    // Open Library subjects are messy; keep only the ones that are real genres
+    const subj = (j.docs||[]).flatMap(x => x.subject || []).map(x => x.toLowerCase());
+    const genre = BOOK_GENRES.filter(([g, re]) => subj.some(x => re.test(x))).map(([g]) => g).slice(0, 3).join(", ");
+    return {url: d?.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : null, genre};
   }
   if(i.type === "anime"){
     const j = await getJSON(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(t)}&limit=1&sfw=true`);
     const a = j.data?.[0];
-    return a?.images?.jpg?.large_image_url || a?.images?.jpg?.image_url || null;
+    return {url: a?.images?.jpg?.large_image_url || a?.images?.jpg?.image_url || null,
+      genre: (a?.genres || []).map(g => g.name).slice(0, 3).join(", "),
+      year: a?.year || a?.aired?.prop?.from?.year || "", studio: a?.studios?.[0]?.name || ""};
   }
   // movie: the lead image of the film's own Wikipedia article is the poster. Posters aren't freely licensed,
   // so ask for any licence (pilicense=any), and only accept an article whose title is the movie itself,
@@ -359,29 +380,57 @@ async function findPoster(i){
   const isFilm = title => { const n = norm(title), base = norm(title.replace(/\s*\(.*\)\s*$/, ""));
     return base === want && (n === want || /\bfilm\b|\bmovie\b/.test(n) || (y && n.includes(y))); };
   for(const q of [`${t} ${y} film`, `${t} film`, t]){
-    const u = `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=8&prop=pageimages&piprop=thumbnail&pithumbsize=342&pilicense=any`;
+    const u = `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=8&prop=pageimages|pageprops&ppprop=wikibase_item&piprop=thumbnail&pithumbsize=342&pilicense=any`;
     const j = await getJSON(u);
     const pages = Object.values(j.query?.pages || {}).filter(p => p.thumbnail && isFilm(p.title));
     // best: the year's film, then any "(film)" article, then the plain title
     pages.sort((a, b) => (y && b.title.includes(y)) - (y && a.title.includes(y)) || /film/i.test(b.title) - /film/i.test(a.title) || a.index - b.index);
-    if(pages[0]) return pages[0].thumbnail.source;
+    if(pages[0]) return {url: pages[0].thumbnail.source, ...(await filmFacts(pages[0].pageprops?.wikibase_item))};
   }
-  return null;
+  return {url: null};
+}
+// genres + release year of a film from Wikidata (the data behind Wikipedia)
+async function filmFacts(qid){
+  if(!qid) return {};
+  try{
+    const W = "https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&origin=*";
+    const e = (await getJSON(`${W}&ids=${qid}&props=claims`)).entities?.[qid];
+    const year = (e?.claims?.P577?.[0]?.mainsnak?.datavalue?.value?.time || "").slice(1, 5);
+    const gids = (e?.claims?.P136 || []).map(c => c.mainsnak?.datavalue?.value?.id).filter(Boolean).slice(0, 4);
+    let genre = "";
+    if(gids.length){
+      const L = (await getJSON(`${W}&ids=${gids.join("|")}&props=labels&languages=en`)).entities || {};
+      genre = gids.map(id => L[id]?.labels?.en?.value).filter(Boolean)
+        .map(g => g.replace(/\s+film$/i, "").replace(/^./, c => c.toUpperCase())).filter((g, k, a) => a.indexOf(g) === k).slice(0, 3).join(", ");
+    }
+    return {genre, year};
+  }catch(err){ return {}; }
 }
 let pBusy = false; const pQueue = [];
 function queuePosters(items){
-  for(const i of items) if(!i.poster && !PC[pKey(i)] && !pQueue.some(x => pKey(x) === pKey(i))) pQueue.push(i);
+  // look up items with no cover yet, and items never checked for a genre
+  for(const i of items) if(((!i.poster && !PC[pKey(i)]) || (!i.genre && !i.looked)) && !pQueue.some(x => x.id === i.id)) pQueue.push(i);
   if(!pBusy) pumpPosters();
 }
 async function pumpPosters(){
   pBusy = true;
   while(pQueue.length){
     const i = pQueue.shift(), k = pKey(i);
-    let url = null, failed = false;
-    try{ url = await findPoster(i); }catch(e){ failed = true; }
-    if(!failed){ PC[k] = {url, t: Date.now()}; try{ localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){} }
+    let info = null, failed = false;
+    try{ info = await findPoster(i); }catch(e){ failed = true; }
+    if(!failed){
+      PC[k] = {url: info?.url || null, t: Date.now()}; try{ localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){}
+      // fill in what's still empty (never overwrite what you typed): genre, and the year for movies / anime
+      let changed = false;
+      if(info?.genre && !i.genre){ i.genre = info.genre; changed = true; }
+      if(!i.by && info?.year && i.type !== "book"){ i.by = i.type === "anime" && info.studio ? `${info.year} / ${info.studio}` : String(info.year); changed = true; }
+      if(!i.looked){ i.looked = 1; changed = true; }   // remembered (and synced), so it isn't looked up again
+      if(changed){ save(); }
+    }
     const el = document.querySelector(`.item[data-id="${i.id}"] .poster`);
     if(el && !failed) el.outerHTML = posterHTML(i);
+    const by = document.querySelector(`.item[data-id="${i.id}"] .by`), byHTML = metaHTML(i);
+    if(!failed){ if(by) by.outerHTML = byHTML; else if(byHTML) document.querySelector(`.item[data-id="${i.id}"] .t`)?.insertAdjacentHTML("afterend", byHTML); }
     await new Promise(r => setTimeout(r, i.type === "anime" ? 450 : 150));   // Jikan allows about 3 requests a second
   }
   pBusy = false;
@@ -421,7 +470,7 @@ function openDlg(it){
   editing = it || null;
   const type = it?.type || (view.type==="all" ? "book" : view.type);
   $("dlgTitle").textContent = it ? "Edit" : "Add to library";
-  $("fType").value = type; $("fTitle").value = it?.title||""; $("fBy").value = it?.by||""; $("fNote").value = it?.note||""; $("fPoster").value = it?.poster||"";
+  $("fType").value = type; $("fTitle").value = it?.title||""; $("fBy").value = it?.by||""; $("fNote").value = it?.note||""; $("fPoster").value = it?.poster||""; $("fGenre").value = it?.genre||"";
   $("fByLabel").textContent = TYPES[type].by; fillStatus(type, it?.status||"todo");
   fillRating(it?.rating||0); $("fReview").value = it?.review||""; showRate();
   $("dlg").showModal(); $("fTitle").focus();
@@ -432,10 +481,11 @@ $("addBtn").onclick = () => openDlg(null);
 $("dlgCancel").onclick = () => $("dlg").close();
 $("dlgSave").onclick = () => {
   const title = $("fTitle").value.trim(); if(!title){ $("fTitle").focus(); return; }
-  const data = { type:$("fType").value, title, by:$("fBy").value.trim(), note:$("fNote").value.trim(), status:$("fStatus").value, rating:+$("fRating").value, review:$("fReview").value.trim(), poster:$("fPoster").value.trim() };
+  const data = { type:$("fType").value, title, by:$("fBy").value.trim(), note:$("fNote").value.trim(), status:$("fStatus").value, rating:+$("fRating").value, review:$("fReview").value.trim(), poster:$("fPoster").value.trim(), genre:$("fGenre").value.trim() };
+  if(!data.genre) delete data.genre;
   if(!data.poster) delete data.poster;
   if(!["done","dropped"].includes(data.status)){ delete data.rating; delete data.review; }
-  if(editing){ if(!data.poster) delete editing.poster; Object.assign(editing, data); }
+  if(editing){ if(!data.poster) delete editing.poster; if(!data.genre){ delete editing.genre; delete editing.looked; } Object.assign(editing, data); }
   else S.items.push({ id:uid(), rating:0, added:Date.now(), ...data });
   $("dlg").close(); save();
 };
