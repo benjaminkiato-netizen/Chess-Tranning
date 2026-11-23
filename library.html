@@ -338,6 +338,9 @@ if(!PC){   // first run of v2: keep the book and anime covers, look movies up ag
   PC = {}; try{ const old = JSON.parse(localStorage.getItem("library.posters.v1")) || {};
     for(const [k, v] of Object.entries(old)) if(!k.startsWith("movie|")) PC[k] = v;
     localStorage.removeItem("library.posters.v1"); localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){} }
+const pFail = {};   // lookups that failed (site busy), and when to try them again
+// one-time: anime remembered as "no cover" get another try with the backup sources
+if(!PC.__anime2){ for(const k of Object.keys(PC)) if(k.startsWith("anime|") && !PC[k]?.url) delete PC[k]; PC.__anime2 = 1; try{ localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){} }
 const pKey = i => `${i.type}|${i.title.toLowerCase()}|${(i.by||"").toLowerCase()}`;
 const ICON = {book:"📖", movie:"🎬", anime:"📺"};
 function metaHTML(i){
@@ -348,8 +351,8 @@ function metaHTML(i){
 function posterHTML(i){
   const url = i.poster || PC[pKey(i)]?.url;
   if(url) return `<div class="poster"><img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.textContent='${ICON[i.type]||"🎞"}'"></div>`;
-  const looking = !PC[pKey(i)];
-  return `<div class="poster${looking ? " loading" : ""}" title="${looking ? "Looking for a cover…" : "No cover found. Edit to paste an image link."}">${ICON[i.type]||"🎞"}</div>`;
+  const looking = !PC[pKey(i)], retry = pFail[pKey(i)];
+  return `<div class="poster${looking && !retry ? " loading" : ""}" title="${retry ? "The cover site was busy. Trying again shortly…" : looking ? "Looking for a cover…" : "No cover found. Edit to paste an image link."}">${ICON[i.type]||"🎞"}</div>`;
 }
 const BOOK_GENRES = [["Science fiction",/science fiction|sci-fi/],["Fantasy",/\bfantasy\b/],["Horror",/\bhorror\b/],["Mystery",/\bmystery|detective/],
   ["Thriller",/thriller|suspense/],["Romance",/\bromance\b|love stories/],["Humor",/humou?r|comic|satire/],["Historical fiction",/historical fiction/],
@@ -372,11 +375,17 @@ async function findPoster(i){
     return {url: d?.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : null, genre};
   }
   if(i.type === "anime"){
-    const j = await getJSON(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(t)}&limit=1&sfw=true`);
-    const a = j.data?.[0];
-    return {url: a?.images?.jpg?.large_image_url || a?.images?.jpg?.image_url || null,
-      genre: (a?.genres || []).map(g => g.name).slice(0, 3).join(", "),
-      year: a?.year || a?.aired?.prop?.from?.year || "", studio: a?.studios?.[0]?.name || ""};
+    let jikanErr = null, a = null;
+    try{ a = (await getJSON(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(t)}&limit=1&sfw=true`)).data?.[0]; }catch(e){ jikanErr = e; }
+    const url = a?.images?.jpg?.large_image_url || a?.images?.jpg?.image_url;
+    if(url) return {url, genre: (a.genres || []).map(g => g.name).slice(0, 3).join(", "),
+      year: a.year || a.aired?.prop?.from?.year || "", studio: a.studios?.[0]?.name || ""};
+    // MyAnimeList busy or no match: the show's own Wikipedia article, then TMDB if you've added a key
+    const w = await wikiImage(t, /\b(tv series|anime|manga|film)\b/, yearOf(i.by));
+    if(w) return w;
+    if(tmdbKey()){ try{ const m = await tmdbFind(i); if(m.url) return m; }catch(e){ if(e.badKey) tmdbBad(); } }
+    if(jikanErr) throw jikanErr;   // try again later rather than remembering "no cover"
+    return {url: null};
   }
   // movie: the lead image of the film's own Wikipedia article is the poster. Posters aren't freely licensed,
   // so ask for any licence (pilicense=any), and only accept an article whose title is the movie itself,
@@ -434,6 +443,16 @@ async function tmdbFind(i){
     year: (hit.release_date || hit.first_air_date || "").slice(0, 4)};
 }
 
+// lead image of the article that IS this title ("Paranoia Agent", "Ergo Proxy (TV series)"), never some other page
+async function wikiImage(t, kindRe, y){
+  const norm = x => x.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(), want = norm(t);
+  const ok = title => { const n = norm(title), base = norm(title.replace(/\s*\(.*\)\s*$/, "")); return base === want && (n === want || kindRe.test(n) || (y && n.includes(y))); };
+  const u = `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${encodeURIComponent(t)}&gsrlimit=8&prop=pageimages|pageprops&ppprop=wikibase_item&piprop=thumbnail&pithumbsize=342&pilicense=any`;
+  const pages = Object.values((await getJSON(u)).query?.pages || {}).filter(p => p.thumbnail && ok(p.title)).sort((a, b) => a.index - b.index);
+  if(!pages[0]) return null;
+  return {url: pages[0].thumbnail.source, ...(await filmFacts(pages[0].pageprops?.wikibase_item))};
+}
+
 // genres + release year of a film from Wikidata (the data behind Wikipedia)
 async function filmFacts(qid){
   if(!qid) return {};
@@ -479,7 +498,8 @@ $("tmdbBtn").onclick = async () => {
 let pBusy = false; const pQueue = [];
 function queuePosters(items){
   // look up items with no cover yet, and items never checked for a genre
-  for(const i of items) if(((!i.poster && !PC[pKey(i)]) || (!i.genre && !i.looked)) && !pQueue.some(x => x.id === i.id)) pQueue.push(i);
+  const now = Date.now();
+  for(const i of items) if(((!i.poster && !PC[pKey(i)]) || (!i.genre && !i.looked)) && !(pFail[pKey(i)]?.until > now) && !pQueue.some(x => x.id === i.id)) pQueue.push(i);
   if(!pBusy) pumpPosters();
 }
 async function pumpPosters(){
@@ -487,21 +507,28 @@ async function pumpPosters(){
   while(pQueue.length){
     const i = pQueue.shift(), k = pKey(i);
     let info = null, failed = false;
-    try{ info = await findPoster(i); }catch(e){ failed = true; }
+    try{ info = await findPoster(i); delete pFail[k]; }
+    catch(e){   // busy / rate-limited / offline: wait 30 s, then 1, 2, 4 … up to 10 minutes before retrying this one
+      failed = true;
+      const n = (pFail[k]?.n || 0) + 1, wait = Math.min(600e3, 30e3 * 2 ** (n - 1));
+      pFail[k] = {n, until: Date.now() + wait};
+      setTimeout(() => queuePosters(S.items), wait + 200);
+    }
     if(!failed){
       PC[k] = {url: info?.url || null, t: Date.now()}; try{ localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){}
       // fill in what's still empty (never overwrite what you typed): genre, and the year for movies / anime
       let changed = false;
       if(info?.genre && !i.genre){ i.genre = info.genre; changed = true; }
       if(!i.by && info?.year && i.type !== "book"){ i.by = i.type === "anime" && info.studio ? `${info.year} / ${info.studio}` : String(info.year); changed = true; }
-      if(!i.looked){ i.looked = 1; changed = true; }   // remembered (and synced), so it isn't looked up again
+      if(!i.looked){ i.looked = 1; changed = true; }
+      if(pKey(i) !== k){ PC[pKey(i)] = PC[k]; try{ localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){} }   // the year was just filled in: remember the cover under the new name too   // remembered (and synced), so it isn't looked up again
       if(changed){ save(); }
     }
     const el = document.querySelector(`.item[data-id="${i.id}"] .poster`);
     if(el && !failed) el.outerHTML = posterHTML(i);
     const by = document.querySelector(`.item[data-id="${i.id}"] .by`), byHTML = metaHTML(i);
     if(!failed){ if(by) by.outerHTML = byHTML; else if(byHTML) document.querySelector(`.item[data-id="${i.id}"] .t`)?.insertAdjacentHTML("afterend", byHTML); }
-    await new Promise(r => setTimeout(r, i.type === "anime" ? 450 : 150));   // Jikan allows about 3 requests a second
+    await new Promise(r => setTimeout(r, i.type === "anime" ? 1100 : 200));   // MyAnimeList (Jikan) allows about 60 lookups a minute
   }
   pBusy = false;
   renderTmdbHint();
