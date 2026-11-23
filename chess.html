@@ -103,6 +103,8 @@ summary{cursor:pointer;font-weight:600}
 .sq.tgt.occ::after{width:88%;height:88%;background:transparent;box-shadow:inset 0 0 0 4px rgba(20,30,20,.28)}
 .sq.pre::before{content:"";position:absolute;inset:0;background:rgba(40,80,210,.55)}
 .sq.mine{cursor:grab}
+.plink{color:inherit;text-decoration:none}
+.plink:hover{text-decoration:underline;color:var(--accent-2, var(--accent))}
 /* chessground (Lichess's board, the same one Chess Lab / Study uses) */
 .board.cgb{display:block;position:relative}
 .board.cgb .cg-host{width:100%;height:100%}
@@ -3036,6 +3038,13 @@ function setDrillMode(m){
     ? "Click any move or use ← → to step through. Play your own moves to try other lines; the engine follows."
     : "Explore freely: move any piece for either side. Use ← → to step through moves.";
 }
+// a player's name in a game as a link to their profile (Lichess or Chess.com); computer opponents stay plain
+const playerLink = (p, g) => {
+  const n = esc(playerName(p)), id = p && !p.aiLevel && (p.user?.name || p.user?.id);
+  if(!id) return n;
+  const url = isCC(g) ? `https://www.chess.com/member/${encodeURIComponent(id)}` : `https://lichess.org/@/${encodeURIComponent(id)}`;
+  return `<a class="plink" href="${url}" target="_blank" rel="noopener" title="Open ${n}'s ${isCC(g) ? "Chess.com" : "Lichess"} profile">${n}</a>`;
+};
 const playerName = p => p?.user?.name || (p?.aiLevel ? `Stockfish level ${p.aiLevel}` : "Anonymous");
 const isCC = g => g?.site === "chesscom";
 const siteName = () => S.gameSite === "chesscom" ? "Chess.com" : "Lichess";
@@ -3415,7 +3424,7 @@ function renderGameTop(){
     const p = c === "w" ? g.players.white : g.players.black, st = A?.players?.[c];
     const rd = p.ratingDiff;
     return `<div class="gp-pl">
-      <div class="gp-pl-top"><i class="dot ${c}"></i><span class="nm">${esc(playerName(p))}</span>${c===me?'<span class="tt">You</span>':""}
+      <div class="gp-pl-top"><i class="dot ${c}"></i><span class="nm">${playerLink(p, g)}</span>${c===me?'<span class="tt">You</span>':""}
         <span class="num muted">${p.rating ?? ""}${rd!=null?` <span class="rd ${rd>=0?"up":"down"}">${rd>=0?"+":""}${rd}</span>`:""}</span></div>
       ${st ? `<div class="gp-st"><span class="acc num">${st.accuracy ?? "–"}%</span>
         <span class="j inacc num" title="Inaccuracies">${st.inaccuracy}?!</span><span class="j mist num" title="Mistakes">${st.mistake}?</span>
@@ -3543,7 +3552,7 @@ function renderReport(){
     const rows = order.filter(kd => cnt[c][kd] || ["best", "inacc", "mist", "blun"].includes(kd)).map(kd =>
       `<span class="bdg" style="background:${BADGE[kd].bg}" title="${BADGE[kd].t}">${BADGE[kd].html}</span><span>${names[kd]}</span><span class="n num">${cnt[c][kd] || 0}</span>`).join("");
     return `<div>
-      <div class="rp-h"><i class="dot ${c}"></i><span class="nm">${esc(playerName(p))}</span>${c === me ? '<span class="tt">You</span>' : ""}</div>
+      <div class="rp-h"><i class="dot ${c}"></i><span class="nm">${playerLink(p, g)}</span>${c === me ? '<span class="tt">You</span>' : ""}</div>
       <div class="rp-rate" title="Estimated from this game's accuracy (${st.accuracy ?? "?"}%) and average centipawn loss (ACPL ${acpl ?? "?"}). A rough guide, not an official rating.">
         <b class="num">${rating ? "≈" + rating : "–"}</b><span class="summary">${rating ? "game rating" : "too few moves to estimate"}</span></div>
       <div class="rp-rows">${rows}</div></div>`;
@@ -5141,6 +5150,9 @@ function cancelPending(){
 }
 
 /* the live game itself, on your board */
+// a player's name as a link to their Lichess profile (computer opponents have no profile)
+const plink = p => { const n = esc(pname(p)), id = p && !p.aiLevel && (p.id || p.name);
+  return id ? `<a class="plink" href="https://lichess.org/@/${encodeURIComponent(id)}" target="_blank" rel="noopener" title="Open ${n}'s Lichess profile">${n}</a>` : n; };
 const pname = p => !p ? "Opponent" : p.aiLevel ? `Stockfish level ${p.aiLevel}` : `${p.title ? p.title + " " : ""}${p.name || p.id || "Anonymous"}`;
 function openLive(id){
   if(!(live && live.id === id)){
@@ -5173,8 +5185,8 @@ function liveHeader(){
   const f = live.full, opp = live.myColor === "w" ? f.black : f.white, me = live.myColor === "w" ? f.white : f.black;
   $("d-theme").textContent = `vs ${pname(opp)}`;
   $("d-count").textContent = `${f.rated ? "Rated" : "Casual"} ${f.speed} · ${f.clock ? `${f.clock.initial/60000}+${f.clock.increment/1000}` : ""}`;
-  $("lvOppName").innerHTML = `<i class="dot ${live.gone?.gone ? "off" : "on"}" title="${live.gone?.gone ? "Opponent left the game" : "Opponent is in the game"}"></i>${esc(pname(opp))} <span class="muted num">${opp?.rating ?? ""}</span>`;
-  $("lvMeName").innerHTML = `<i class="dot on" title="You're in the game"></i>${esc(pname(me))} <span class="muted num">${me?.rating ?? ""}</span>`;
+  $("lvOppName").innerHTML = `<i class="dot ${live.gone?.gone ? "off" : "on"}" title="${live.gone?.gone ? "Opponent left the game" : "Opponent is in the game"}"></i>${plink(opp)} <span class="muted num">${opp?.rating ?? ""}</span>`;
+  $("lvMeName").innerHTML = `<i class="dot on" title="You're in the game"></i>${plink(me)} <span class="muted num">${me?.rating ?? ""}</span>`;
 }
 function applyLive(st, force){
   if(!st) return;
