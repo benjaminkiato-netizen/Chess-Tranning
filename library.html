@@ -72,6 +72,9 @@ button.ghost{font:600 14px var(--body);color:var(--fg);background:var(--panel);b
 .genres{display:inline-flex;flex-wrap:wrap;gap:4px}
 .genre{font:500 11.5px var(--body);color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
 .poster.loading{animation:pl 1.2s ease-in-out infinite}
+.tmdb-hint{background:var(--panel);border:1px dashed var(--line);border-radius:12px;padding:10px 14px;margin:0 0 12px;color:var(--muted);font-size:14px}
+.tmdb-hint[hidden]{display:none}
+.tmdb-hint button{margin-left:8px}
 @keyframes pl{50%{opacity:.5}}
 .item .side{display:flex;gap:8px;align-items:center;justify-content:flex-end;grid-row:1/3;grid-column:2}
 @media (max-width:620px){.item{grid-template-columns:minmax(0,1fr)}.item .side{grid-row:auto;grid-column:1;justify-content:flex-start;flex-wrap:wrap;order:5;gap:4px;margin-top:4px}
@@ -134,9 +137,11 @@ dialog .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
       <option value="rating">Sort: top rated</option>
     </select>
     <button class="pri" id="addBtn">+ Add</button>
+    <button class="ghost" id="tmdbBtn" title="The Movie Database: posters and genres for movies that aren't on Wikipedia">🎬 TMDB key</button>
   </div>
 
-  <div class="list" id="list"></div>
+  <div class="tmdb-hint" id="tmdbHint" hidden></div>
+<div class="list" id="list"></div>
 </div>
 
 <dialog id="dlg">
@@ -385,10 +390,50 @@ async function findPoster(i){
     const pages = Object.values(j.query?.pages || {}).filter(p => p.thumbnail && isFilm(p.title));
     // best: the year's film, then any "(film)" article, then the plain title
     pages.sort((a, b) => (y && b.title.includes(y)) - (y && a.title.includes(y)) || /film/i.test(b.title) - /film/i.test(a.title) || a.index - b.index);
-    if(pages[0]) return {url: pages[0].thumbnail.source, ...(await filmFacts(pages[0].pageprops?.wikibase_item))};
+    if(pages[0]){
+      const w = {url: pages[0].thumbnail.source, ...(await filmFacts(pages[0].pageprops?.wikibase_item))};
+      if(!w.genre && tmdbKey()){ try{ const m = await tmdbFind(i); w.genre = m.genre || ""; w.year ||= m.year; }catch(e){ if(e.badKey) tmdbBad(); } }
+      return w;
+    }
   }
+  if(tmdbKey()){ try{ const m = await tmdbFind(i); if(m.url) return m; }catch(e){ if(e.badKey) tmdbBad(); else throw e; } }
   return {url: null};
 }
+// ---- The Movie Database (TMDB): fallback for movies with no Wikipedia article. Needs your own free key,
+// kept only in this browser (the name has no "library." prefix, so it is never synced).
+const TMDB_KEY = "tmdbKey";
+const tmdbKey = () => { try{ return (localStorage.getItem(TMDB_KEY) || "").trim(); }catch(e){ return ""; } };
+async function tmdb(path, params = {}){
+  const k = tmdbKey(); if(!k) return null;
+  const long = k.length > 40;   // a long "API Read Access Token" goes in a header; the short "API key" in the URL
+  const q = new URLSearchParams({...params, ...(long ? {} : {api_key: k})});
+  const r = await fetch(`https://api.themoviedb.org/3/${path}?${q}`, long ? {headers: {Authorization: `Bearer ${k}`}} : {});
+  if(r.status === 401) throw Object.assign(new Error("bad key"), {badKey: true});
+  if(!r.ok) throw new Error(r.status);
+  return r.json();
+}
+let TMDB_GENRES = null;
+async function tmdbGenres(){
+  if(TMDB_GENRES) return TMDB_GENRES;
+  const [m, t] = await Promise.all([tmdb("genre/movie/list", {language: "en-US"}), tmdb("genre/tv/list", {language: "en-US"})]);
+  TMDB_GENRES = new Map([...(m?.genres || []), ...(t?.genres || [])].map(g => [g.id, g.name]));
+  return TMDB_GENRES;
+}
+async function tmdbFind(i){
+  const t = i.title.replace(/\s*\(.*?\)\s*/g, " ").trim(), y = yearOf(i.by);
+  let j = await tmdb("search/movie", {query: t, include_adult: "false", ...(y ? {year: y} : {})});
+  let hit = (j?.results || []).find(x => x.poster_path) || null;
+  if(!hit){   // TV films and episodes (e.g. "Into the Dark" entries) are often filed as TV
+    j = await tmdb("search/multi", {query: t, include_adult: "false"});
+    hit = (j?.results || []).find(x => x.poster_path && (x.media_type === "movie" || x.media_type === "tv")) || null;
+  }
+  if(!hit) return {};
+  const G = await tmdbGenres();
+  return {url: `https://image.tmdb.org/t/p/w342${hit.poster_path}`,
+    genre: (hit.genre_ids || []).map(id => G.get(id)).filter(Boolean).slice(0, 3).join(", "),
+    year: (hit.release_date || hit.first_air_date || "").slice(0, 4)};
+}
+
 // genres + release year of a film from Wikidata (the data behind Wikipedia)
 async function filmFacts(qid){
   if(!qid) return {};
@@ -406,6 +451,31 @@ async function filmFacts(qid){
     return {genre, year};
   }catch(err){ return {}; }
 }
+function tmdbBad(){ try{ localStorage.removeItem(TMDB_KEY); }catch(e){} toast("TMDB didn't accept that key, so it was removed. Check it and add it again."); renderTmdbHint(); }
+function renderTmdbHint(){
+  const h = $("tmdbHint"); if(!h) return;
+  const missing = S.items.filter(i => i.type === "movie" && !i.poster && PC[pKey(i)] && !PC[pKey(i)].url).length;
+  $("tmdbBtn").textContent = tmdbKey() ? "🎬 TMDB ✓" : "🎬 TMDB key";
+  h.hidden = !missing || !!tmdbKey();
+  h.innerHTML = `${missing} movie${missing === 1 ? " has" : "s have"} no poster because ${missing === 1 ? "it isn't" : "they aren't"} on Wikipedia. A free TMDB key fills ${missing === 1 ? "it" : "them"} in. <button class="ghost" onclick="$('tmdbBtn').click()">Add key</button>`;
+}
+$("tmdbBtn").onclick = async () => {
+  const cur = tmdbKey();
+  const v = prompt(cur
+    ? "Your TMDB key is saved in this browser. Paste a new one to replace it, or clear the box to remove it:"
+    : "Paste your TMDB API key (the short \"API Key\" or the long \"API Read Access Token\").\n\nGet one free: themoviedb.org → sign up → Settings → API → request a key (Developer, personal use).\n\nIt's stored only in this browser and never synced.", cur);
+  if(v === null) return;
+  try{ v.trim() ? localStorage.setItem(TMDB_KEY, v.trim()) : localStorage.removeItem(TMDB_KEY); }catch(e){}
+  TMDB_GENRES = null;
+  if(v.trim()){
+    try{ await tmdb("configuration"); toast("TMDB key works. Looking up the missing posters…"); }
+    catch(e){ if(e.badKey){ tmdbBad(); return; } toast("Couldn't reach TMDB right now; it will try again later."); }
+    // look again at movies that have no poster or no genre yet
+    for(const i of S.items) if(i.type === "movie"){ if(PC[pKey(i)] && !PC[pKey(i)].url) delete PC[pKey(i)]; if(!i.genre) delete i.looked; }
+    try{ localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){}
+  }
+  render(); renderTmdbHint();
+};
 let pBusy = false; const pQueue = [];
 function queuePosters(items){
   // look up items with no cover yet, and items never checked for a genre
@@ -434,6 +504,7 @@ async function pumpPosters(){
     await new Promise(r => setTimeout(r, i.type === "anime" ? 450 : 150));   // Jikan allows about 3 requests a second
   }
   pBusy = false;
+  renderTmdbHint();
 }
 
 $("tabs").onclick = e => { const t = e.target.closest(".tab"); if(!t) return; view.type = t.dataset.t; render(); };
