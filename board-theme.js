@@ -6,7 +6,7 @@
  */
 (() => {
   'use strict';
-  const KEY = 'chesslab.boardTheme', PKEY = 'chesslab.pieceSet', V = 7;
+  const KEY = 'chesslab.boardTheme', PKEY = 'chesslab.pieceSet', V = 8;
   const BASE = new URL('chess-lab/pieces/', document.currentScript ? document.currentScript.src : location.href).href;
   const THEMES = [
     { id: 'classic', name: 'Classic Green', l: '#eed5a4', d: '#355a31' },
@@ -19,8 +19,10 @@
     { id: 'bw', name: 'Black & White', l: '#e3e3e3', d: '#2c2c2b' },
     { id: 'darkgreen', name: 'Dark Green', l: '#c3e4ae', d: '#1d4a1e' },
     { id: 'slate', name: 'Slate', l: '#c1cfdb', d: '#2f4252' },
+    { id: 'iceblue', name: 'Ice Blue', l: '#e2e2e2', d: '#7690c6' },
   ];
   const SETS = [
+    { id: 'classic', name: 'Classic' },   // the site's original pieces
     { id: 'cartoon', name: 'Cartoon' },
     { id: 'geometric', name: 'Geometric' },
     { id: 'outlined', name: 'Outlined' },
