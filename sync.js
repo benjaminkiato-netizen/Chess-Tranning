@@ -19,7 +19,7 @@
     pauseUntil: 'hubSync.pauseUntil', lastPush: 'hubSync.lastPush',
   };
   const PUSH_EVERY = 90_000;   // at most one upload per 90 s across all tabs (GitHub limits how often a gist can be edited)
-  const SYNCED_PREFIXES = ['dailyPuzzleDrill.', 'chesslab.', 'library.'];
+  const SYNCED_PREFIXES = ['dailyPuzzleDrill.', 'chesslab.', 'library.', 'thailand.'];
   const NEVER_SYNC = new Set(['chesslab.inbox', 'chesslab.studies.history']);
   const PUZZLE_KEY = 'dailyPuzzleDrill.v1';
   const PUZZLE_LOCAL_ONLY = ['token', 'pool', 'ganalysis'];

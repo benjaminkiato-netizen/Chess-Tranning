@@ -8,10 +8,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
-/* Layout: centered greeting, three equal doors (Trading | Chess | Library) that stack on phones. Dark to match the apps. */
+/* Layout: centered greeting, four equal doors (Trading | Chess | Library | Thailand) that stack on phones. Dark to match the apps. */
 :root{
   --bg:#0b0d10; --panel:#13171c; --line:#262d36; --fg:#e6e9ee; --muted:#8b95a3;
-  --trade:#22c55e; --trade-red:#ef4444; --chess:#eed5a4; --chess-dark:#355a31; --lib:#a78bfa;
+  --trade:#22c55e; --trade-red:#ef4444; --chess:#eed5a4; --chess-dark:#355a31; --lib:#a78bfa; --thai:#fb923c;
   --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
   --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
@@ -25,7 +25,7 @@ body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--body);
 .hello{display:flex;flex-direction:column;gap:6px}
 .eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
 h1{font-family:var(--display);font-size:clamp(30px,5vw,48px);line-height:1.08;margin:0;text-wrap:balance;font-weight:700}
-.doors{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.doors{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
 @media (max-width:1000px){.doors{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:700px){.doors{grid-template-columns:minmax(0,1fr)}}
 a.door{display:flex;flex-direction:column;gap:18px;text-decoration:none;color:inherit;background:var(--panel);border:1px solid var(--line);
@@ -34,6 +34,7 @@ a.door{display:flex;flex-direction:column;gap:18px;text-decoration:none;color:in
 a.door.trade:hover,a.door.trade:focus-visible{border-color:var(--trade)}
 a.door.chess:hover,a.door.chess:focus-visible{border-color:var(--chess)}
 a.door.lib:hover,a.door.lib:focus-visible{border-color:var(--lib)}
+a.door.thai:hover,a.door.thai:focus-visible{border-color:var(--thai)}
 a.door:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
 .art{height:150px;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center}
 .trade .art{background:#0e1115;border:1px solid var(--line)}
@@ -50,9 +51,11 @@ h2{font-family:var(--display);font-size:28px;margin:0;line-height:1.1}
   border-radius:999px;padding:7px 14px;cursor:pointer}
 .syncbtn:hover{border-color:var(--muted)}
 .syncbtn.on{border-color:#2f7d4f}
-.trade .go{color:var(--trade)} .chess .go{color:var(--chess)} .lib .go{color:var(--lib)}
+.trade .go{color:var(--trade)} .chess .go{color:var(--chess)} .lib .go{color:var(--lib)} .thai .go{color:var(--thai)}
 .lib .art{background:#120f1c;border:1px solid var(--line)}
 .lib .art svg{width:100%;height:100%}
+.thai .art{background:#1a120b;border:1px solid var(--line)}
+.thai .art svg{width:100%;height:100%}
 </style>
 </head>
 <body>
@@ -91,6 +94,15 @@ h2{font-family:var(--display);font-size:28px;margin:0;line-height:1.1}
       <div><h2>Library</h2><p>Books, movies and anime to get through.</p></div>
       <div class="stat" id="libStat"></div>
       <span class="go">Open library →</span>
+    </a>
+
+    <a class="door thai" href="thailand.html">
+      <div class="art" aria-hidden="true">
+        <svg viewBox="0 0 300 150" preserveAspectRatio="xMidYMax meet"><g id="skyline"></g></svg>
+      </div>
+      <div><h2>Thailand</h2><p>Bangkok move: budget, apartments, money and visa plan.</p></div>
+      <div class="stat" id="thaiStat"></div>
+      <span class="go">Open plan →</span>
     </a>
   </div>
 </div>
@@ -154,6 +166,27 @@ document.getElementById("greet").textContent = (h<12?"Good morning, Dede.":h<18?
     ? `<span>Done <b>${n("done")}/${items.filter(i=>i.status!=="dropped").length}</b></span>` + (n("doing") ? `<span>In progress <b>${n("doing")}</b></span>` : "")
       + (() => { const r = items.filter(i => i.rating); return r.length ? `<span>Avg <b>★ ${(r.reduce((a,i)=>a+i.rating,0)/r.length).toFixed(1)}</b></span>` : ""; })()
     : `<span>Your recommendations are waiting</span>`;
+})();
+
+// Bangkok skyline + BTS viaduct art, and the move plan's monthly buffer
+(function(){
+  let seed = 11, x = 12, out = "";
+  const rnd = () => (seed = (seed*9301+49297)%233280)/233280;
+  const cols = ["#fb923c","#c2410c","#fdba74","#9a3412","#fbbf72"];
+  while(x < 288){
+    const w = 12 + rnd()*16, h = 34 + rnd()*62;
+    out += `<rect x="${x}" y="${108-h}" width="${w}" height="${h}" fill="${cols[Math.floor(rnd()*cols.length)]}" opacity="${0.45+rnd()*0.4}"/>`;
+    x += w + 3;
+  }
+  out += `<rect x="0" y="108" width="300" height="6" fill="#3a2a1c"/>`;
+  for(let p=24;p<300;p+=46) out += `<rect x="${p}" y="114" width="6" height="30" fill="#3a2a1c"/>`;
+  out += `<rect x="70" y="96" width="120" height="12" rx="4" fill="#e6e9ee"/><rect x="74" y="99" width="112" height="3" fill="#22c55e"/>`;
+  document.getElementById("skyline").innerHTML = out;
+  let T = null; try{ T = JSON.parse(localStorage.getItem("thailand.budget.v1")); }catch(e){}
+  const n = v => { const k = parseFloat(v); return isFinite(k) ? k : 0; };
+  let buf = 333;
+  if (T && Array.isArray(T.v)) buf = n(T.va) + n(T.bal)*n(T.apy)/100/12 - T.v.reduce((a,v)=>a+n(v),0);
+  document.getElementById("thaiStat").innerHTML = `<span>Buffer <b>$${Math.round(buf).toLocaleString("en-US")}/mo</b></span><span>Move <b>Mar 2027</b></span>`;
 })();
 </script>
 <script>
