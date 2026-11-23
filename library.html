@@ -31,8 +31,19 @@ a{color:inherit}
 h1{font-family:var(--display);font-size:clamp(30px,5vw,44px);line-height:1.05;margin:0}
 .sub{color:var(--muted);margin:4px 0 0}
 .progress{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-@media (max-width:560px){.progress{gap:8px}.pcard{padding:10px}.pcard .row{flex-direction:column;gap:0}.pcard b{font-size:15px}.pcard span{font-size:12px}}
-.pcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+@media (max-width:560px){.progress{gap:8px}.pcard{padding:12px;min-height:0}.pcard .row{flex-direction:column;gap:0}.pcard .big{flex-direction:column;align-items:flex-start;gap:4px}.pcard .big b{font-size:17px}.pcard .big em{margin-left:0}.pcard .ico{font-size:26px}.pcard span{font-size:12px}}
+.pcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 20px 16px;display:flex;flex-direction:column;gap:10px;
+  color:var(--fg);font:inherit;text-align:left;cursor:pointer;min-height:150px;transition:border-color .15s,transform .15s,background .15s}
+.pcard:hover{border-color:#4a4466;transform:translateY(-2px)}
+.pcard.on{border-color:var(--lib);background:#1d1830;box-shadow:0 0 0 1px var(--lib) inset}
+.pcard .big{display:flex;align-items:center;gap:12px}
+.pcard .ico{font-size:34px;line-height:1}
+.pcard .big b{font-size:24px}
+.pcard .big em{font-style:normal;font-family:var(--mono);font-size:14px;color:var(--muted);margin-left:auto}
+.viewing{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--line);padding:4px 2px 10px}
+.viewing b{font-family:var(--display);font-size:18px}
+.viewing span{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.viewing button{margin-left:auto;background:none;border:0;color:var(--lib);font:600 14px var(--body);cursor:pointer}
 .pcard .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .pcard b{font-family:var(--display);font-size:17px;font-weight:700}
 .pcard span{font-family:var(--mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -125,7 +136,7 @@ dialog .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
 
   <div class="progress" id="progress"></div>
 
-  <div class="tabs" id="tabs" role="tablist"></div>
+  <div id="tabs"></div>
 
   <div class="tools">
     <div class="chips" id="chips"></div>
@@ -290,13 +301,17 @@ function render(){
     const pct = all.length ? Math.round(done/all.length*100) : 0;
     const rated = S.items.filter(i => i.type===t && i.rating);
     const avg = rated.length ? (rated.reduce((a,i)=>a+i.rating,0)/rated.length).toFixed(1) : null;
-    return `<div class="pcard"><div class="row"><b>${m.label}</b><span>${done}/${all.length} ${t==="book"?"read":"watched"}</span></div><div class="bar"><i style="width:${pct}%"></i></div>`
-      + `<div class="row"><span>${avg ? `avg <span class="avg">★ ${avg}/10</span>` : "no ratings yet"}</span><span>${rated.length ? rated.length+" rated" : ""}</span></div></div>`;
+    const n = S.items.filter(i => i.type===t).length;
+    return `<button class="pcard ${view.type===t?"on":""}" data-t="${t}" title="${view.type===t ? "Show everything" : "Show only " + m.label.toLowerCase()}">`
+      + `<div class="big"><span class="ico">${ICON[t]||""}</span><b>${m.label}</b><em>${n}</em></div>`
+      + `<div class="row"><span>${done}/${all.length} ${t==="book"?"read":"watched"}</span><span>${pct}%</span></div><div class="bar"><i style="width:${pct}%"></i></div>`
+      + `<div class="row"><span>${avg ? `avg <span class="avg">★ ${avg}/10</span>` : "no ratings yet"}</span><span>${rated.length ? rated.length+" rated" : ""}</span></div></button>`;
   }).join("");
   // tabs
   const count = t => S.items.filter(i => t==="all" || i.type===t).length;
-  $("tabs").innerHTML = [["all","All"],...Object.entries(TYPES).map(([k,m])=>[k,m.label])].map(([k,l]) =>
-    `<button class="tab ${view.type===k?"on":""}" data-t="${k}" role="tab">${l}<small>${count(k)}</small></button>`).join("");
+  $("tabs").innerHTML = view.type === "all"
+    ? `<div class="viewing"><b>Everything</b><span>${count("all")}</span><span style="margin-left:auto">Click Books, Movies or Anime above to see just those</span></div>`
+    : `<div class="viewing"><b>${ICON[view.type]||""} ${TYPES[view.type].label}</b><span>${count(view.type)}</span><button data-t="all">Show all (${count("all")}) ✕</button></div>`;
   // status chips
   const tt = view.type==="all" ? null : view.type;
   $("chips").innerHTML = [["all","All"],...["todo","doing","done","dropped"].map(s=>[s,statusLabel(s,tt)]),["rated","★ Rated"]].map(([k,l]) =>
@@ -453,6 +468,13 @@ async function wikiImage(t, kindRe, y){
   return {url: pages[0].thumbnail.source, ...(await filmFacts(pages[0].pageprops?.wikibase_item))};
 }
 
+// Wikidata names genres wordily ("horror anime and manga", "psychological horror fiction", "comedy film")
+function cleanGenre(g){
+  return String(g || "").trim().replace(/\s+(anime and manga|anime|manga|films?|novel|television series|tv series)$/i, "")
+    .replace(/(?<!science|historical)\s+fiction$/i, "").replace(/^./, c => c.toUpperCase());   // keep "Science fiction"
+}
+const cleanGenres = str => String(str || "").split(",").map(cleanGenre).filter((g, k, a) => g && a.indexOf(g) === k).join(", ");
+
 // genres + release year of a film from Wikidata (the data behind Wikipedia)
 async function filmFacts(qid){
   if(!qid) return {};
@@ -465,7 +487,7 @@ async function filmFacts(qid){
     if(gids.length){
       const L = (await getJSON(`${W}&ids=${gids.join("|")}&props=labels&languages=en`)).entities || {};
       genre = gids.map(id => L[id]?.labels?.en?.value).filter(Boolean)
-        .map(g => g.replace(/\s+film$/i, "").replace(/^./, c => c.toUpperCase())).filter((g, k, a) => a.indexOf(g) === k).slice(0, 3).join(", ");
+        .map(cleanGenre).filter((g, k, a) => g && a.indexOf(g) === k).slice(0, 3).join(", ");
     }
     return {genre, year};
   }catch(err){ return {}; }
@@ -534,7 +556,9 @@ async function pumpPosters(){
   renderTmdbHint();
 }
 
-$("tabs").onclick = e => { const t = e.target.closest(".tab"); if(!t) return; view.type = t.dataset.t; render(); };
+$("tabs").onclick = e => { const t = e.target.closest("[data-t]"); if(!t) return; view.type = t.dataset.t; render(); };
+// the big Books / Movies / Anime tiles pick the category; clicking the open one shows everything again
+$("progress").onclick = e => { const t = e.target.closest(".pcard"); if(!t) return; view.type = view.type === t.dataset.t ? "all" : t.dataset.t; view.status = "all"; render(); };
 $("chips").onclick = e => { const c = e.target.closest(".chip"); if(!c) return; view.status = c.dataset.s; render(); };
 $("q").oninput = e => { view.q = e.target.value; const pos = e.target.selectionStart; render(); $("q").focus(); $("q").setSelectionRange(pos,pos); };
 $("sort").onchange = e => { view.sort = e.target.value; render(); };
@@ -591,6 +615,8 @@ $("fTitle").onkeydown = e => { if(e.key==="Enter"){ e.preventDefault(); $("dlgSa
 
 // another tab or a sync pull changed the data
 window.addEventListener("storage", e => { if(e.key===KEY){ S = load(); render(); } });
+// tidy genres saved before the clean-up ("Horror anime and manga" -> "Horror")
+{ let ch = false; for(const i of S.items) if(i.genre){ const g = cleanGenres(i.genre); if(g !== i.genre){ i.genre = g; ch = true; } } if(ch) persist(S); }
 render();
 </script>
 </body>
