@@ -807,6 +807,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
           <label for="sp-rapid"><input type="checkbox" id="sp-rapid" value="rapid"> Rapid</label>
           <label for="sp-blitz"><input type="checkbox" id="sp-blitz" value="blitz"> Blitz</label>
           <label for="sp-classical"><input type="checkbox" id="sp-classical" value="classical"> Classical</label>
+          <label for="sp-ai" title="Show games against Lichess's computer (Stockfish levels) and bots"><input type="checkbox" id="sp-ai"> vs Stockfish</label>
         </fieldset>
         <label for="gmMax">How many<select id="gmMax"><option value="20">20</option><option value="50">50</option><option value="100">100</option></select></label>
         <button class="primary" type="submit">Load games</button>
@@ -3117,6 +3118,7 @@ async function gamesTab(){
   show("games");
   setSiteUi();
   for(const s of ["bullet","rapid","blitz","classical"]) $("sp-"+s).checked = S.gameSpeeds.includes(s);
+  $("sp-ai").checked = !!S.gameShowAI;
   $("gmMax").value = String(S.gameMax);
   if(!S.accounts.lichess.length && S.token){
     try{
@@ -3341,6 +3343,11 @@ function renderGames(){
   if(gLoading){ list.innerHTML = `<p class="summary">Loading your games from ${siteName()}…</p>`; return; }
   if(!gList){ list.innerHTML = ""; return; }
   let w=0,d=0,l=0,accSum=0,accN=0;
+  // games against the computer (Stockfish levels) or bots are hidden unless "vs Stockfish" is ticked
+  const vsComputer = g => { const me = myColor(g), opp = g.players?.[me === "w" || me === "white" ? "black" : "white"]; return !!(opp?.aiLevel || opp?.user?.title === "BOT"); };
+  const hiddenAI = S.gameShowAI ? 0 : gList.filter(vsComputer).length;
+  const gAll = gList;
+  { const gList = S.gameShowAI ? gAll : gAll.filter(g => !vsComputer(g));
   for(const g of gList){
     const o = outcome(g, myColor(g)); if(o==="win") w++; else if(o==="loss") l++; else d++;
     const a = myAccuracy(g); if(a != null){ accSum += a; accN++; }
@@ -3349,6 +3356,7 @@ function renderGames(){
     ? `${gList.length} games: <b class="num">${w}</b> won, <b class="num">${d}</b> drawn, <b class="num">${l}</b> lost` +
       (accN ? ` · average accuracy <b class="num">${Math.round(accSum/accN)}%</b> over ${accN} analysed` : "")
     : (gEmptyWhy || "No games found for those time controls.");
+  if(hiddenAI) $("gmSummary").innerHTML += ` <span class="muted">· ${hiddenAI} game${hiddenAI === 1 ? "" : "s"} vs Stockfish hidden</span>`;
   const shown = gList.filter(g => gFilter === "all" ? true
     : gFilter === "notes" ? !!(S.gnotes[g.id]?.note || Object.keys(S.gnotes[g.id]?.moves||{}).length)
     : outcome(g, myColor(g)) === gFilter);
@@ -3373,6 +3381,7 @@ function renderGames(){
       </span></button>`;
   }).join("") || '<p class="summary">Nothing matches that filter.</p>';
   list.querySelectorAll(".gm-row").forEach(b => b.onclick = () => openGame(gList.find(g => g.id === b.dataset.id)));
+  }
 }
 
 function openGame(g){
@@ -3999,6 +4008,7 @@ $("gmForm").onsubmit = e => {
   S.gameMax = +$("gmMax").value; save();
   loadGames();
 };
+$("sp-ai").onchange = () => { S.gameShowAI = $("sp-ai").checked; save(); renderGames(); };
 $("gmFilter").querySelectorAll("button").forEach(b => b.onclick = () => {
   gFilter = b.dataset.f;
   $("gmFilter").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
