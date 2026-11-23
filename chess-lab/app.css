@@ -373,3 +373,6 @@ footer { color: var(--muted); font-size: 11px; position: fixed; right: 12px; bot
 /* Study engine lines: each move is clickable (plays the line up to that move) */
 .eng-line .eng-mv { cursor: pointer; border-radius: 4px; padding: 0 2px; }
 .eng-line .eng-mv:hover { background: var(--accent); color: #fff; }
+
+/* Study: the first move of each variation (side line) is purple; main line stays green, losing lines red */
+.tree .var > .mn:first-child + .m:not(.losing):not(.cur) { color: #b68cff; font-weight: 600; }
