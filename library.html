@@ -322,8 +322,12 @@ function render(){
 
 /* ---------- posters & covers (free sources that allow it, looked up once and remembered on this device) ----------
    books: Open Library covers · movies: Wikipedia's article image (the poster) · anime: MyAnimeList via Jikan */
-const PKEY = "library.posters.v1";
-let PC = {}; try{ PC = JSON.parse(localStorage.getItem(PKEY)) || {}; }catch(e){ PC = {}; }
+const PKEY = "library.posters.v2";
+let PC = {}; try{ PC = JSON.parse(localStorage.getItem(PKEY)) || null; }catch(e){ PC = null; }
+if(!PC){   // first run of v2: keep the book and anime covers, look movies up again
+  PC = {}; try{ const old = JSON.parse(localStorage.getItem("library.posters.v1")) || {};
+    for(const [k, v] of Object.entries(old)) if(!k.startsWith("movie|")) PC[k] = v;
+    localStorage.removeItem("library.posters.v1"); localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){} }
 const pKey = i => `${i.type}|${i.title.toLowerCase()}|${(i.by||"").toLowerCase()}`;
 const ICON = {book:"📖", movie:"🎬", anime:"📺"};
 function posterHTML(i){
@@ -348,14 +352,19 @@ async function findPoster(i){
     const a = j.data?.[0];
     return a?.images?.jpg?.large_image_url || a?.images?.jpg?.image_url || null;
   }
-  // movie: Wikipedia's lead image for "<title> <year> film" is the poster
-  const y = yearOf(i.by);
-  for(const q of [`${t} ${y} film`, `${t} film`]){
-    const u = `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=3&prop=pageimages&piprop=thumbnail&pithumbsize=342`;
+  // movie: the lead image of the film's own Wikipedia article is the poster. Posters aren't freely licensed,
+  // so ask for any licence (pilicense=any), and only accept an article whose title is the movie itself,
+  // like "Dune (2021 film)" or "The Martian (film)" - never some other page that happens to have a photo
+  const y = yearOf(i.by), norm = x => x.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(), want = norm(t);
+  const isFilm = title => { const n = norm(title), base = norm(title.replace(/\s*\(.*\)\s*$/, ""));
+    return base === want && (n === want || /\bfilm\b|\bmovie\b/.test(n) || (y && n.includes(y))); };
+  for(const q of [`${t} ${y} film`, `${t} film`, t]){
+    const u = `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=8&prop=pageimages&piprop=thumbnail&pithumbsize=342&pilicense=any`;
     const j = await getJSON(u);
-    const pages = Object.values(j.query?.pages || {}).sort((a, b) => a.index - b.index);
-    const hit = pages.find(p => p.thumbnail);
-    if(hit) return hit.thumbnail.source;
+    const pages = Object.values(j.query?.pages || {}).filter(p => p.thumbnail && isFilm(p.title));
+    // best: the year's film, then any "(film)" article, then the plain title
+    pages.sort((a, b) => (y && b.title.includes(y)) - (y && a.title.includes(y)) || /film/i.test(b.title) - /film/i.test(a.title) || a.index - b.index);
+    if(pages[0]) return pages[0].thumbnail.source;
   }
   return null;
 }
