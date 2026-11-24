@@ -186,7 +186,7 @@ document.getElementById("greet").textContent = (h<12?"Good morning, Dede.":h<18?
   const n = v => { const k = parseFloat(v); return isFinite(k) ? k : 0; };
   let buf = 333;
   if (T && Array.isArray(T.v)) buf = n(T.va) + n(T.bal)*n(T.apy)/100/12 - T.v.reduce((a,v)=>a+n(v),0);
-  document.getElementById("thaiStat").innerHTML = `<span>Buffer <b>$${Math.round(buf).toLocaleString("en-US")}/mo</b></span><span>Move <b>Dec 31</b></span>`;
+  document.getElementById("thaiStat").innerHTML = `<span>Buffer <b>$${Math.round(buf).toLocaleString("en-US")}/mo</b></span><span>Land <b>Jan 1</b></span>`;
 })();
 </script>
 <script>
