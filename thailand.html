@@ -83,6 +83,8 @@ input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(-
 .apt td.bf b{color:var(--buffer)}
 .apt td:nth-child(4){grid-column:1/-1;order:5;justify-content:flex-start;text-align:left}
 .apt td:nth-child(4)::before{width:4.5em}
+.apt a.src{display:block;font-size:12.5px;color:var(--thai);text-decoration:none;margin:2px 0}
+.apt a.src:hover{text-decoration:underline}
 .apt tr.best{border-color:#2f7d4f;background:#13241a}
 .pill{display:inline-block;font:500 12px var(--mono);padding:1px 7px;border-radius:99px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
 .pill.warn{border-color:#7a4a17;color:#fbbf72}
@@ -149,7 +151,7 @@ footer{font-size:13px;color:var(--muted)}
 
     <div class="panel" id="apartments">
       <h2>Apartment shortlist</h2>
-      <p class="note">Buffer = your budget above with this rent swapped in. Gym = door to door to Watchara (Sukhumvit Soi 1, near BTS Phloen Chit).</p>
+      <p class="note">Buffer = your budget above with this rent swapped in. Gym = door to door to Watchara (Sukhumvit Soi 1, near BTS Phloen Chit). Each condo links to the site you found it on.</p>
       <div class="scroll">
         <table class="apt">
           <thead><tr><th>Condo</th><th class="n">Rent</th><th class="n">Size</th><th>Gym</th><th class="n">Buffer</th></tr></thead>
@@ -243,15 +245,15 @@ footer{font-size:13px;color:var(--muted)}
     ["ATM / transfer fees", "", 4, 15]
   ];
   const APTS = [
-    ["The Trendy Condominium", "Studio, 12th floor · 2008 · balcony · available Dec 31, 2026 (Sukhumvit Soi 13)", 15500, "35", "~10–15 min", "Walk ~1 km to Soi 1, or BTS Nana → Phloen Chit, 1 stop", "Listed as $471/mo: confirm the baht rent"],
-    ["RYE Sukhumvit 101", "1-bed, 4th floor · 2022 · 1-month deposit · ready Dec 1, 2026", 9500, "28", "~35–45 min", "1.6 km to BTS Punnawithi (walk or motorbike taxi), then BTS", ""],
-    ["A Space Me Sukhumvit 77", "1-bed, 3rd floor · 2013 · low-rise, 2 Olympic pools", 12000, "29", "~45–60 min", "Free shuttle to BTS On Nut (3–5 km), then BTS", "Check late shuttle times; ask about a Jan 1 move-in"],
-    ["Rhythm Asoke", "Studio, 35th floor · 2015", 14000, "22.5", "~30–35 min", "MRT Phra Ram 9 → BTS Asok", ""],
-    ["Origin Place Bangna", "1-bed, 2nd floor · 2025 · move-in ready now", 17000, "35", "~50–60 min", "MRT Yellow + BTS, higher fares", ""],
-    ["Waterford Diamond", "1-bed, 32nd floor · late 1990s", 19000, "52", "~20 min", "BTS Phrom Phong, 3 stops", "Below the building's usual rent: verify"],
-    ["The Lofts Ekkamai", "Studio, 11th floor · 2016 · 1-month deposit · ready Dec 4, 2026", 25000, "28", "~15–20 min", "300 m to BTS Ekkamai, 5 stops", "Well over budget"],
-    ["Valles Haus (Sansiri)", "1-bed, 5th floor · new, finishing Jan 2027 · government-rate utilities · available Mar 22, 2027", 14500, "35", "~30–40 min", "1.4 km to BTS Phra Khanong, then 6 stops", "Not ready until March: too late"],
-    ["KnightsBridge Prime On Nut", "1-bed, 18th floor · ready Mar 13, 2027", 20600, "27", "~25–30 min", "BTS On Nut, one train", "Not ready until March: too late"]
+    ["The Trendy Condominium", "Studio, 12th floor · 2008 · balcony · available Dec 31, 2026 (Sukhumvit Soi 13)", 15500, "35", "~10–15 min", "Walk ~1 km to Soi 1, or BTS Nana → Phloen Chit, 1 stop", "Listed as $471/mo: confirm the baht rent", "FazWaz · U1133930", "https://www.fazwaz.com/property-rent/studio-condo-for-rent-at-the-trendy-condominium-in-khlong-toei-nuea-bangkok-u1133930"],
+    ["RYE Sukhumvit 101", "1-bed, 4th floor · 2022 · 1-month deposit · ready Dec 1, 2026", 9500, "28", "~35–45 min", "1.6 km to BTS Punnawithi (walk or motorbike taxi), then BTS", "", "FlexiRent · #001164", "https://www.flexirent.ing/en/rent-detail/rye-sukhumvit-101---1164"],
+    ["A Space Me Sukhumvit 77", "1-bed, 3rd floor · 2013 · low-rise, 2 Olympic pools", 12000, "29", "~45–60 min", "Free shuttle to BTS On Nut (3–5 km), then BTS", "Check late shuttle times; ask about a Jan 1 move-in", "Thailand-Property · CX-186392 (Connex Property)", "https://www.thailand-property.com/condo/1049/a-space-me-sukhumvit-77"],
+    ["Rhythm Asoke", "Studio, 35th floor · 2015", 14000, "22.5", "~30–35 min", "MRT Phra Ram 9 → BTS Asok", "", "Thailand-Property · U2002032", "https://www.thailand-property.com"],
+    ["Origin Place Bangna", "1-bed, 2nd floor · 2025 · move-in ready now", 17000, "35", "~50–60 min", "MRT Yellow + BTS, higher fares", "", "FlexiRent · #000846", "https://www.flexirent.ing"],
+    ["Waterford Diamond", "1-bed, 32nd floor · late 1990s", 19000, "52", "~20 min", "BTS Phrom Phong, 3 stops", "Below the building's usual rent: verify", "Thailand-Property · ฿19,000 listing on Soi 30/1", "https://www.thailand-property.com"],
+    ["The Lofts Ekkamai", "Studio, 11th floor · 2016 · 1-month deposit · ready Dec 4, 2026", 25000, "28", "~15–20 min", "300 m to BTS Ekkamai, 5 stops", "Well over budget", "FlexiRent · #001013", "https://www.flexirent.ing/en/rent-detail/the-lofts-ekkamai---1013"],
+    ["Valles Haus (Sansiri)", "1-bed, 5th floor · new, finishing Jan 2027 · government-rate utilities · available Mar 22, 2027", 14500, "35", "~30–40 min", "1.4 km to BTS Phra Khanong, then 6 stops", "Not ready until March: too late", "FazWaz · U5963154", "https://www.fazwaz.com/property-rent/1-bedroom-condo-for-rent-at-valles-haus-in-phra-khanong-nuea-bangkok-u5963154"],
+    ["KnightsBridge Prime On Nut", "1-bed, 18th floor · ready Mar 13, 2027", 20600, "27", "~25–30 min", "BTS On Nut, one train", "Not ready until March: too late", "FlexiRent · #000868", "https://www.flexirent.ing"]
   ];
   const DEF = { va: 1487, bal: 125000, apy: 3.55, fx: 33, v: START.map(r => r[3]) };
   const clone = o => JSON.parse(JSON.stringify(o));
@@ -300,7 +302,7 @@ footer{font-size:13px;color:var(--muted)}
     const rows = APTS.map(a => { const b = inc - (cost - rent + a[2] / fx); return { a, b }; });
     const best = Math.max(...rows.map(r => r.b));
     $("apts").innerHTML = rows.map(({ a, b }) =>
-      `<tr class="${b === best ? "best" : ""}"><td data-l="Condo"><b>${a[0]}</b><small>${a[1]}</small>${a[6] ? `<span class="pill warn">${a[6]}</span>` : ""}</td>` +
+      `<tr class="${b === best ? "best" : ""}"><td data-l="Condo"><b>${a[0]}</b><small>${a[1]}</small><a class="src" href="${a[8]}" target="_blank" rel="noopener">${a[7]} ↗</a>${a[6] ? `<span class="pill warn">${a[6]}</span>` : ""}</td>` +
       `<td class="n" data-l="Rent">฿${a[2].toLocaleString("en-US")}<small>${usd(a[2] / fx)}</small></td>` +
       `<td class="n" data-l="Size">${a[3]} m²</td>` +
       `<td data-l="Gym">${a[4]}<small>${a[5]}</small></td>` +
