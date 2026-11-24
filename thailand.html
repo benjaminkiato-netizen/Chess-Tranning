@@ -95,6 +95,17 @@ li{margin-bottom:6px}
 .line time{font:700 17px var(--display);color:var(--thai);white-space:nowrap}
 .line li.done time{color:var(--buffer)}
 footer{font-size:13px;color:var(--muted)}
+.conv{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:10px 14px;align-items:end}
+.conv h2{grid-column:1/-1;margin:0}
+.conv label{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:600}
+.conv input[type=number]{width:100%;font-size:20px;min-height:48px}
+.conv .swap{font:700 20px var(--display);color:var(--thai);padding-bottom:10px}
+.conv .row{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{font:500 13px var(--mono);border:1px solid var(--line);background:var(--panel2);color:var(--fg);border-radius:99px;padding:6px 12px;min-height:36px;cursor:pointer}
+.chip:hover{border-color:var(--thai)}
+.conv .rate{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:13px;color:var(--muted)}
+.conv .rate .btn{margin:0}
+@media (max-width:560px){.conv{grid-template-columns:minmax(0,1fr)}.conv .swap{display:none}}
 @media (max-width:820px){.two,.three{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:560px){.cards{gap:8px}.card{padding:12px}.card b{font-size:20px}input[type=number]{width:5em}
   .line li{grid-template-columns:minmax(0,1fr);gap:2px}
@@ -120,13 +131,23 @@ footer{font-size:13px;color:var(--muted)}
     <div class="card buf" id="cBufCard"><span>Buffer left / month</span><b id="cBuf">$333</b><em id="cBufT">฿11,000</em></div>
   </div>
 
+
+  <section class="panel conv" id="convert">
+    <h2>Baht ↔ dollars</h2>
+    <label for="cvThb">Thai baht (฿)<input type="number" id="cvThb" inputmode="decimal" step="any" value="1000"></label>
+    <span class="swap" aria-hidden="true">⇄</span>
+    <label for="cvUsd">US dollars ($)<input type="number" id="cvUsd" inputmode="decimal" step="any"></label>
+    <div class="row" id="cvChips"></div>
+    <div class="rate"><span id="cvRate">Rate: ฿33.00 per $1 (from your budget)</span><button type="button" class="btn" id="cvLive">Get today's rate</button><span id="cvMsg"></span></div>
+  </section>
+
   <div>
     <div class="ibar" id="ibar" role="img" aria-label="Where each month's income goes"></div>
     <ul class="legend" id="legend"></ul>
   </div>
 
   <nav class="nav" aria-label="Sections">
-    <a href="#budget">Budget</a><a href="#apartments">Apartments</a><a href="#money">Money setup</a><a href="#paying">Paying &amp; transit</a><a href="#visa">Visa &amp; tax</a><a href="#timeline">Timeline</a>
+    <a href="#convert">Converter</a><a href="#budget">Budget</a><a href="#apartments">Apartments</a><a href="#money">Money setup</a><a href="#paying">Paying &amp; transit</a><a href="#visa">Visa &amp; tax</a><a href="#timeline">Timeline</a>
   </nav>
 
   <section class="two">
@@ -319,10 +340,37 @@ footer{font-size:13px;color:var(--muted)}
     if (["va", "bal", "apy", "fx"].includes(id)) st[id] = num(e.target.value);
     else if (/^v\d+$/.test(id)) st.v[+id.slice(1)] = num(e.target.value);
     else return;
-    draw();
+    draw(); if (id === "fx") conv();
   });
-  $("reset").addEventListener("click", () => { st = clone(DEF); fill(); draw(); });
-  fill(); draw();
+  $("reset").addEventListener("click", () => { st = clone(DEF); fill(); draw(); conv(); });
+
+  // Baht <-> dollar converter, using the budget's ฿ per $ rate
+  const CHIPS = [100, 500, 1000, 4300, 13500, 16500];
+  let cvLast = "thb";
+  $("cvChips").innerHTML = CHIPS.map(v => `<button type="button" class="chip" data-thb="${v}">฿${v.toLocaleString("en-US")}</button>`).join("");
+  const conv = () => {
+    const fx = num(st.fx) || 33;
+    if (cvLast === "thb") { const t = num($("cvThb").value); $("cvUsd").value = t ? (t / fx).toFixed(2) : ""; }
+    else { const u = num($("cvUsd").value); $("cvThb").value = u ? Math.round(u * fx) : ""; }
+    $("cvRate").textContent = `Rate: ฿${fx.toFixed(2)} per $1 · $1 = ฿${fx.toFixed(2)}, ฿100 = $${(100 / fx).toFixed(2)}`;
+  };
+  $("cvThb").addEventListener("input", () => { cvLast = "thb"; conv(); });
+  $("cvUsd").addEventListener("input", () => { cvLast = "usd"; conv(); });
+  $("cvChips").addEventListener("click", e => { const b = e.target.closest("[data-thb]"); if (!b) return; $("cvThb").value = b.dataset.thb; cvLast = "thb"; conv(); });
+  $("cvLive").addEventListener("click", async () => {
+    $("cvMsg").textContent = "Checking…";
+    try {
+      const r = await fetch("https://open.er-api.com/v6/latest/USD");
+      const j = await r.json();
+      const rate = j && j.rates && j.rates.THB;
+      if (!rate) throw new Error("no rate");
+      st.fx = Math.round(rate * 100) / 100; $("fx").value = st.fx; draw(); conv();
+      $("cvMsg").textContent = "Updated to today's market rate. Your whole budget now uses it.";
+    } catch (e) {
+      $("cvMsg").textContent = "Couldn't reach the rate service. Type the rate in the budget's ฿ per $ box instead.";
+    }
+  });
+  fill(); draw(); conv();
 
   const b = $("syncBtn"); if (window.HubSync && HubSync.connected()) { b.textContent = "☁ Sync on"; b.classList.add("on"); }
 }
