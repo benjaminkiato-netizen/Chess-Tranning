@@ -3615,7 +3615,7 @@ function renderReport(){
     return `<div>
       <div class="rp-h"><i class="dot ${c}"></i><span class="nm">${playerLink(p, g)}</span>${c === me ? '<span class="tt">You</span>' : ""}</div>
       <div class="rp-rate" title="Starts from ${p?.rating ? "the player's rating (" + p.rating + ")" : "an average rating"} and moves toward the level this game's accuracy (${st.accuracy ?? "?"}%) and average centipawn loss (ACPL ${acpl ?? "?"}) point to. A rough guide, not an official rating.">
-        <b class="num">${rating ? "≈" + rating : "–"}</b><span class="summary">${rating ? "game rating" : "too few moves to estimate"}</span></div>
+        <b class="num">${rating || "–"}</b><span class="summary">${rating ? "game rating" : "too few moves to estimate"}</span></div>
       <div class="rp-rows">${rows}</div></div>`;
   };
   const hasCls = !!A.cls;
