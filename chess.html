@@ -152,8 +152,8 @@ body.dragging, body.dragging *{cursor:grabbing !important}
 .engine{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
 .eng-head{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px}
 .eng-lines{display:flex;flex-direction:column;gap:4px}
-button.eng-line{display:grid;grid-template-columns:52px minmax(0,1fr);gap:8px;align-items:baseline;text-align:left;padding:6px 8px;border-radius:6px;border:1px solid transparent;background:var(--bg);font-weight:400;font-size:13px;line-height:1.45}
-button.eng-line:hover{border-color:var(--accent)}
+.eng-line{cursor:pointer;display:grid;grid-template-columns:52px minmax(0,1fr);gap:8px;align-items:baseline;text-align:left;padding:6px 8px;border-radius:6px;border:1px solid transparent;background:var(--bg);font-weight:400;font-size:13px;line-height:1.45}
+.eng-line:hover{border-color:var(--accent)}
 .eng-line .sc{font-weight:600;font-size:13px;text-align:center;border-radius:4px;padding:1px 0;background:var(--line)}
 .eng-line .sc.w{background:#f4f4f0;color:#111} .eng-line .sc.b{background:#222;color:#eee}
 .eng-line .pv{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
@@ -412,6 +412,10 @@ button.mv{white-space:nowrap;overflow:hidden}
 .coach-text{font-size:14px;line-height:1.55;display:flex;flex-direction:column;gap:8px}
 .gp .coach-text p{margin:0;font-size:14px}
 .coach-line{font-size:13px;color:var(--muted);border-left:3px solid var(--line);padding-left:10px}
+/* moves in commentary you can click to play on the board */
+.mvlink{all:unset;cursor:pointer;font-weight:600;color:var(--accent-2, #9be7b0);border-bottom:1px dotted currentColor;border-radius:3px;padding:0 1px}
+.mvlink:hover{background:var(--accent, #2f7d4f);color:#fff;border-bottom-color:transparent}
+.eng-line .mvlink{font-weight:400;color:inherit;border-bottom:0}
 .coach-note{font-size:13px;border-left:3px solid #8b7cf6;padding-left:10px}
 .coach-empty{color:var(--muted);font-size:14px}
 .gp{display:flex;flex-direction:column;gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
@@ -1125,7 +1129,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
         <button id="engToggle" class="link">Turn off</button>
       </div>
       <div class="eng-lines" id="engLines"></div>
-      <p class="eng-note">Runs in your browser. Click a line to play its first move. <a href="https://github.com/official-stockfish/Stockfish" target="_blank" rel="noopener">Stockfish</a> is free software (GPLv3), browser build by <a href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noopener">stockfish.js</a>.</p>
+      <p class="eng-note">Runs in your browser. Click a line to play its first move, or click any move in it to play up to that move. <a href="https://github.com/official-stockfish/Stockfish" target="_blank" rel="noopener">Stockfish</a> is free software (GPLv3), browser build by <a href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noopener">stockfish.js</a>.</p>
     </div>
     <div class="nav" id="nav" hidden>
       <div class="nav-btns">
@@ -2101,6 +2105,19 @@ function fmtScore(l){
   if(l.type === "mate") return (l.val > 0 ? "#" : "#-") + Math.abs(l.val);
   const p = l.val/100; return (p > 0 ? "+" : "") + p.toFixed(Math.abs(p) >= 10 ? 0 : 1);
 }
+function pvLinks(fen, pv, base, max=10){
+  if(base < 0) return pvSan(fen, pv, max);
+  const g = new Chess(fen), sans = [], parts = [];
+  for(const u of pv.slice(0,max)){ const m = g.move({from:u.slice(0,2), to:u.slice(2,4), promotion:u[4]}); if(!m) break; sans.push(m.san); }
+  const line = esc(sans.join(" "));
+  let num = +fen.split(" ")[5] || 1, white = fen.split(" ")[1] === "w";
+  sans.forEach((san, k) => {
+    const lnk = `<span class="mvlink" data-base="${base}" data-line="${line}" data-k="${k}" title="Play the line up to ${esc(san)}">${esc(san)}</span>`;
+    if(white) parts.push(`<b>${num}.</b> ${lnk}`); else { parts.push(k === 0 ? `<b>${num}…</b> ${lnk}` : lnk); num++; }
+    white = !white;
+  });
+  return parts.join(" ") + (pv.length > max ? " …" : "");
+}
 function pvSan(fen, pv, max=10){
   const g = new Chess(fen), parts = [];
   let num = +fen.split(" ")[5] || 1, first = true;
@@ -2132,11 +2149,13 @@ function renderEngine(){
   if(g && g.in_draw()){ L.innerHTML = '<p style="margin:0;font-weight:600">Draw.</p>'; $("engDepth").textContent = ""; setBar({type:"cp", val:0}); return; }
   $("engDepth").textContent = sfDepth ? `depth ${sfDepth}/${SF_DEPTH}` : "thinking…";
   const lines = sfLines.filter(Boolean);
-  L.innerHTML = lines.length ? lines.map((l,i) => `<button class="eng-line" data-i="${i}">
+  const here = positions[viewIdx] && positions[viewIdx].fen === sfFen ? viewIdx : -1;
+  L.innerHTML = lines.length ? lines.map((l,i) => `<div class="eng-line" role="button" tabindex="0" data-i="${i}">
       <span class="sc num ${l.val>0||(l.type==='mate'&&l.val>0)?'w':l.val<0?'b':''}">${fmtScore(l)}</span>
-      <span class="pv">${pvSan(sfFen, l.pv)}</span></button>`).join("")
+      <span class="pv">${pvLinks(sfFen, l.pv, here)}</span></div>`).join("")
     : '<p class="summary" style="margin:0">Thinking…</p>';
-  L.querySelectorAll(".eng-line").forEach(b => b.onclick = () => {
+  L.querySelectorAll(".eng-line").forEach(b => b.onclick = e => {
+    if(e.target.closest(".mvlink")) return;   // a single move was clicked: the page-wide handler plays up to it
     const u = lines[+b.dataset.i]?.pv[0]; if(!u || !analysis) return;
     const legal = legalFrom(u.slice(0,2), u.slice(2,4));
     if(legal.length){ skipAnimTo = null; analysisMove(u.slice(0,2), u.slice(2,4), legal[0]); }
@@ -3651,10 +3670,11 @@ function gameSync(){
     com = `<b>${moveLabel(gPly)}</b>${ev ? ` <span class="num muted">${ev}</span>` : ""}`;
     if(e?.judgment){
       const s = SYM[e.judgment.name];
-      com += `<br><span class="j ${s[1]}">${esc(e.judgment.comment)}</span>`;
+      const bases = [{idx: gPly-1, fen: positions[gPly-1].fen}, {idx: gPly, fen: positions[gPly].fen}];
+      com += `<br><span class="j ${s[1]}">${linkMoves(e.judgment.comment, bases)}</span>`;
       const coach = coachLine(gPly, e);
-      if(coach) com += `<br>${esc(coach)}`;
-      if(e.variation) com += `<br><span class="muted">Best line: ${esc(e.variation.split(" ").slice(0,8).join(" "))}</span>`;
+      if(coach) com += `<br>${linkMoves(coach, bases)}`;
+      if(e.variation) com += `<br><span class="muted">Best line: ${linkLine(e.variation.split(" ").slice(0,8), gPly-1)}</span>`;
     }
   } else com = '<span class="muted">Starting position. Press → to begin.</span>';
   $("gpComment").innerHTML = com;
@@ -3690,6 +3710,49 @@ function renderMaterial(fen){
   };
   box.innerHTML = row("w") + row("b");
 }
+/* Clickable moves in commentary: any move named in a comment ("Nxc6 was best", "Best line: Qh7# Kf8 …")
+   becomes a link that plays it on the board. A word only becomes a link if it is a legal move from the
+   position the comment is about, so ordinary words are never turned into links by mistake. */
+const SAN_RE = /(O-O-O|O-O|[KQRBN][a-h]?[1-8]?x?[a-h][1-8]|[a-h]x[a-h][1-8](?:=[QRBN])?|[a-h][1-8](?:=[QRBN])?)[+#]?/g;
+function legalSan(fen, san){ try{ const g = new Chess(fen); return g.move(san.replace(/[+#!?]+$/, ""), {sloppy: true}) ? g : null; }catch(e){ return null; } }
+// text -> html; single moves are tried from each base position in turn (before the move, then after it)
+function linkMoves(text, bases){
+  let out = "", at = 0;
+  for(const m of String(text).matchAll(SAN_RE)){
+    const san = m[0], i = m.index, prev = text[i-1] || " ", next = text[i + san.length] || " ";
+    if(/[A-Za-z0-9]/.test(prev) || /[A-Za-z0-9]/.test(next)) continue;     // part of a longer word
+    const b = bases.find(b => legalSan(b.fen, san));
+    if(!b) continue;
+    out += esc(text.slice(at, i)) + `<button class="mvlink" data-base="${b.idx}" data-line="${esc(san)}" data-k="0" title="Play ${esc(san)} on the board">${esc(san)}</button>`;
+    at = i + san.length;
+  }
+  return out + esc(text.slice(at));
+}
+// a line of moves -> each move clickable; clicking move k plays the line up to it
+function linkLine(sans, baseIdx){
+  const fen0 = positions[baseIdx]?.fen; if(!fen0) return esc(sans.join(" "));
+  const g = new Chess(fen0), ok = [];
+  for(const s of sans){ try{ if(!g.move(s.replace(/[+#!?]+$/, ""), {sloppy: true})) break; }catch(e){ break; } ok.push(s); }
+  const line = ok.join(" ");
+  return ok.map((s, k) => `<button class="mvlink" data-base="${baseIdx}" data-line="${esc(line)}" data-k="${k}" title="Play the line up to ${esc(s)}">${esc(s)}</button>`).join(" ")
+    + (ok.length < sans.length ? " " + esc(sans.slice(ok.length).join(" ")) : "");
+}
+// play moves 0..k of a line from positions[base] (a branch off the game, like playing your own line)
+function playMoveLine(base, line, k){
+  if(!analysis || !positions[base]) return;
+  const sans = line.split(" ").slice(0, k + 1);
+  positions = positions.slice(0, base + 1); viewIdx = base;
+  let g = new Chess(positions[base].fen), last = null;
+  for(const s of sans){ let mv = null; try{ mv = g.move(s.replace(/[+#!?]+$/, ""), {sloppy: true}); }catch(e){} if(!mv) break; positions.push({fen: g.fen(), lm: [mv.from, mv.to]}); last = mv; }
+  viewIdx = positions.length - 1; game = new Chess(positions[viewIdx].fen); lastMove = positions[viewIdx].lm; selected = null;
+  if(last) moveSound(last);
+  updateNav(); draw();
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest(".mvlink"); if(!b) return;
+  e.preventDefault(); playMoveLine(+b.dataset.base, b.dataset.line, +b.dataset.k);
+});
+
 /* Coach card (wide screens): what kind of move this was and why, for every move, not just the errors. */
 const COACH_TXT = {
   best: "Stockfish's top choice here.",
@@ -3711,9 +3774,10 @@ function renderCoach(onMain, d, A, e){
     <div class="coach-move">${esc(moveLabel(gPly))} · ${who === "You" ? "your move" : "opponent's move"}${ev ? `<span class="num">${ev}</span>` : ""}</div></div></div><div class="coach-text">`;
   if(!A) html += `<p class="coach-empty">Run the analysis (right panel) to get comments on every move.</p>`;
   else if(e?.judgment){
-    html += `<p>${esc(e.judgment.comment)}</p>`;
-    const coach = coachLine(gPly, e); if(coach) html += `<p>${esc(coach)}</p>`;
-    if(e.variation) html += `<p class="coach-line">Best line: ${esc(e.variation.split(" ").slice(0,8).join(" "))}</p>`;
+    const bases = [{idx: gPly-1, fen: positions[gPly-1].fen}, {idx: gPly, fen: positions[gPly].fen}];
+    html += `<p>${linkMoves(e.judgment.comment, bases)}</p>`;
+    const coach = coachLine(gPly, e); if(coach) html += `<p>${linkMoves(coach, bases)}</p>`;
+    if(e.variation) html += `<p class="coach-line">Best line: ${linkLine(e.variation.split(" ").slice(0,8), gPly-1)}</p>`;
   } else if(kind && COACH_TXT[kind]) html += `<p>${COACH_TXT[kind]}</p>`;
   const note = S.gnotes[curGame.id]?.moves?.[gPly];
   if(note) html += `<p class="coach-note">${esc(note)}</p>`;
