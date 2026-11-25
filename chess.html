@@ -2025,10 +2025,19 @@ function startAnalysis(){
   mainline = positions.slice(); viewIdx = positions.length-1;
   updateNav(); draw();
 }
+// game review: once the board is back on a position of the game itself (you stepped back to where
+// your line branched off, or played the move that was really played), drop your line and follow the game
+function rejoinGame(){
+  if(mode !== "game" || !mainline || positions === mainline || !mainline[viewIdx]) return;
+  for(let k = 0; k <= viewIdx; k++) if(positions[k].fen !== mainline[k].fen) return;
+  if(positions.length === mainline.length && positions.every((p,k) => p.fen === mainline[k].fen)) return;
+  positions = mainline.slice();
+}
 function setView(i){
   if(!analysis) return;
   const was = viewIdx;
   viewIdx = Math.max(0, Math.min(positions.length-1, i));
+  rejoinGame();
   game = new Chess(positions[viewIdx].fen); lastMove = positions[viewIdx].lm; selected = null;
   if(viewIdx !== was && viewIdx > 0 && lastMove){
     try{ moveSound(new Chess(positions[viewIdx-1].fen).move({from:lastMove[0], to:lastMove[1], promotion:"q"})); }catch(e){}
@@ -2042,7 +2051,7 @@ function analysisMove(from, to, legal){
   lastMove = [from, to]; selected = null;
   positions = positions.slice(0, viewIdx+1);   // a new move here replaces whatever came after
   positions.push({fen: game.fen(), lm: lastMove.slice()});
-  viewIdx = positions.length-1;
+  viewIdx = positions.length-1; rejoinGame();
   moveSound(mv); updateNav(); draw();
 }
 /* ---------- Stockfish (runs in the browser, files in /engine) ---------- */
@@ -3744,7 +3753,7 @@ function playMoveLine(base, line, k){
   positions = positions.slice(0, base + 1); viewIdx = base;
   let g = new Chess(positions[base].fen), last = null;
   for(const s of sans){ let mv = null; try{ mv = g.move(s.replace(/[+#!?]+$/, ""), {sloppy: true}); }catch(e){} if(!mv) break; positions.push({fen: g.fen(), lm: [mv.from, mv.to]}); last = mv; }
-  viewIdx = positions.length - 1; game = new Chess(positions[viewIdx].fen); lastMove = positions[viewIdx].lm; selected = null;
+  viewIdx = positions.length - 1; rejoinGame(); game = new Chess(positions[viewIdx].fen); lastMove = positions[viewIdx].lm; selected = null;
   if(last) moveSound(last);
   updateNav(); draw();
 }
