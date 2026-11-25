@@ -390,6 +390,10 @@ button.mv{white-space:nowrap;overflow:hidden}
   .drill-grid.gm .gunder .gp-report .rp-rate b{font-size:22px}
   .drill-grid.gm .gunder .gp-report .rp-rows{font-size:13px;gap:4px 8px}
   .drill-grid.gm .gunder:has(> .gp-report[hidden]), .drill-grid.gm .gunder:has(> .gcoach[hidden]){grid-template-columns:1fr}
+  /* commentary box in the left column: fixed height so the move list under it never jumps */
+  .drill-grid.gm .gleft > .gcoach{height:250px;flex:none}
+  .drill-grid.gm .gleft > .gcoach .coach-card{overflow-y:auto;min-height:0}
+  .drill-grid.gm .gunder > .nav{margin:0}
   .drill-grid.gm .gleft{position:relative}
   .drill-grid.gm #gleft > #back{align-self:flex-start;white-space:nowrap}
   .drill-grid.gm .gcoach{display:flex}
@@ -3060,9 +3064,7 @@ function setDrillMode(m){
   $("gleft").hidden = !(g || L); $("gcoach").hidden = !g; $("matBox").hidden = !g;
   $("liveLeft").hidden = !L;
   document.querySelector(".wrap").classList.toggle("wide", g || L);
-  if(g) $("gleft").prepend($("nav")); else $("gpBottom").before($("nav"));
-  // wide screens: "← All games" sits top-left, beside the move buttons; live: "← Play" goes to the empty left column
-  if((g && matchMedia("(min-width:1500px)").matches) || L) $("gleft").prepend($("back")); else if($("back").parentElement.id === "gleft") $("matBox").before($("back"));
+  placeGameBoxes(m);
   document.querySelector("#drill .drill-top").hidden = L;   // live: header row goes away so the move panel fills from the top
   $("live").hidden = !L;
   $("d-count").hidden = L; $("d-theme").hidden = L;   // live game: drop the "Casual Rapid · vs Stockfish" header text
@@ -3074,6 +3076,17 @@ function setDrillMode(m){
     ? "Click any move or use ← → to step through. Play your own moves to try other lines; the engine follows."
     : "Explore freely: move any piece for either side. Use ← → to step through moves.";
 }
+// game review on wide screens: the coach's commentary sits top-left above the move list, and the
+// move buttons / play-on box sits under the board beside the report. Narrower: buttons top-left as before.
+function placeGameBoxes(m = mode){
+  const g = m === "game", L = m === "live", wide = matchMedia("(min-width:1500px)").matches;
+  const nav = $("nav"), coach = $("gcoach"), left = $("gleft"), under = document.querySelector("#drill .gunder");
+  if(g && wide){ under.appendChild(nav); left.prepend(coach); }
+  else{ under.appendChild(coach); if(g) left.prepend(nav); else $("gpBottom").before(nav); }
+  // wide screens: "← All games" sits top-left; live: "← Play" goes to the empty left column
+  if((g && wide) || L) left.prepend($("back")); else if($("back").parentElement.id === "gleft") $("matBox").before($("back"));
+}
+matchMedia("(min-width:1500px)").addEventListener("change", () => { if(mode === "game") placeGameBoxes(); });
 // a player's name in a game as a link to their profile (Lichess or Chess.com); computer opponents stay plain
 const playerLink = (p, g) => {
   const n = esc(playerName(p)), id = p && !p.aiLevel && (p.user?.name || p.user?.id);
