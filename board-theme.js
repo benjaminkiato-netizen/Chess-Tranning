@@ -6,7 +6,7 @@
  */
 (() => {
   'use strict';
-  const KEY = 'chesslab.boardTheme', PKEY = 'chesslab.pieceSet', V = 11;
+  const KEY = 'chesslab.boardTheme', PKEY = 'chesslab.pieceSet', V = 13;
   const BASE = new URL('chess-lab/pieces/', document.currentScript ? document.currentScript.src : location.href).href;
   const THEMES = [
     { id: 'classic', name: 'Classic Green', l: '#eed5a4', d: '#355a31' },
