@@ -4804,14 +4804,14 @@ function snNext(){
   if(r.i >= r.order.length){ snFinish(); return; }
   const it = S.sn.items[r.order[r.i]]; if(!it){ r.i++; snNext(); return; }
   snPz = {it, pos: r.i, game: new Chess(it.fen), solved: false, failed: false, t0: performance.now(), lastMove: null};
-  snRunCard(); snDraw(); snRenderSet();
+  snRunCard(); snDraw(); snRenderSet(); snCg.setAutoShapes(snPlayedArrow(it));
   if(it.type === "mate"){
     snPz.expect = it.best; snPz.userMoves = 0;
-    const z = snPz; snMatePrompt(z, `In your game vs ${esc(it.vs)} you played ${esc(it.label)}. Play it all the way to checkmate.`);
-    SFQ.eval(it.fen, 800).then(x => { if(snPz === z && !z.userMoves && x.mate > 0){ z.mateIn = x.mate; snMatePrompt(z, `In your game vs ${esc(it.vs)} you played ${esc(it.label)}. Play it all the way to checkmate.`); } }).catch(() => {});
+    const z = snPz; snMatePrompt(z, `In your game vs ${esc(it.vs)} you played <b class="bad">${esc(it.played)}</b> (red arrow). Play it all the way to checkmate.`);
+    SFQ.eval(it.fen, 800).then(x => { if(snPz === z && !z.userMoves && x.mate > 0){ z.mateIn = x.mate; snMatePrompt(z, `In your game vs ${esc(it.vs)} you played <b class="bad">${esc(it.played)}</b> (red arrow). Play it all the way to checkmate.`); } }).catch(() => {});
     return;
   }
-  $("snPrompt").innerHTML = `<b>${it.fen.split(" ")[1] === "w" ? "White" : "Black"} to move.</b> Find the best move.${it.solved && it.bestT != null ? ` <b>Time to beat: ${fmtS(it.bestT)}</b>` : ""} <span class="sn-src">In your game vs ${esc(it.vs)} you played ${esc(it.label)} (${esc((SN_KINDS[it.kind] || "").replace(/s$/, "").toLowerCase())}).</span>`;
+  $("snPrompt").innerHTML = `<b>${it.fen.split(" ")[1] === "w" ? "White" : "Black"} to move.</b> Find the best move.${it.solved && it.bestT != null ? ` <b>Time to beat: ${fmtS(it.bestT)}</b>` : ""} <span class="sn-src">In your game vs ${esc(it.vs)} you played <b class="bad">${esc(it.played)}</b> (red arrow), ${esc(SN_KINDS[it.kind] ? (SN_KINDS[it.kind] === "Inaccuracies" ? "an inaccuracy" : "a " + SN_KINDS[it.kind].replace(/s$/, "").toLowerCase()) : "")}.</span>`;
 }
 function snRunCard(){
   const r = S.sn.set?.run, el = $("snRun");
@@ -4839,6 +4839,10 @@ function snDrawIdle(){
   const b = $("snBoard"); snCg ||= cgBoard(b, (o, d) => snTry(o, d));
   const it = snPile("todo")[0] || snPile("solved")[0];
   snCg.set({fen: it ? it.fen.split(" ")[0] : "start", orientation: it ? cgColor(it.fen.split(" ")[1]) : "white", lastMove: undefined, check: false, movable: {color: undefined, dests: new Map()}});
+}
+// the move you actually played in the game, as a red arrow
+function snPlayedArrow(it){
+  try{ const m = new Chess(it.fen).move(it.played, {sloppy: true}); return m ? [{orig: m.from, dest: m.to, brush: "red"}] : []; }catch(e){ return []; }
 }
 // a position was answered: move it between the piles and keep its best time. Returns a line for the prompt.
 function snPileResult(it, ok, dt){
@@ -4881,7 +4885,7 @@ async function snTry(from, to){
     const bm = z.sans[0] || it.best;
     $("snPrompt").innerHTML = `<span class="bad">✗ Not this time.</span> Best was <b>${esc(bm)}</b>. In the game you played ${esc(it.played)}. ${note} ${snLineHtml(z)}`;
     snDraw(to); snRunCard();
-    snCg.setAutoShapes([{orig: it.best.slice(0,2), dest: it.best.slice(2,4), brush: "green"}]);
+    snCg.setAutoShapes([...snPlayedArrow(it), {orig: it.best.slice(0,2), dest: it.best.slice(2,4), brush: "green"}]);
     snShowWhy(z);
   }
 }
@@ -5007,6 +5011,7 @@ function snMatePrompt(z, extra){
 }
 async function snMateTry(z, m, uci, dt){
   const g = z.game, r = S.sn.set.run, it = z.it;
+  snCg.setAutoShapes([]);
   z.lastMove = [m.from, m.to]; r.time += dt; z.think = (z.think || 0) + dt; z.userMoves = (z.userMoves || 0) + 1;
   const finish = ok => {
     // the whole sequence becomes the line you can step through
