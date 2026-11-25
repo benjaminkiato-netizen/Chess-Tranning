@@ -421,6 +421,9 @@ button.mv{white-space:nowrap;overflow:hidden}
 .coach-line{font-size:13px;color:var(--muted);border-left:3px solid var(--line);padding-left:10px}
 /* moves in commentary you can click to play on the board */
 .mvlink{all:unset;cursor:pointer;font-weight:600;color:var(--accent-2, #9be7b0);border-bottom:1px dotted currentColor;border-radius:3px;padding:0 1px}
+.mvlink.done{opacity:.55;border-bottom-style:solid}
+.mvlink.here{opacity:1;background:var(--accent, #2f7d4f);color:#fff;border-bottom-color:transparent}
+.coach-own{font-size:12px;color:var(--muted);margin-bottom:-4px}
 .mvlink:hover{background:var(--accent, #2f7d4f);color:#fff;border-bottom-color:transparent}
 .eng-line .mvlink{font-weight:400;color:inherit;border-bottom:0}
 .coach-note{font-size:13px;border-left:3px solid #8b7cf6;padding-left:10px}
@@ -3689,7 +3692,13 @@ function gameSync(){
   // comment for this move
   const A = gAnalysis(curGame), e = gPly > 0 ? A?.evals?.[gPly-1] : null;
   let com = "";
-  if(!onMain) com = `<span class="muted">Exploring your own line from ${d > 1 ? moveLabel(d-1) : "the start"}.</span>`;
+  const eb = !onMain && d >= 1 && mainline[d] ? A?.evals?.[d-1] : null;
+  if(!onMain && eb?.judgment){
+    const sans = eb.variation ? eb.variation.split(" ").slice(0,8) : [];
+    com = `<span class="muted">Your own line · the game's comment on ${moveLabel(d)}</span><br><span class="j ${SYM[eb.judgment.name][1]}">${linkMoves(eb.judgment.comment, [{idx: d-1, fen: mainline[d-1].fen}])}</span>`
+      + (sans.length ? `<br><span class="muted">Best line: ${linkLine(sans, d-1, linePlayed(d-1, sans))}</span>` : "");
+  }
+  else if(!onMain) com = `<span class="muted">Exploring your own line from ${d > 1 ? moveLabel(d-1) : "the start"}.</span>`;
   else if(gPly > 0){
     const ev = e ? (e.mate !== undefined ? (e.mate === 0 ? "" : `#${e.mate}`) : `${e.eval > 0 ? "+" : ""}${(e.eval/100).toFixed(1)}`) : "";
     com = `<b>${moveLabel(gPly)}</b>${ev ? ` <span class="num muted">${ev}</span>` : ""}`;
@@ -3754,12 +3763,19 @@ function linkMoves(text, bases){
   return out + esc(text.slice(at));
 }
 // a line of moves -> each move clickable; clicking move k plays the line up to it
-function linkLine(sans, baseIdx){
+// which move of a line (played from positions[baseIdx]) the board is on right now
+function linePlayed(baseIdx, sans){
+  const g = new Chess(positions[baseIdx].fen); let n = 0;
+  for(const s of sans){ let mv = null; try{ mv = g.move(s.replace(/[+#!?]+$/, ""), {sloppy: true}); }catch(e){} if(!mv || !positions[baseIdx+n+1] || positions[baseIdx+n+1].fen !== g.fen()) break; n++; }
+  const at = viewIdx - baseIdx;
+  return at >= 1 && at <= n ? at : 0;     // which move of the line the board is on (0 = not on the line)
+}
+function linkLine(sans, baseIdx, played = 0){
   const fen0 = positions[baseIdx]?.fen; if(!fen0) return esc(sans.join(" "));
   const g = new Chess(fen0), ok = [];
   for(const s of sans){ try{ if(!g.move(s.replace(/[+#!?]+$/, ""), {sloppy: true})) break; }catch(e){ break; } ok.push(s); }
   const line = ok.join(" ");
-  return ok.map((s, k) => `<button class="mvlink" data-base="${baseIdx}" data-line="${esc(line)}" data-k="${k}" title="Play the line up to ${esc(s)}">${esc(s)}</button>`).join(" ")
+  return ok.map((s, k) => `<button class="mvlink${k < played ? " done" : ""}${k === played-1 ? " here" : ""}" data-base="${baseIdx}" data-line="${esc(line)}" data-k="${k}" title="Play the line up to ${esc(s)}">${esc(s)}</button>`).join(" ")
     + (ok.length < sans.length ? " " + esc(sans.slice(ok.length).join(" ")) : "");
 }
 // play moves 0..k of a line from positions[base] (a branch off the game, like playing your own line)
@@ -3787,24 +3803,26 @@ const COACH_TXT = {
 };
 function renderCoach(onMain, d, A, e){
   const box = $("gpCoach"); if(!box) return;
-  if(!onMain){ box.innerHTML = `<div class="coach-empty">Exploring your own line from ${d > 1 ? esc(moveLabel(d-1)) : "the start"}. The engine panel on the right follows along.</div>`; return; }
-  if(gPly < 1){ box.innerHTML = `<div class="coach-empty">Starting position. Press → or click a move to see what the coach thinks of it.</div>`; return; }
+  // off the game: keep the comment on the game move you branched away from, so its best line stays readable
+  const P = onMain ? gPly : d;
+  if(!onMain){ e = A?.evals?.[P-1]; if(P < 1 || !mainline[P] || !e?.judgment){ box.innerHTML = `<div class="coach-empty">Exploring your own line from ${d > 1 ? esc(moveLabel(d-1)) : "the start"}. The engine panel on the right follows along.</div>`; return; } }
+  if(P < 1){ box.innerHTML = `<div class="coach-empty">Starting position. Press → or click a move to see what the coach thinks of it.</div>`; return; }
   const ev = e ? (e.mate !== undefined ? (e.mate === 0 ? "" : `#${e.mate}`) : `${e.eval > 0 ? "+" : ""}${(e.eval/100).toFixed(1)}`) : "";
-  const kind = e?.judgment ? SYM[e.judgment.name][1] : A?.cls?.[gPly-1];
+  const kind = e?.judgment ? SYM[e.judgment.name][1] : A?.cls?.[P-1];
   const b = kind && BADGE[kind];
-  const mover = mainline[gPly-1]?.fen.split(" ")[1], you = mover === color;
+  const mover = mainline[P-1]?.fen.split(" ")[1], you = mover === color;
   const who = you ? "You" : "Your opponent";
-  let html = `<div class="coach-top">${b ? `<span class="coach-badge" style="background:${b.bg}">${b.html}</span>` : ""}
-    <div><div class="coach-kind">${b ? esc(e?.judgment ? e.judgment.name : b.t.split(":")[0]) : esc(moveLabel(gPly))}</div>
-    <div class="coach-move">${esc(moveLabel(gPly))} · ${who === "You" ? "your move" : "opponent's move"}${ev ? `<span class="num">${ev}</span>` : ""}</div></div></div><div class="coach-text">`;
+  let html = (onMain ? "" : `<div class="coach-own">Your own line · the game's comment on ${esc(moveLabel(P))}</div>`) + `<div class="coach-top">${b ? `<span class="coach-badge" style="background:${b.bg}">${b.html}</span>` : ""}
+    <div><div class="coach-kind">${b ? esc(e?.judgment ? e.judgment.name : b.t.split(":")[0]) : esc(moveLabel(P))}</div>
+    <div class="coach-move">${esc(moveLabel(P))} · ${who === "You" ? "your move" : "opponent's move"}${ev ? `<span class="num">${ev}</span>` : ""}</div></div></div><div class="coach-text">`;
   if(!A) html += `<p class="coach-empty">Run the analysis (right panel) to get comments on every move.</p>`;
   else if(e?.judgment){
-    const bases = [{idx: gPly-1, fen: positions[gPly-1].fen}, {idx: gPly, fen: positions[gPly].fen}];
+    const bases = [{idx: P-1, fen: mainline[P-1].fen}].concat(onMain ? [{idx: P, fen: mainline[P].fen}] : []);
     html += `<p>${linkMoves(e.judgment.comment, bases)}</p>`;
-    const coach = coachLine(gPly, e); if(coach) html += `<p>${linkMoves(coach, bases)}</p>`;
-    if(e.variation) html += `<p class="coach-line">Best line: ${linkLine(e.variation.split(" ").slice(0,8), gPly-1)}</p>`;
+    const coach = coachLine(P, e); if(coach) html += `<p>${linkMoves(coach, bases)}</p>`;
+    if(e.variation) html += `<p class="coach-line">Best line: ${linkLine(e.variation.split(" ").slice(0,8), P-1, onMain ? 0 : linePlayed(P-1, e.variation.split(" ").slice(0,8)))}</p>`;
   } else if(kind && COACH_TXT[kind]) html += `<p>${COACH_TXT[kind]}</p>`;
-  const note = S.gnotes[curGame.id]?.moves?.[gPly];
+  const note = S.gnotes[curGame.id]?.moves?.[P];
   if(note) html += `<p class="coach-note">${esc(note)}</p>`;
   box.innerHTML = html + "</div>";
 }
