@@ -171,6 +171,8 @@ function board() {
     premovable: { enabled: false }, highlight: { lastMove: true, check: true }, drawable: { enabled: true },
   });
   if (window.ResizeObserver) new ResizeObserver(() => cg.redrawAll()).observe($('drill-board'));
+  // re-measure the board when you press on it (its remembered screen position goes stale if the layout shifts)
+  for (const t of ['pointerdown', 'mousedown', 'touchstart']) $('drill-board').addEventListener(t, () => { try { cg.state.dom.bounds.clear(); } catch { /* */ } }, { capture: true, passive: true });
   return cg;
 }
 function dests(c) { const m = new Map(); for (const mv of c.moves({ verbose: true })) { if (!m.has(mv.from)) m.set(mv.from, []); m.get(mv.from).push(mv.to); } return m; }

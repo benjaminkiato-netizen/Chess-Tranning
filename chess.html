@@ -1876,6 +1876,11 @@ function cgBoard(b, after, extra = {}){
       lastW = w; cg.redrawAll();
     }).observe(b);
   }
+  // Chessground remembers where the board is on screen and only re-measures on scroll / window resize.
+  // When the layout around it shifts (e.g. entering "your own line" in game review), that memory goes
+  // stale and a click lands on the neighbouring square. Re-measure at the moment you press.
+  const fresh = () => { try{ cg.state.dom.bounds.clear(); }catch(e){} };
+  for(const t of ["pointerdown", "mousedown", "touchstart"]) b.addEventListener(t, fresh, {capture: true, passive: true});
   lookSelect(cg, b);
   return cg;
 }
