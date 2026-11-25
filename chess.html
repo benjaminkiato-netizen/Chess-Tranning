@@ -382,7 +382,10 @@ button.mv{white-space:nowrap;overflow:hidden}
   .wrap.wide{max-width:1880px}
   .drill-grid.gm{grid-template-columns:300px auto 300px;justify-content:center}
   .drill-grid.gm .gleft{display:flex;flex-direction:column;gap:14px;width:300px}
-  .drill-grid.gm .gunder{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch}
+  .drill-grid.gm .gunder{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:stretch}
+  /* the panels under the board never set the column's width: it is always the board's width,
+     whatever text the coach shows, so nothing on the page jumps around */
+  .drill-grid.gm .bcol > .gunder, .drill-grid.gm .bcol > .gp-comment{width:0;min-width:100%;box-sizing:border-box}
   .drill-grid.gm .gunder .gp-report{grid-template-columns:1fr 1fr;gap:10px;padding:14px}
   .drill-grid.gm .gunder .gp-report .rp-rate b{font-size:22px}
   .drill-grid.gm .gunder .gp-report .rp-rows{font-size:13px;gap:4px 8px}
