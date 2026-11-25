@@ -97,5 +97,30 @@
     applyBoard(read(KEY, 'classic')); applyPieces(curSet());
     d.showModal();
   }
+  /* Drag feel, on every chessground board: the piece you pick up lifts (a little bigger, with a shadow),
+     the cursor is a hand, and the square you'd drop it on gets an outline that follows you. */
+  const feel = document.createElement('style');
+  feel.textContent = `
+    .cg-wrap piece{cursor:grab}
+    .cg-wrap piece.dragging{cursor:grabbing;filter:drop-shadow(0 8px 7px rgba(0,0,0,.45))}
+    .cg-wrap piece.dragging::before{transform:scale(1.12);transform-origin:50% 70%}
+    .cg-wrap cg-board.bt-dragging, .cg-wrap cg-board.bt-dragging piece{cursor:grabbing}
+    .bt-hover{position:absolute;width:12.5%;height:12.5%;pointer-events:none;z-index:3;
+      box-shadow:inset 0 0 0 4px rgba(255,255,255,.7);border-radius:2px}`;
+  document.head.appendChild(feel);
+  let hoverEl = null, hoverBoard = null;
+  const clearHover = () => { if (hoverEl) hoverEl.remove(); if (hoverBoard) hoverBoard.classList.remove('bt-dragging'); hoverEl = hoverBoard = null; };
+  document.addEventListener('pointermove', (e) => {
+    const p = document.querySelector('.cg-wrap piece.dragging');
+    if (!p) { if (hoverEl) clearHover(); return; }
+    const board = p.parentElement, r = board.getBoundingClientRect();
+    const col = Math.floor((e.clientX - r.left) / (r.width / 8)), row = Math.floor((e.clientY - r.top) / (r.height / 8));
+    if (col < 0 || col > 7 || row < 0 || row > 7) { if (hoverEl) hoverEl.style.display = 'none'; return; }
+    if (hoverBoard !== board) { clearHover(); hoverBoard = board; board.classList.add('bt-dragging'); }
+    if (!hoverEl) { hoverEl = document.createElement('div'); hoverEl.className = 'bt-hover'; board.appendChild(hoverEl); }
+    hoverEl.style.display = ''; hoverEl.style.left = col * 12.5 + '%'; hoverEl.style.top = row * 12.5 + '%';
+  }, { passive: true });
+  for (const t of ['pointerup', 'pointercancel', 'blur']) window.addEventListener(t, () => setTimeout(clearHover, 0), { passive: true });
+
   window.BoardTheme = { open, pieceUrl, themes: THEMES, sets: SETS };
 })();

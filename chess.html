@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script src="sync.js"></script>
-<script src="board-theme.js?v=6"></script>
+<script src="board-theme.js?v=7"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Daily Puzzle Drill</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2261,6 +2261,9 @@ function ctx(){
   if(AC.state==="suspended") AC.resume(); loadSamples(AC); return AC;
 }
 const SND_BASE = "sounds/";
+// set the sound system up while the page is idle (it starts paused until your first click), so the first
+// time you grab a piece the board doesn't stall while it starts up
+(window.requestIdleCallback || (f => setTimeout(f, 800)))(() => { try{ if(!AC){ AC = new (window.AudioContext || window.webkitAudioContext)(); AC.onstatechange = () => { try{ soundLabel(); }catch(e){} }; } loadSamples(AC); }catch(e){} });
 // recorded wooden piece sounds (two takes for moves, picked at random; a double knock for captures)
 const SAMPLES = {}; let samplesLoading = null;
 function loadSamples(ac){
