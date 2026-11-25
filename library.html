@@ -355,6 +355,7 @@ if(!PC){   // first run of v2: keep the book and anime covers, look movies up ag
     localStorage.removeItem("library.posters.v1"); localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){} }
 const pFail = {};   // lookups that failed (site busy), and when to try them again
 // one-time: anime remembered as "no cover" get another try with the backup sources
+if(!PC.__anime3){ for(const k of Object.keys(PC)) if(k.startsWith("anime|") && !PC[k]?.url) delete PC[k]; PC.__anime3 = 1; try{ localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){} }
 if(!PC.__anime2){ for(const k of Object.keys(PC)) if(k.startsWith("anime|") && !PC[k]?.url) delete PC[k]; PC.__anime2 = 1; try{ localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){} }
 const pKey = i => `${i.type}|${i.title.toLowerCase()}|${(i.by||"").toLowerCase()}`;
 const ICON = {book:"📖", movie:"🎬", anime:"📺"};
@@ -390,13 +391,24 @@ async function findPoster(i){
     return {url: d?.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : null, genre};
   }
   if(i.type === "anime"){
-    let jikanErr = null, a = null;
-    try{ a = (await getJSON(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(t)}&limit=1&sfw=true`)).data?.[0]; }catch(e){ jikanErr = e; }
+    let jikanErr = null, a = null, first = null;
+    // the title as typed, then a looser spelling ("Demon's De De De De" -> "Demons Dededede"); pick the result whose name matches
+    for(const q of [...new Set([t, loose(t)])]){
+      try{
+        const res = (await getJSON(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(q)}&limit=5&sfw=true`)).data || [];
+        a = res.find(x => [x.title, x.title_english, ...(x.title_synonyms || []), ...(x.titles || []).map(y => y.title)].some(n => n && sq(n) === sq(t)))
+          || res.find(x => [x.title, x.title_english].some(n => n && (sq(n).includes(sq(t)) || sq(t).includes(sq(n)))))
+          || null;
+        first ||= res[0]; jikanErr = null; if(a) break;
+      }catch(e){ jikanErr = e; }
+      if(q === t && loose(t) !== t) await new Promise(r => setTimeout(r, 1100));   // Jikan allows about one request a second
+    }
+    a ||= first;
     const url = a?.images?.jpg?.large_image_url || a?.images?.jpg?.image_url;
     if(url) return {url, genre: (a.genres || []).map(g => g.name).slice(0, 3).join(", "),
       year: a.year || a.aired?.prop?.from?.year || "", studio: a.studios?.[0]?.name || ""};
     // MyAnimeList busy or no match: the show's own Wikipedia article, then TMDB if you've added a key
-    const w = await wikiImage(t, /\b(tv series|anime|manga|film)\b/, yearOf(i.by));
+    const w = await wikiImage(t, /\b(tv series|anime|manga|film)\b/, yearOf(i.by)) || (loose(t) !== t ? await wikiImage(loose(t), /\b(tv series|anime|manga|film)\b/, yearOf(i.by)) : null);
     if(w) return w;
     if(tmdbKey()){ try{ const m = await tmdbFind(i); if(m.url) return m; }catch(e){ if(e.badKey) tmdbBad(); } }
     if(jikanErr) throw jikanErr;   // try again later rather than remembering "no cover"
@@ -459,9 +471,13 @@ async function tmdbFind(i){
 }
 
 // lead image of the article that IS this title ("Paranoia Agent", "Ergo Proxy (TV series)"), never some other page
+// titles compared without spaces or punctuation: "Demon's De De De De" == "Demons Dededede"
+const sq = x => String(x || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]/g, "");
+// a looser spelling to search with: no apostrophes, repeated short syllables joined ("De De De De" -> "Dededede")
+const loose = t => t.replace(/['’]/g, "").replace(/\b([A-Za-z]{1,3})(\s+\1\b)+/gi, m => m.replace(/\s+/g, "").replace(/^./, c => c.toUpperCase()).replace(/(?<=.)./g, c => c.toLowerCase()));
 async function wikiImage(t, kindRe, y){
   const norm = x => x.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(), want = norm(t);
-  const ok = title => { const n = norm(title), base = norm(title.replace(/\s*\(.*\)\s*$/, "")); return base === want && (n === want || kindRe.test(n) || (y && n.includes(y))); };
+  const ok = title => { const n = norm(title), base = norm(title.replace(/\s*\(.*\)\s*$/, "")); return sq(base) === sq(want) && (n === want || kindRe.test(n) || (y && n.includes(y))); };
   const u = `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${encodeURIComponent(t)}&gsrlimit=8&prop=pageimages|pageprops&ppprop=wikibase_item&piprop=thumbnail&pithumbsize=342&pilicense=any`;
   const pages = Object.values((await getJSON(u)).query?.pages || {}).filter(p => p.thumbnail && ok(p.title)).sort((a, b) => a.index - b.index);
   if(!pages[0]) return null;
