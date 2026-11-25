@@ -159,6 +159,9 @@ body.dragging, body.dragging *{cursor:grabbing !important}
 .eng-line .pv{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .eng-line .pv b{font-weight:500;color:var(--muted)}
 .eng-note{margin:0;font-size:12px;color:var(--muted)} .eng-note a{color:var(--muted)}
+.eng-game{display:block;font-size:13px;font-weight:600;color:var(--accent-2,#9be7b0);text-decoration:none;padding:2px 0}
+.eng-game:hover{text-decoration:underline}
+.eng-game:not([hidden]) + .eng-note{display:none}
 .sq.check::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at center, rgba(255,0,0,1) 0%, rgba(231,0,0,1) 25%, rgba(169,0,0,0) 89%, rgba(158,0,0,0) 100%)}
 .board{overflow:visible}
 .mbadge{position:absolute;z-index:30;top:0;right:0;transform:translate(32%,-32%);width:max(20px,3.4cqw);height:max(20px,3.4cqw);border-radius:50%;
@@ -1139,6 +1142,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
         <button id="engToggle" class="link">Turn off</button>
       </div>
       <div class="eng-lines" id="engLines"></div>
+      <a id="engGameLink" class="eng-game" target="_blank" rel="noopener" hidden></a>
       <p class="eng-note">Runs in your browser. Click a line to play its first move, or click any move in it to play up to that move. <a href="https://github.com/official-stockfish/Stockfish" target="_blank" rel="noopener">Stockfish</a> is free software (GPLv3), browser build by <a href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noopener">stockfish.js</a>.</p>
     </div>
     <div class="nav" id="nav" hidden>
@@ -2199,7 +2203,16 @@ function engineUpdate(){
   if(fen !== sfFen) sfGo(fen); else renderEngine();
 }
 
-function updateNav(){
+// game review: the engine box links to this game on Lichess / Chess.com, at the move on screen
+function updateGameLink(){
+  const a = $("engGameLink"); if(!a) return;
+  if(mode !== "game" || !curGame){ a.hidden = true; return; }
+  let ply = 0; while(ply < viewIdx && mainline[ply+1] && positions[ply+1]?.fen === mainline[ply+1].fen) ply++;
+  a.href = gameUrl(curGame, color, ply);
+  a.textContent = `Open this game on ${isCC(curGame) ? "Chess.com" : "Lichess"}${ply ? " at " + moveLabel(ply) : ""} ↗`;
+  a.hidden = false;
+}
+function updateNav(){ updateGameLink();
   const nav = $("nav"); if(!nav) return;
   nav.hidden = !analysis;
   engineUpdate();
