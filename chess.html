@@ -3841,11 +3841,15 @@ $("gpMoveNote").oninput = e => {
   if(had !== !!n.moves[gPly]){ renderMoveList(); gameSync(); }
 };
 /* Build a PGN (chess.js game) from SAN moves plus headers. */
-function buildGame({sans, startFen, white, black, result, site, date, name}){
+function buildGame({sans, startFen, white, black, result, site, date, name, event, tags}){
   const g = startFen ? new Chess(startFen) : new Chess();
-  const hdr = ["Event", name, "White", white, "Black", black, "Result", result || "*"];
+  // same tag order as Lichess's own PGN export; the ratings (WhiteElo/BlackElo) are what Chess.com's and
+  // other reviewers need to estimate a "game rating"
+  const hdr = ["Event", event || name];
   if(site) hdr.push("Site", site);
-  if(date) hdr.push("Date", date);
+  if(date) hdr.push("Date", date, "Round", "-");
+  hdr.push("White", white, "Black", black, "Result", result || "*");
+  for(const [k, v] of tags || []) if(v != null && v !== "") hdr.push(k, String(v));
   if(startFen) hdr.push("SetUp", "1", "FEN", startFen);
   g.header(...hdr);
   for(const san of sans) if(!g.move(san, {sloppy:true})) break;
@@ -3872,9 +3876,22 @@ function sendToStudy(info){
   location.href = "chess-lab/";
 }
 const pgnDate = t => new Date(t || Date.now()).toISOString().slice(0, 10).replace(/-/g, ".");
+// the extra PGN tags for a game: ids, time, ratings and rating changes, time control, opening, how it ended
+function pgnTags(g){
+  const P = g.players || {}, t = new Date(g.createdAt || Date.now()).toISOString();
+  const elo = p => p?.aiLevel ? null : p?.rating ?? "?", diff = p => p?.ratingDiff == null ? null : (p.ratingDiff > 0 ? "+" : "") + p.ratingDiff;
+  const term = {outoftime: "Time forfeit", timeout: "Time forfeit", aborted: "Abandoned", noStart: "Abandoned"}[g.status] || (g.status === "started" ? "Unterminated" : "Normal");
+  return [["GameId", isCC(g) ? null : g.id], ["UTCDate", t.slice(0,10).replace(/-/g, ".")], ["UTCTime", t.slice(11,19)],
+    ["WhiteElo", elo(P.white)], ["BlackElo", elo(P.black)], ["WhiteRatingDiff", diff(P.white)], ["BlackRatingDiff", diff(P.black)],
+    ["WhiteTitle", P.white?.user?.title], ["BlackTitle", P.black?.user?.title],
+    ["Variant", g.variant === "standard" || !g.variant ? "Standard" : g.variant[0].toUpperCase() + g.variant.slice(1)],
+    ["TimeControl", g.clock ? `${g.clock.initial}+${g.clock.increment}` : g.daysPerTurn ? `1/${g.daysPerTurn * 86400}` : "-"],
+    ["ECO", g.opening?.eco], ["Opening", g.opening?.name], ["Termination", term]];
+}
 function gameInfo(){
   const g = curGame, opp = color === "w" ? g.players.black : g.players.white;
   return {
+    event: `${g.rated === false ? "casual" : "rated"} ${g.speed || "chess"} game`, tags: pgnTags(g),
     sans: gSan, startFen: g.initialFen || null,
     white: playerName(g.players.white), black: playerName(g.players.black),
     result: g.winner ? (g.winner === "white" ? "1-0" : "0-1") : (g.status === "started" ? "*" : "1/2-1/2"),
@@ -5435,6 +5452,10 @@ function renderLiveActions(){
         result: w ? (w === "white" ? "1-0" : "0-1") : "1/2-1/2",
         site: `https://lichess.org/${live.id}`, date: pgnDate(),
         name: `vs ${pname(opp)} · ${new Date().toLocaleDateString()}`,
+        event: `${f.rated === false ? "casual" : "rated"} ${f.speed || "chess"} game`,
+        tags: [["GameId", live.id], ["WhiteElo", f.white?.aiLevel ? null : f.white?.rating ?? "?"], ["BlackElo", f.black?.aiLevel ? null : f.black?.rating ?? "?"],
+          ["WhiteTitle", f.white?.title], ["BlackTitle", f.black?.title], ["Variant", "Standard"],
+          ["TimeControl", f.clock ? `${Math.round(f.clock.initial/1000)}+${Math.round(f.clock.increment/1000)}` : "-"]],
         orientation: live.myColor === "b" ? "black" : "white", ply: live.hist.length - 1,
       };
     };
