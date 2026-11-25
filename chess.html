@@ -4440,7 +4440,7 @@ function snType(fen, best, played, prev, me, phase, after, line){
   return phase === "endgame" ? "endgame" : "quiet";
 }
 // pull the drill positions out of one analysed game
-function snCollectGame(g, A){
+function snCollectGame(g, A, onlyNew, onlyK){
   const me = myColor(g), sans = g.moves.split(" ").filter(Boolean), fens = [];
   const c = g.initialFen ? new Chess(g.initialFen) : new Chess(); fens.push(c.fen());
   for(const san of sans){ if(!c.move(san, {sloppy:true})) break; fens.push(c.fen()); }
@@ -4452,6 +4452,8 @@ function snCollectGame(g, A){
     if(!e || fen.split(" ")[1] !== me || !e.judgment || !e.best) continue;
     if(!bad(e) && e.judgment.name !== "Inaccuracy") continue;   // blunders, mistakes and inaccuracies
     const missed = false;
+    if(onlyK != null && k !== onlyK) continue;
+    if(onlyNew && S.sn.items[`${g.id}:${k}`]) continue;
     const phase = snPhase(fen, k), prev = k >= 2 ? A.evals[k-2] : A.ev0, old = S.sn.items[`${g.id}:${k}`];
     S.sn.items[`${g.id}:${k}`] = {solved: old?.solved || null, bestT: old?.bestT ?? null, tries: old?.tries || 0, id:`${g.id}:${k}`, fen, best:e.best, line:e.variation || "", played:sans[k-1],
       kind: missed ? "missed" : e.judgment.name.toLowerCase(), type: snType(fen, e.best, sans[k-1], prev, me, phase, e, e.variation), phase,
@@ -5109,13 +5111,32 @@ function snPanel(p){
 }
 $("snTabs").onclick = e => { const b = e.target.closest("button[data-pane]"); if(b) snPanel(b.dataset.pane); };
 // one time: games analysed before inaccuracies were included get them added (their analysis is still saved)
+let snAdding = false;
 async function snAddInaccuracies(){
-  if((S.sn.v || 0) >= 5 || snJob) return;
+  if((S.sn.v || 0) >= 5 || snJob || snAdding) return; snAdding = true;
   try{
-    const {games} = await snLoadAll(); let n = 0;
-    for(const g of games){ if(!S.sn.done[g.id]) continue; const A = gAnalysis(g); if(A) n += snCollectGame(g, A); }
-    S.sn.v = 5; save(); snRenderSet(); snRenderSummary();
+    const {games} = await snLoadAll(); let n = 0, t = performance.now();
+    S.sn.v5done ??= {};
+    for(const g of games){
+      if(!S.sn.done[g.id] || S.sn.v5done[g.id]) continue;
+      const A = gAnalysis(g);
+      // one position at a time: sorting a position into a type can take ~50ms
+      if(A) for(let k = 1; k <= A.evals.length; k++){
+        const e = A.evals[k-1];
+        if(!e?.judgment || e.judgment.name !== "Inaccuracy" || S.sn.items[`${g.id}:${k}`]) continue;
+        n += snCollectGame(g, A, true, k);
+        if(performance.now() - t > 30){ await new Promise(r => setTimeout(r, 0)); t = performance.now(); }
+      }
+      S.sn.v5done[g.id] = 1;
+      // a few milliseconds of work at a time, so the page never freezes (and progress is kept if you leave)
+      if(performance.now() - t > 30){
+        if(performance.now() - (snAddInaccuracies.saved || 0) > 5000){ save(); snAddInaccuracies.saved = performance.now(); }
+        await new Promise(r => setTimeout(r, 0)); t = performance.now();
+      }
+    }
+    S.sn.v = 5; delete S.sn.v5done; save(); if(!snPz) snRenderSet(); snRenderSummary();
   }catch(e){}
+  snAdding = false;
 }
 function snTab(){
   snAddInaccuracies();
