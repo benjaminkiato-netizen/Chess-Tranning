@@ -6,7 +6,7 @@
  */
 (() => {
   'use strict';
-  const KEY = 'chesslab.boardTheme', PKEY = 'chesslab.pieceSet', V = 13;
+  const KEY = 'chesslab.boardTheme', PKEY = 'chesslab.pieceSet', V = 15;
   const BASE = new URL('chess-lab/pieces/', document.currentScript ? document.currentScript.src : location.href).href;
   const THEMES = [
     { id: 'classic', name: 'Classic Green', l: '#eed5a4', d: '#355a31' },
@@ -28,7 +28,7 @@
     { id: 'geometric', name: 'Geometric' },
     { id: 'outlined', name: 'Outlined' },
     { id: 'flat', name: 'Flat' },
-    { id: 'soft', name: 'Soft' },
+    { id: 'soft', name: 'Soft', top: '-23%' },   // drawn lower in its image, so lifted more
   ];
   const KEYS = ['w', 'b'].flatMap((c) => [...'kqrbnp'].map((p) => c + p));
   const read = (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } };
@@ -44,6 +44,8 @@
   function applyPieces(set) {
     const s = document.documentElement.style;
     for (const k of KEYS) s.setProperty(`--pc-${k}`, `url("${pieceUrl(k, set)}")`);
+    // how far each set's image is lifted so its pieces sit in the middle of the square
+    s.setProperty('--pc-top', (SETS.find(x => x.id === set) || {}).top || '-15%');
     // boards drawn with <img> (chess page mini boards and play board): swap them in place
     document.querySelectorAll('img').forEach((im) => {
       const m = /chess-lab\/pieces\/(?:[a-z]+\/)?([wb][kqrbnp])\.png/.exec(im.getAttribute('src') || '');
@@ -110,6 +112,18 @@
     .bt-hover{position:absolute;width:12.5%;height:12.5%;pointer-events:none;z-index:3;
       box-shadow:inset 0 0 0 4px rgba(255,255,255,.7);border-radius:2px}`;
   document.head.appendChild(feel);
+  /* Coordinates like ChessSigma: rank numbers in the top-left of the a-file squares, file letters in the
+     bottom-right of the first-rank squares, sized with the board, in the colour of the opposite square. */
+  const coords = document.createElement('style');
+  coords.textContent = `
+    .cg-wrap cg-container{container-type:size}
+    .cg-wrap coords{opacity:1 !important;font:500 clamp(10px, 2.4cqw, 22px)/1 "IBM Plex Sans", system-ui, sans-serif !important;text-shadow:none !important}
+    .cg-wrap coords.ranks{left:0 !important;top:0 !important;width:12.5% !important;height:100% !important;align-items:flex-start !important}
+    .cg-wrap coords.ranks coord{transform:none !important;padding:.3em 0 0 .32em;text-align:left}
+    .cg-wrap coords.files{left:0 !important;bottom:0 !important;width:100% !important;height:12.5% !important;align-items:flex-end;text-align:right !important}
+    .cg-wrap coords.files coord{padding:0 .32em .28em 0;flex:1 1 0 !important}
+    .cg-wrap coords coord{text-transform:lowercase !important}`;
+  document.head.appendChild(coords);
   let hoverEl = null, hoverBoard = null;
   const clearHover = () => { if (hoverEl) hoverEl.remove(); if (hoverBoard) hoverBoard.classList.remove('bt-dragging'); hoverEl = hoverBoard = null; };
   document.addEventListener('pointermove', (e) => {

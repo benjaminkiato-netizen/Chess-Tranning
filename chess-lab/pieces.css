@@ -13,9 +13,9 @@
 .cg-wrap piece.knight.black { background-image: var(--pc-bn, url("pieces/cartoon/bn.png?v=6")); }
 .cg-wrap piece.pawn.black { background-image: var(--pc-bp, url("pieces/cartoon/bp.png?v=6")); }
 
-/* Pieces drawn 25% bigger than before (115% of the square instead of 92%), standing on the square's bottom edge.
-   A background can't spill outside its element, so the image is drawn on ::before, which can: tall pieces
-   like the king poke a little into the square above. */
+/* Pieces centred in their square (like ChessSigma): the image is drawn at 110% of the square and lifted by
+   --pc-top (set per piece set by board-theme.js) so the pieces sit in the middle. A background can't spill outside its element,
+   so the image is drawn on ::before, which can. */
 .cg-wrap piece { background-size: 0 0 !important; }
-.cg-wrap piece::before { content: ""; position: absolute; left: -7.5%; top: -15%; width: 115%; height: 115%;
+.cg-wrap piece::before { content: ""; position: absolute; left: -5%; top: var(--pc-top, -15%); width: 110%; height: 110%;
   background-image: inherit; background-size: 100% 100%; background-repeat: no-repeat; pointer-events: none; }
