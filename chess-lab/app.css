@@ -376,3 +376,6 @@ footer { color: var(--muted); font-size: 11px; position: fixed; right: 12px; bot
 
 /* Study: the first move of each variation (side line) is purple; main line stays green, losing lines red */
 .tree .var > .mn:first-child + .m:not(.losing):not(.cur) { color: #b68cff; font-weight: 600; }
+
+.mvl{cursor:pointer;font-weight:600;color:#9be7b0;border-bottom:1px dotted currentColor;border-radius:3px;padding:0 1px}
+.mvl:hover{background:#2f7d4f;color:#fff;border-bottom-color:transparent}
