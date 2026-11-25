@@ -666,6 +666,12 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
 .sn-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .sn-stat{border:1px solid var(--line);border-radius:10px;padding:8px 10px;text-align:center}
 .sn-stat{padding:5px 6px} .sn-stat b{display:block;font-size:17px} .sn-stat span{font-size:11px;color:var(--muted)}
+.sn-piles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.sn-pile{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.sn-pile.on{border-color:var(--accent,#2f7d4f)}
+.sn-pile-h{font-weight:700}
+.sn-pile-n{font:700 30px/1 var(--mono)}
+.sn-pile button{margin-top:auto}
 .sn-chips{display:flex;flex-wrap:wrap;gap:6px}
 .sn-chip{border:1px solid var(--line);background:none;color:inherit;border-radius:999px;padding:5px 10px;font-size:13px;cursor:pointer}
 .sn-chip.on{border-color:var(--accent);background:color-mix(in srgb, var(--accent) 18%, transparent)}
@@ -758,7 +764,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
   <nav class="tabs" id="tabs" aria-label="Chess sections">
     <a href="index.html" class="homelink">← Home</a>
     <button id="tabPuz" class="on">Puzzles</button>
-    <button data-view="sn" id="tabSN">Mistake Drills</button>
+    <button data-view="sn" id="tabSN">Learn from Mistakes</button>
     <button data-view="games" id="tabGames">Games</button>
     <button data-view="play" id="tabPlay">Play</button>
     <button class="themebtn" style="margin:0 0 0 auto" title="Board colors" onclick="BoardTheme.open()">🎨</button>
@@ -983,7 +989,7 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
     <div class="card rush-hist" id="rushHist"></div>
   </section>
 
-  <!-- MISTAKE DRILLS: your own mistakes from analysed games, drilled in woodpecker cycles -->
+  <!-- LEARN FROM YOUR MISTAKES: your own blunders / mistakes / inaccuracies, find the best move; solved ones race your best time -->
   <section id="sn" hidden>
     <div class="sn-grid">
       <div class="sn-boardcol">
@@ -991,8 +997,8 @@ button.tile.replay:disabled{background:var(--bg);color:var(--muted);box-shadow:i
         <div class="sn-prompt" id="snPrompt" aria-live="polite"></div>
       </div>
       <aside class="sn-side">
-        <div class="sn-head" title="Your own mistakes from your games, solved again in cycles until the right move is automatic. The next cycle only unlocks when you beat your accuracy and your time.">
-          <b>Mistake drills</b><span class="sn-note">woodpecker method</span>
+        <div class="sn-head" title="Your own blunders, mistakes and inaccuracies: find the best move. Solved ones move to a pile where you race your best time.">
+          <b>Learn from your mistakes</b><span class="sn-note">find the best move</span>
         </div>
         <nav class="sn-tabs" id="snTabs">
           <button data-pane="drill">Drill</button><button data-pane="progress">Progress</button><button data-pane="leaks">Leaks</button><button data-pane="types">Types</button><button data-pane="batches" id="snTabBatches">Batches</button>
@@ -4304,12 +4310,12 @@ $("rtReset").onclick = () => {
   save(); renderRated();
 };
 
-/* ---------- Mistake drills (woodpecker method) ----------
+/* ---------- Learn from your mistakes ----------
    1. Collect: analyse your recent games (Stockfish in the browser, or Lichess's own analysis when a game has it)
       and keep every position where you made a mistake or blunder, plus the ones where your opponent blundered
       and you didn't punish it ("missed wins").
    2. Each position gets a rough type (missed mate, hung a piece, missed fork, ...) and a game phase.
-   3. Build a fixed set and solve it in cycles. A new cycle unlocks only when you beat your best accuracy AND time. */
+   3. Two piles: "Find the best move" (unsolved) and "Beat your time" (solved, raced against your best time). */
 S.sn ??= {items: {}, done: {}, missed: true, set: null};
 S.sn.skip ??= ["worstfish"];   // opponents whose games don't count (e.g. bots you were trying to lose to)
 // games against any Lichess BOT account, or against a name on the skip list, are left out
@@ -4321,7 +4327,7 @@ function snSkipped(g){
 function snPurge(){   // drop positions already collected from games that are now skipped
   const skip = S.sn.skip.map(x => x.toLowerCase());
   for(const [id, it] of Object.entries(S.sn.items)) if(it.bot || skip.includes((it.vs || "").toLowerCase())) delete S.sn.items[id];
-  if(S.sn.set) S.sn.set.ids = S.sn.set.ids.filter(id => S.sn.items[id]);
+  if(S.sn.set?.run) S.sn.set.run.order = S.sn.set.run.order.filter(id => S.sn.items[id]);
   for(const [id, x] of Object.entries(S.sn.games || {})) if(skip.includes((x.vs || "").toLowerCase())) delete S.sn.games[id];
   save();
 }
@@ -4341,13 +4347,7 @@ const SN_TYPES = {
 const SN_PHASE = {opening:"Opening", middlegame:"Middlegame", endgame:"Endgame"};
 let snJob = null, snCg = null, snPz = null;
 snPurge();
-if(S.sn.set){   // repair scores from the old double-counting bug (could exceed 100%)
-  const st = S.sn.set;
-  if(st.best && st.best.acc > 100) st.best.acc = 100;
-  st.history.forEach(h => { if(h.acc > 100) h.acc = 100; });
-  if(st.run && st.run.correct > st.run.i) st.run.correct = st.run.i;
-  save();
-}
+if(S.sn.set && !S.sn.set.pile){ S.sn.set = null; save(); }   // a set from the old cycle version
 if((S.sn.v || 1) < 2){
   for(const it of Object.values(S.sn.items)){
     if(it.type !== "fork") continue;
@@ -4450,10 +4450,10 @@ function snCollectGame(g, A){
   for(let k = 1; k < fens.length; k++){
     const e = A.evals[k-1], fen = fens[k-1];
     if(!e || fen.split(" ")[1] !== me || !e.judgment || !e.best) continue;
-    const missed = k >= 2 && bad(A.evals[k-2]);
-    if(!missed && !bad(e)) continue;          // plain inaccuracies aren't drilled
-    const phase = snPhase(fen, k), prev = k >= 2 ? A.evals[k-2] : A.ev0;
-    S.sn.items[`${g.id}:${k}`] = {id:`${g.id}:${k}`, fen, best:e.best, line:e.variation || "", played:sans[k-1],
+    if(!bad(e) && e.judgment.name !== "Inaccuracy") continue;   // blunders, mistakes and inaccuracies
+    const missed = false;
+    const phase = snPhase(fen, k), prev = k >= 2 ? A.evals[k-2] : A.ev0, old = S.sn.items[`${g.id}:${k}`];
+    S.sn.items[`${g.id}:${k}`] = {solved: old?.solved || null, bestT: old?.bestT ?? null, tries: old?.tries || 0, id:`${g.id}:${k}`, fen, best:e.best, line:e.variation || "", played:sans[k-1],
       kind: missed ? "missed" : e.judgment.name.toLowerCase(), type: snType(fen, e.best, sans[k-1], prev, me, phase, e, e.variation), phase,
       opening: g.opening?.name ? g.opening.name.split(":")[0] : "", gid:g.id, link: gameUrl(g, me, k),
       label: moveLabelOf(fen, sans[k-1]), date: g.createdAt || Date.now(), vs: playerName(opp), bot: opp?.user?.title === "BOT" || !!opp?.aiLevel};
@@ -4463,7 +4463,8 @@ function snCollectGame(g, A){
   return n;
 }
 function moveLabelOf(fen, san){ const [, t, , , , n] = fen.split(" "); return `${n}${t === "w" ? "." : "..."} ${san}`; }
-const snItems = () => Object.values(S.sn.items).filter(it => S.sn.missed || it.kind !== "missed");
+const SN_KINDS = {blunder: "Blunders", mistake: "Mistakes", inaccuracy: "Inaccuracies"};
+const snItems = () => Object.values(S.sn.items).filter(it => SN_KINDS[it.kind]);
 
 /* ---- "Your leaks": a per-game report built from every analysed game (like chessitup's checkup) ----
    Stats are kept per game in S.sn.games so they survive after the full analysis is trimmed. */
@@ -4552,9 +4553,7 @@ function snRenderLeaks(){
   el.onclick = e => {
     const b = e.target.closest("[data-drill]"); if(!b) return;
     const L = SN_LEAKS.find(x => x.k === b.dataset.drill), ids = L.ids(G);
-    if(S.sn.set?.history?.length && !confirm("Start a new drill set from these positions? Your current set's cycle history goes with it.")) return;
-    S.sn.set = {ids, filter: "custom", name: view ? `Batch ${view}: ${L.name}` : L.name, batch: view || null, created: Date.now(), cycle: 1, best: null, history: [], run: null};
-    save(); snRenderSet(); snDrawIdle(); snPanel("drill");
+    S.sn.kind = "all"; snPz = null; snStartPile(ids.some(id => !S.sn.items[id]?.solved) ? "todo" : "solved", ids);
   };
 }
 
@@ -4564,7 +4563,6 @@ function snRenderLeaks(){
 const SN_BATCH = 50;
 S.sn.batches ??= [];      // [{n, ids:[gameId], from, to, created}]
 S.sn.speeds ??= (S.gameSpeeds || ["rapid","blitz"]).filter(x => x !== "bullet").length ? (S.gameSpeeds || []).filter(x => x !== "bullet") : ["rapid","blitz"];
-S.sn.drilled ??= {};      // batch n -> {cycles, best}
 // load your games from every site you have an account on, with the Mistake Drills time controls
 async function snLoadAll(){
   const keep = {site: S.gameSite, speeds: S.gameSpeeds, max: S.gameMax, sel: {...S.gameUserSel}}, all = [], errs = [];
@@ -4691,10 +4689,10 @@ function snSpark(M, B){
       ${pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="${col}"><title>Batch ${B[i].n}: ${M.fmt(p[2])}</title></circle><text x="${p[0]}" y="${H - 3}" text-anchor="middle" font-size="10" fill="currentColor" opacity=".6">B${B[i].n}</text>`).join("")}
     </svg></div>`;
 }
-// % of each batch's positions mastered, after every cycle you finish (one line per batch)
+// % of each batch's positions solved, over time (one line per batch)
 function snMasteryChart(){
   const L = S.sn.mlog.filter(e => Object.keys(e.b).length);
-  if(L.length < 2) return `<p class="sn-note">Mastery over time shows here after you finish a couple of cycles.</p>`;
+  if(L.length < 2) return `<p class="sn-note">Solved-over-time shows here once you've worked through some positions.</p>`;
   const W = 300, H = 80, padL = 26, padB = 14, cols = ["#60a5fa","#34d399","#f59e0b","#f472b6","#a78bfa","#f87171","#22d3ee","#facc15"];
   const nb = [...new Set(L.flatMap(e => Object.keys(e.b)))].map(Number).sort((a,b) => a-b);
   const x = i => padL + i * (W - padL - 6) / (L.length - 1), y = p => H - padB - p * (H - padB - 8);
@@ -4702,7 +4700,7 @@ function snMasteryChart(){
     return pts.length ? `<polyline fill="none" stroke="${cols[k % cols.length]}" stroke-width="2" points="${pts.map(p => p[0]+","+p[1]).join(" ")}"/>` : ""; }).join("");
   const grid = [0, .5, 1].map(p => `<line x1="${padL}" x2="${W}" y1="${y(p)}" y2="${y(p)}" stroke="currentColor" opacity=".12"/><text x="0" y="${y(p)+3}" font-size="9" fill="currentColor" opacity=".6">${p*100}%</text>`).join("");
   const d0 = new Date(L[0].t).toLocaleDateString(), d1 = new Date(L[L.length-1].t).toLocaleDateString();
-  return `<div class="sp"><div class="sp-head"><b>Mastered over time</b><span class="sn-note">${d0} to ${d1}</span></div>
+  return `<div class="sp"><div class="sp-head"><b>Solved over time</b><span class="sn-note">${d0} to ${d1}</span></div>
     <svg viewBox="0 0 ${W} ${H}" class="sp-svg" style="height:${H}px">${grid}${lines}</svg>
     <div class="sn-row sn-note">${nb.map((n, k) => `<span><i style="display:inline-block;width:10px;height:3px;background:${cols[k % cols.length]};vertical-align:middle"></i> B${n}</span>`).join(" ")}</div></div>`;
 }
@@ -4716,8 +4714,7 @@ function snRenderProgress(){
     <div class="pg-wrap"><table class="sn-hist pg-tab"><tr><th></th>${B.map(b => `<th title="${new Date(b.from).toLocaleDateString()} to ${new Date(b.to).toLocaleDateString()}">B${b.n}<br><span class="sn-note">${b.ids.length} games</span></th>`).join("")}</tr>
       ${SN_MET.map(M => `<tr><td>${esc(M.name)}</td>${B.map((b, i) => `<td>${b.m[M.k] != null ? M.fmt(b.m[M.k]) : "–"} ${arrow(M, b.m[M.k], B[i-1]?.m[M.k])}</td>`).join("")}</tr>`).join("")}
       <tr><td>Score</td>${B.map(b => `<td>${Math.round((b.m.score || 0) * 100)}%</td>`).join("")}</tr>
-      <tr><td>Mastered</td>${B.map(b => { const [m, t] = snBatchMastery(b); return `<td>${m}/${t}${t ? ` <span class="sn-note">${Math.round(m/t*100)}%</span>` : ""}</td>`; }).join("")}</tr>
-      <tr><td>Drilled</td>${B.map(b => { const d = S.sn.drilled[b.n]; return `<td>${d ? `cycle ${d.cycles}${d.best != null ? `, ${d.best}%` : ""}` : "–"}</td>`; }).join("")}</tr>
+      <tr><td>Solved</td>${B.map(b => { const [m, t] = snBatchMastery(b); return `<td>${m}/${t}${t ? ` <span class="sn-note">${Math.round(m/t*100)}%</span>` : ""}</td>`; }).join("")}</tr>
       <tr><td></td>${B.map(b => `<td><button class="link" data-bdrill="${b.n}">Drill</button></td>`).join("")}</tr>
     </table></div>
     ${snMasteryChart()}
@@ -4725,9 +4722,7 @@ function snRenderProgress(){
   el.querySelectorAll("[data-bdrill]").forEach(btn => btn.onclick = () => {
     const b = S.sn.batches.find(x => x.n === +btn.dataset.bdrill), ids = snItems().filter(it => b.ids.includes(it.gid)).map(it => it.id);
     if(!ids.length){ alert("No positions to drill from this batch."); return; }
-    if(S.sn.set?.history?.length && !confirm(`Start a new drill set from batch ${b.n}'s ${ids.length} positions? Your current set's cycle history goes with it.`)) return;
-    S.sn.set = {ids, filter: "custom", name: `Batch ${b.n} mistakes`, batch: b.n, created: Date.now(), cycle: 1, best: null, history: [], run: null};
-    save(); snRenderSet(); snDrawIdle(); snPanel("drill");
+    S.sn.kind = "all"; snPz = null; snStartPile(ids.some(id => !S.sn.items[id]?.solved) ? "todo" : "solved", ids);
   });
 }
 
@@ -4746,12 +4741,11 @@ function snRenderSummary(){
     <p class="sn-note">Types are a best guess from the engine's move, so a few may be in the wrong group.</p>`;
 }
 
-/* ---- the drill set and its cycles ---- */
-/* Graduation: a position you solve correctly and quickly (under SN_FAST) in SN_GRAD cycles in a row is "mastered"
-   and leaves your cycles. Mastery is kept per position, so each batch's progress can be tracked over time. */
-const SN_GRAD = 3, SN_FAST = 20000;
-S.sn.mlog ??= [];   // [{t, b:{batchN:[mastered, total]}}] one entry per finished cycle, for the mastery graph
-const snMastered = it => !!it?.grad;
+/* ---- Learn from your mistakes: two piles ----
+   "Find the best move": every blunder, mistake and inaccuracy you haven't solved yet. Solve one and it moves to
+   "Beat your time", where you solve it again against your best time. Miss one there and it goes back. */
+const snMastered = it => !!it?.solved;   // "mastered" now just means: in the solved pile
+S.sn.mlog ??= [];
 function snBatchMastery(b){ const it = snItems().filter(x => b.ids.includes(x.gid)); return [it.filter(snMastered).length, it.length]; }
 function snLogMastery(){
   const b = {}; for(const x of S.sn.batches) b[x.n] = snBatchMastery(x);
@@ -4760,54 +4754,48 @@ function snLogMastery(){
   S.sn.mlog.push({t: Date.now(), b}); if(S.sn.mlog.length > 300) S.sn.mlog.shift();
 }
 const fmtT = ms => { const s = Math.round(ms/1000); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; };
-function snBuild(filter, size){
-  let it = snItems().filter(x => filter === "all" || x.type === filter);
-  it.sort((a,b) => b.date - a.date); if(size) it = it.slice(0, size);
-  S.sn.set = {ids: it.map(x => x.id), filter, created: Date.now(), cycle: 1, best: null, history: [], run: null};
-  save(); snRenderSet(); snDrawIdle();
+const fmtS = ms => ms == null ? "–" : (ms/1000).toFixed(1) + "s";
+// the positions of one pile, filtered by kind (and optionally to a given list), newest game first
+function snPile(pile, only){
+  const kind = S.sn.kind || "all";
+  return snItems().filter(it => (pile === "solved") === !!it.solved && (kind === "all" || it.kind === kind) && (!only || only.includes(it.id)))
+    .sort((a,b) => b.date - a.date || a.id.localeCompare(b.id));
+}
+function snStartPile(pile, only){
+  const order = snPile(pile, only).map(it => it.id);
+  if(!order.length){ snRenderSet(); $("snPrompt").innerHTML = pile === "todo" ? '<span class="ok">Nothing left to solve here.</span> Head to "Beat your time", or analyse more games.' : "Nothing in this pile yet."; return; }
+  if(pile === "solved") for(let i = order.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+  S.sn.set = {pile, run: {order, i: 0, correct: 0, time: 0}};
+  save(); snRenderSet(); snPanel("drill"); snNext();
 }
 function snRenderSet(){
-  const set = S.sn.set, it = snItems();
-  const counts = it.reduce((m, x) => (m[x.type] = (m[x.type] || 0) + 1, m), {});
-  const pick = S.sn.pick || "all";
-  const chips = [["all", "All", it.length], ...Object.entries(counts).sort((a,b) => b[1]-a[1]).map(([k,v]) => [k, SN_TYPES[k]?.[0] || k, v])]
-    .map(([k, name, v]) => `<button class="sn-chip${pick === k ? " on" : ""}" data-k="${k}">${esc(name)}<b>${v}</b></button>`).join("");
-  const builder = `<div class="sn-chips" id="snChips">${chips}</div>
-    <div class="sn-row"><select id="snSize" aria-label="Set size">${[20,40,60,0].map(v => `<option value="${v}"${v === (S.sn.size ?? 40) ? " selected" : ""}>${v ? v + " positions" : "All positions"}</option>`).join("")}</select>
-      <button${set ? "" : ' class="primary"'} id="snBuild"${it.length ? "" : " disabled"}>${set ? "Build a new set" : "Build my drill set"}</button></div>`;
-  if(!set){
-    $("snSet").innerHTML = `<div class="eyebrow">Drill set</div><p class="sn-note">${it.length ? "Pick what to drill, then build a fixed set. Newest mistakes first." : "Analyse some games first."}</p>${builder}`;
-  } else {
-    const live = set.ids.filter(id => S.sn.items[id]), r = set.run, done = live.filter(id => snMastered(S.sn.items[id])).length;
-    const bestPer = set.best ? (set.best.per ?? set.best.time / Math.max(1, live.length)) : null;
-    const hist = set.history.length ? `<table class="sn-hist"><tr><th>Cycle</th><th>Positions</th><th>Accuracy</th><th>Time</th><th></th></tr>${set.history.slice(-8).map(h =>
-      `<tr><td>${h.cycle}</td><td>${h.n ?? "–"}</td><td>${h.acc}%</td><td>${fmtT(h.time)}</td><td>${h.beat ? "✓ unlocked" : "try again"}</td></tr>`).join("")}</table>` : "";
-    const mast = `<div class="sn-note">🎓 Mastered <b>${done}</b> of ${live.length} · ${live.length - done} left in your cycles</div>
-      <div class="sn-prog"><i style="width:${live.length ? done / live.length * 100 : 0}%;background:var(--good)"></i></div>
-      <label class="sn-row sn-note"><input type="checkbox" id="snShowM"${S.sn.showMastered ? " checked" : ""}> Keep mastered positions in my cycles</label>`;
-    $("snSet").innerHTML = `<div class="eyebrow">Drill set · ${esc(set.name || (set.filter === "all" ? "All types" : SN_TYPES[set.filter]?.[0] || set.filter))} · ${live.length} position${live.length === 1 ? "" : "s"}</div>
-      <h3 style="margin:0">Cycle ${set.cycle}</h3>
-      ${set.best ? `<p class="sn-note">To unlock cycle ${set.cycle + 1}: at least <b>${set.best.acc}%</b> and under <b>${(bestPer/1000).toFixed(1)}s</b> per position. A position you get right in under ${SN_FAST/1000}s in ${SN_GRAD} cycles in a row is mastered and leaves your cycles.</p>` : `<p class="sn-note">First pass: this sets the score to beat. Get a position right in under ${SN_FAST/1000}s in ${SN_GRAD} cycles in a row and it's mastered.</p>`}
-      ${mast}
-      <div class="sn-row"><button class="primary" id="snStart"${live.length ? "" : " disabled"}>${r ? `Continue (${r.i} / ${r.order.length})` : `Start cycle ${set.cycle}`}</button>${r ? '<button id="snRestart">Restart cycle</button>' : ""}</div>
-      ${hist}
-      <details><summary class="sn-note">Change the set</summary>${builder}</details>`;
-    $("snStart").onclick = () => snStartCycle(!r);
-    $("snShowM").onchange = e => { S.sn.showMastered = e.target.checked; save(); };
-    if($("snRestart")) $("snRestart").onclick = () => snStartCycle(true);
-  }
-  $("snChips").onclick = e => { const b = e.target.closest(".sn-chip"); if(!b) return; S.sn.pick = b.dataset.k; save(); snRenderSet(); };
-  $("snBuild").onclick = () => { S.sn.size = +$("snSize").value; if(set && set.history.length && !confirm("Start a new set? This set's cycle history goes with it.")) return; snBuild(S.sn.pick || "all", S.sn.size); };
-}
-function snStartCycle(fresh){
-  const set = S.sn.set; if(!set) return;
-  if(fresh || !set.run){
-    const order = set.ids.filter(id => S.sn.items[id] && (S.sn.showMastered || !snMastered(S.sn.items[id])));
-    if(!order.length){ snRenderSet(); $("snPrompt").innerHTML = '<span class="ok">Every position in this set is mastered.</span> Build a new set or analyse a new batch.'; return; }
-    for(let i = order.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
-    set.run = {order, i: 0, correct: 0, time: 0};
-  }
-  save(); snRenderSet(); snPanel("drill"); snNext();
+  const all = snItems(), kind = S.sn.kind || "all";
+  const cnt = k => all.filter(it => k === "all" || it.kind === k);
+  const chips = [["all", "All"], ...Object.entries(SN_KINDS)].map(([k, name]) =>
+    `<button class="sn-chip${kind === k ? " on" : ""}" data-k="${k}">${esc(name)}<b>${cnt(k).length}</b></button>`).join("");
+  const todo = snPile("todo"), solved = snPile("solved"), r = S.sn.set?.run, pile = S.sn.set?.pile;
+  const times = solved.filter(it => it.bestT != null).map(it => it.bestT);
+  const avg = times.length ? times.reduce((a,b) => a+b, 0) / times.length : null;
+  $("snSet").innerHTML = `<div class="eyebrow">Learn from your mistakes</div>
+    <p class="sn-note">${all.length ? "Positions from your games where you made a blunder, mistake or inaccuracy. Find the move you should have played." : "Analyse some games first (Batches tab)."}</p>
+    <div class="sn-chips" id="snChips">${chips}</div>
+    <div class="sn-piles">
+      <div class="sn-pile${pile === "todo" && r ? " on" : ""}">
+        <div class="sn-pile-h">🎯 Find the best move</div>
+        <div class="sn-pile-n">${todo.length}</div>
+        <div class="sn-note">to solve. Get one right and it moves to your solved pile.</div>
+        <button class="primary" id="snGoTodo"${todo.length ? "" : " disabled"}>${pile === "todo" && r ? `Continue (${r.i}/${r.order.length})` : "Start"}</button>
+      </div>
+      <div class="sn-pile${pile === "solved" && r ? " on" : ""}">
+        <div class="sn-pile-h">⏱ Beat your time</div>
+        <div class="sn-pile-n">${solved.length}</div>
+        <div class="sn-note">solved${avg != null ? ` · best times average ${fmtS(avg)}` : ""}. Miss one here and it goes back to be solved again.</div>
+        <button id="snGoSolved"${solved.length ? "" : " disabled"}>${pile === "solved" && r ? `Continue (${r.i}/${r.order.length})` : "Start"}</button>
+      </div>
+    </div>`;
+  $("snChips").onclick = e => { const b = e.target.closest("[data-k]"); if(!b) return; S.sn.kind = b.dataset.k; if(!snPz) S.sn.set = null; save(); snRenderSet(); };
+  $("snGoTodo").onclick = () => (pile === "todo" && r && !snPz) ? snNext() : pile === "todo" && r ? null : snStartPile("todo");
+  $("snGoSolved").onclick = () => (pile === "solved" && r && !snPz) ? snNext() : pile === "solved" && r ? null : snStartPile("solved");
 }
 function snNext(){
   const set = S.sn.set, r = set?.run; if(!r) return;
@@ -4821,19 +4809,19 @@ function snNext(){
     SFQ.eval(it.fen, 800).then(x => { if(snPz === z && !z.userMoves && x.mate > 0){ z.mateIn = x.mate; snMatePrompt(z, `In your game vs ${esc(it.vs)} you played ${esc(it.label)}. Play it all the way to checkmate.`); } }).catch(() => {});
     return;
   }
-  $("snPrompt").innerHTML = `<b>${it.fen.split(" ")[1] === "w" ? "White" : "Black"} to move.</b> Find the best move. <span class="sn-src">In your game vs ${esc(it.vs)} you played ${esc(it.label)}${it.kind === "missed" ? " (your opponent had just blundered)" : ""}.</span>`;
+  $("snPrompt").innerHTML = `<b>${it.fen.split(" ")[1] === "w" ? "White" : "Black"} to move.</b> Find the best move.${it.solved && it.bestT != null ? ` <b>Time to beat: ${fmtS(it.bestT)}</b>` : ""} <span class="sn-src">In your game vs ${esc(it.vs)} you played ${esc(it.label)} (${esc((SN_KINDS[it.kind] || "").replace(/s$/, "").toLowerCase())}).</span>`;
 }
 function snRunCard(){
   const r = S.sn.set?.run, el = $("snRun");
   if(!r || !snPz){ el.hidden = true; return; }
   const it = snPz.it; el.hidden = false;
-  el.innerHTML = `<div class="sn-row" style="justify-content:space-between"><b>Position ${snPz.pos + 1} of ${r.order.length}</b><span class="sn-note">${r.correct} right · ${fmtT(r.time)}</span></div>
+  el.innerHTML = `<div class="sn-row" style="justify-content:space-between"><b>${S.sn.set.pile === "solved" ? "⏱ Beat your time" : "🎯 Find the best move"} · ${snPz.pos + 1} of ${r.order.length}</b><span class="sn-note">${r.correct} right</span></div>
     <div class="sn-prog"><i style="width:${r.i / r.order.length * 100}%"></i></div>
     <div class="sn-note">${esc(SN_TYPES[it.type]?.[0] || "")} · ${esc(SN_PHASE[it.phase] || "")}${it.opening ? " · " + esc(it.opening) : ""}</div>
     ${snPz.solved || snPz.failed ? `<div class="sn-row"><button class="primary" id="snNextBtn">Next →</button><a class="sn-src" href="${esc(it.link)}" target="_blank" rel="noopener">See the game ↗</a></div>` : ""}
     <div class="sn-row"><button id="snQuit">Pause</button></div>`;
   if($("snNextBtn")) $("snNextBtn").onclick = () => snNext();
-  $("snQuit").onclick = () => { snPz = null; el.hidden = true; snRenderSet(); snDrawIdle(); $("snPrompt").textContent = "Paused. Your place in this cycle is saved."; };
+  $("snQuit").onclick = () => { snPz = null; el.hidden = true; snRenderSet(); snDrawIdle(); $("snPrompt").textContent = "Paused. Press Continue to pick up where you left off."; };
 }
 function snDraw(bad){
   const b = $("snBoard");
@@ -4847,8 +4835,23 @@ function snDraw(bad){
 }
 function snDrawIdle(){
   const b = $("snBoard"); snCg ||= cgBoard(b, (o, d) => snTry(o, d));
-  const set = S.sn.set, it = set && S.sn.items[set.ids[0]];
+  const it = snPile("todo")[0] || snPile("solved")[0];
   snCg.set({fen: it ? it.fen.split(" ")[0] : "start", orientation: it ? cgColor(it.fen.split(" ")[1]) : "white", lastMove: undefined, check: false, movable: {color: undefined, dests: new Map()}});
+}
+// a position was answered: move it between the piles and keep its best time. Returns a line for the prompt.
+function snPileResult(it, ok, dt){
+  it.tries = (it.tries || 0) + 1;
+  let note;
+  if(ok && !it.solved){ it.solved = Date.now(); it.bestT = dt; note = `<span class="sn-src">Solved in ${fmtS(dt)}: it moves to your <b>Beat your time</b> pile.</span>`; }
+  else if(ok){
+    const prev = it.bestT;
+    if(prev == null || dt < prev){ it.bestT = dt; note = `<b class="ok">⏱ New best: ${fmtS(dt)}</b>${prev != null ? ` <span class="sn-src">(was ${fmtS(prev)})</span>` : ""}`; }
+    else note = `<span class="sn-src">${fmtS(dt)} · your best is ${fmtS(prev)}.</span>`;
+  }
+  else if(it.solved){ it.solved = null; note = `<span class="sn-src">It goes back to <b>Find the best move</b>.</span>`; }
+  else note = `<span class="sn-src">It stays in your pile to try again later.</span>`;
+  snLogMastery(); save(); snRenderSet();
+  return note;
 }
 async function snTry(from, to){
   const z = snPz; if(!z || z.solved || z.failed) return;
@@ -4856,26 +4859,25 @@ async function snTry(from, to){
   let promo;
   if(p?.type === "p" && (to[1] === "8" || to[1] === "1")) promo = "q";
   const m = g.move({from, to, promotion: promo}); if(!m){ snDraw(); return; }
+  moveSound(m);
   const uci = from + to + (m.promotion || ""), r = S.sn.set.run, it = z.it;
   const dt = performance.now() - z.t0;
   if(it.type === "mate") return snMateTry(z, m, uci, dt);
   const right = uci.slice(0,4) === it.best.slice(0,4) || g.in_checkmate();
   z.lastMove = [from, to]; r.time += dt;
   snMakeLine(z);
-  let grad = false;
-  if(right && dt < SN_FAST){ it.streak = (it.streak || 0) + 1; if(it.streak >= SN_GRAD && !it.grad){ it.grad = Date.now(); grad = true; } }
-  else it.streak = 0;
   if(right){
     z.solved = true; r.correct++; r.i = z.pos + 1;
-    $("snPrompt").innerHTML = `<span class="ok">✓ Right: ${esc(m.san)}.</span> ${grad ? `<b>🎓 Mastered</b> (${SN_GRAD} cycles in a row, quickly): it leaves your cycles. ` : it.streak && !it.grad ? `<span class="sn-src">${it.streak}/${SN_GRAD} toward mastered${dt >= SN_FAST ? "" : ""}</span> ` : dt >= SN_FAST ? `<span class="sn-src">Right, but over ${SN_FAST/1000}s, so it doesn't count toward mastered.</span> ` : ""}${snLineHtml(z)}`;
+    const note = snPileResult(it, true, dt);
+    $("snPrompt").innerHTML = `<span class="ok">✓ Right: ${esc(m.san)}.</span> ${note} ${snLineHtml(z)}`;
     snDraw(); snRunCard(); save();
     // stays on this position: look through the line, then press Next when you're ready
     z.view = 1; snView(z, 1); snShowWhy(z);
   } else {
-    z.failed = true; r.i = z.pos + 1; save();
+    z.failed = true; r.i = z.pos + 1; const note = snPileResult(it, false, dt); save();
     g.undo(); z.lastMove = null; z.view = 0;
     const bm = z.sans[0] || it.best;
-    $("snPrompt").innerHTML = `<span class="bad">✗ Not this time.</span> Best was <b>${esc(bm)}</b>. In the game you played ${esc(it.played)}. ${snLineHtml(z)}`;
+    $("snPrompt").innerHTML = `<span class="bad">✗ Not this time.</span> Best was <b>${esc(bm)}</b>. In the game you played ${esc(it.played)}. ${note} ${snLineHtml(z)}`;
     snDraw(to); snRunCard();
     snCg.setAutoShapes([{orig: it.best.slice(0,2), dest: it.best.slice(2,4), brush: "green"}]);
     snShowWhy(z);
@@ -5008,16 +5010,14 @@ async function snMateTry(z, m, uci, dt){
     // the whole sequence becomes the line you can step through
     const c = new Chess(it.fen); z.fens = [c.fen()]; z.moves = [null]; z.sans = [];
     for(const h of g.history({verbose:true})){ c.move(h); z.fens.push(c.fen()); z.moves.push([h.from, h.to]); z.sans.push(h.san); }
-    const fast = z.think / z.userMoves < SN_FAST;
-    let grad = false;
-    if(ok && fast){ it.streak = (it.streak || 0) + 1; if(it.streak >= SN_GRAD && !it.grad){ it.grad = Date.now(); grad = true; } } else it.streak = 0;
     if(ok){ z.solved = true; r.correct++; } else z.failed = true;
-    r.i = z.pos + 1; save();
-    return grad;
+    r.i = z.pos + 1;
+    z.note = snPileResult(it, ok, z.think); save();
+    return false;
   };
   if(g.in_checkmate()){
-    const grad = finish(true);
-    $("snPrompt").innerHTML = `<span class="ok">✓ Checkmate in ${z.userMoves} move${z.userMoves === 1 ? "" : "s"}!</span> ${grad ? `<b>🎓 Mastered.</b> ` : it.streak && !it.grad ? `<span class="sn-src">${it.streak}/${SN_GRAD} toward mastered</span> ` : ""}${snLineHtml(z)}`;
+    finish(true);
+    $("snPrompt").innerHTML = `<span class="ok">✓ Checkmate in ${z.userMoves} move${z.userMoves === 1 ? "" : "s"}!</span> ${z.note} ${snLineHtml(z)}`;
     z.view = z.fens.length - 1; snDraw(); snRunCard(); return;
   }
   z.busy = true; snDraw(); snMatePrompt(z, "Checking…");
@@ -5033,7 +5033,7 @@ async function snMateTry(z, m, uci, dt){
     if(snPz !== z) return;
     finish(false); z.busy = false;
     const bm = best && new Chess(g.fen()).move({from: best.slice(0,2), to: best.slice(2,4), promotion: best[4] || "q"});
-    $("snPrompt").innerHTML = `<span class="bad">✗ ${esc(m.san)} lets the mate slip.</span> ${bm ? `<b>${esc(bm.san)}</b> kept it going.` : ""} ${z.userMoves > 1 ? `You got ${z.userMoves - 1} move${z.userMoves === 2 ? "" : "s"} of it right.` : `In the game you played ${esc(it.played)}.`} ${snLineHtml(z)}`;
+    $("snPrompt").innerHTML = `<span class="bad">✗ ${esc(m.san)} lets the mate slip.</span> ${bm ? `<b>${esc(bm.san)}</b> kept it going.` : ""} ${z.userMoves > 1 ? `You got ${z.userMoves - 1} move${z.userMoves === 2 ? "" : "s"} of it right.` : `In the game you played ${esc(it.played)}.`} ${z.note} ${snLineHtml(z)}`;
     z.view = z.fens.length - 1; snDraw(m.to); snRunCard();
     if(best) snCg.setAutoShapes([{orig: best.slice(0,2), dest: best.slice(2,4), brush: "green"}]);
     return;
@@ -5043,7 +5043,7 @@ async function snMateTry(z, m, uci, dt){
   z.mateIn = -res.mate;   // moves you still need (counted from their side, so this is yours after their reply)
   await new Promise(q => setTimeout(q, 350));
   if(snPz !== z) return;
-  z.lastMove = d ? [d.from, d.to] : null; z.busy = false; z.t0 = performance.now();
+  z.lastMove = d ? [d.from, d.to] : null; z.busy = false; z.t0 = performance.now(); moveSound(d);
   snDraw(); snMatePrompt(z, `✓ ${esc(m.san)}${d ? `, they reply ${esc(d.san)}` : ""}. Keep going.`);
   SFQ.eval(g.fen(), 600).then(x => { if(snPz === z && !z.solved && !z.failed){ z.expect = x.best; if(x.mate > 0){ z.mateIn = x.mate; snMatePrompt(z, `✓ ${esc(m.san)}${d ? `, they reply ${esc(d.san)}` : ""}. Keep going.`); } } }).catch(() => {});
 }
@@ -5072,7 +5072,9 @@ function snLineHtml(z){
 }
 // show position k of the best line (0 = the puzzle position)
 function snView(z, k){
-  k = Math.max(0, Math.min(z.fens.length - 1, k)); z.view = k;
+  k = Math.max(0, Math.min(z.fens.length - 1, k));
+  if(k !== z.view && k > 0 && z.sans?.[k-1]){ try{ moveSound(new Chess(z.fens[k-1]).move(z.sans[k-1], {sloppy:true})); }catch(e){} }
+  z.view = k;
   const c = new Chess(z.fens[k]);
   snCg.set({fen: z.fens[k], turnColor: cgColor(c.turn()), lastMove: z.moves[k] || undefined, check: c.in_check() ? cgColor(c.turn()) : false,
     movable: {color: undefined, dests: new Map()}, highlight: {custom: new Map()}});
@@ -5090,19 +5092,13 @@ document.addEventListener("keydown", e => {
 { let wt = 0;
   $("snBoard").addEventListener("wheel", e => { if(!snOver()) return; e.preventDefault(); const t = Date.now(); if(t - wt < 60) return; wt = t; snLook(snPz.view + (e.deltaY > 0 ? 1 : -1)); }, {passive: false}); }
 function snFinish(){
-  const set = S.sn.set, r = set.run, n = r.order.length;
-  const acc = n ? Math.round(r.correct / n * 100) : 0, time = Math.round(r.time), per = n ? time / n : 0;
-  const bestPer = set.best ? (set.best.per ?? set.best.time / Math.max(1, set.ids.length)) : null;
-  const beat = !set.best || (acc >= set.best.acc && per < bestPer);
-  set.history.push({cycle: set.cycle, acc, time, n, date: Date.now(), beat});
-  if(beat){ set.best = {acc, time, per}; set.cycle++; }
-  snLogMastery();
-  if(set.batch){ const d = S.sn.drilled[set.batch] ||= {cycles: 0, best: null}; d.cycles++; d.best = Math.max(d.best ?? 0, acc); }
-  set.run = null; snPz = null; save();
+  const set = S.sn.set, r = set.run, n = r.order.length, pile = set.pile;
+  S.sn.set = null; snPz = null; snLogMastery(); save();
   $("snRun").hidden = true; snDrawIdle(); snRenderSet();
-  $("snPrompt").innerHTML = beat
-    ? `<span class="ok">Cycle done: ${acc}% in ${fmtT(time)} (${(per/1000).toFixed(1)}s per position).</span> ${set.history.length > 1 ? "You beat your best. " : ""}Cycle ${set.cycle} is unlocked.`
-    : `<span class="bad">Cycle done: ${acc}% in ${fmtT(time)}.</span> Not quite: you need ${set.best.acc}% or better at under ${(bestPer/1000).toFixed(1)}s per position. Run it again.`;
+  const left = snPile("todo").length;
+  $("snPrompt").innerHTML = `<span class="ok">Done: ${r.correct} of ${n} right.</span> ` + (pile === "todo"
+    ? (left ? `${left} still to solve. Press Start to go again.` : "Every position is solved. Try beating your times!")
+    : "Press Start to race your times again.");
   snRenderProgress();
 }
 function snPanel(p){
@@ -5112,7 +5108,17 @@ function snPanel(p){
   if(p === "progress") $("snProgEmpty").hidden = S.sn.batches.length > 0;
 }
 $("snTabs").onclick = e => { const b = e.target.closest("button[data-pane]"); if(b) snPanel(b.dataset.pane); };
+// one time: games analysed before inaccuracies were included get them added (their analysis is still saved)
+async function snAddInaccuracies(){
+  if((S.sn.v || 0) >= 5 || snJob) return;
+  try{
+    const {games} = await snLoadAll(); let n = 0;
+    for(const g of games){ if(!S.sn.done[g.id]) continue; const A = gAnalysis(g); if(A) n += snCollectGame(g, A); }
+    S.sn.v = 5; save(); snRenderSet(); snRenderSummary();
+  }catch(e){}
+}
 function snTab(){
+  snAddInaccuracies();
   snPanel(snPz ? "drill" : (S.sn.panel || (S.sn.batches.length || Object.keys(S.sn.items).length ? "drill" : "batches")));
   snRenderProgress(); snRenderLeaks(); snRenderCollect(); snRenderSummary(); snRenderSet();
   if(snPz){ snRunCard(); snDraw(); } else snDrawIdle();
