@@ -4797,6 +4797,7 @@ function snRenderSet(){
     `<button class="sn-chip${kind === k ? " on" : ""}" data-k="${k}">${esc(name)}<b>${cnt(k).length}</b></button>`).join("");
   const todo = snPile("todo"), solvedN = all.filter(it => it.solved && (kind === "all" || it.kind === kind)).length;
   const r = S.sn.runs[kind], going = r && r.i < r.order.length && r.i > 0;
+  const onBoard = !!snPz && S.sn.set?.key === kind;   // a position from this list is on the board right now
   $("snSet").innerHTML = `<div class="eyebrow">Learn from your mistakes</div>
     <p class="sn-note">${all.length ? "Positions from your games where you made a blunder, mistake or inaccuracy. Find the move you should have played. Get it right and it's done." : "Analyse some games first (Batches tab)."}</p>
     <div class="sn-chips" id="snChips">${chips}</div>
@@ -4804,10 +4805,14 @@ function snRenderSet(){
       <div class="sn-pile-h">🎯 Find the best move</div>
       <div class="sn-row" style="align-items:baseline;gap:10px"><span class="sn-pile-n">${todo.length}</span><span class="sn-note">to solve · ${solvedN} solved</span></div>
       ${going ? `<div class="sn-prog"><i style="width:${r.i / r.order.length * 100}%"></i></div><div class="sn-note">You're at ${r.i + 1} of ${r.order.length}.</div>` : ""}
-      <div class="sn-row"><button class="primary" id="snGoTodo"${todo.length ? "" : " disabled"}>${going ? "Continue" : "Start"}</button>${going ? '<button id="snRestart">Start over</button>' : ""}</div>
+      <div class="sn-row"><button class="primary" id="snGoTodo"${todo.length ? "" : " disabled"}>${onBoard ? (snPz.solved || snPz.failed ? "Next →" : "Skip →") : going ? "Continue" : "Start"}</button>${going ? '<button id="snRestart">Start over</button>' : ""}</div>
     </div>`;
   $("snChips").onclick = e => { const b = e.target.closest("[data-k]"); if(!b) return; S.sn.kind = b.dataset.k; if(!snPz) S.sn.set = null; save(); snRenderSet(); };
-  $("snGoTodo").onclick = () => { if(snPz && S.sn.set?.key === kind) return; snPz = null; snStartPile("todo"); };
+  // same as the Next button: answered -> next position; not answered yet -> skip it; nothing up -> carry on the list
+  $("snGoTodo").onclick = () => {
+    if(onBoard){ const rr = snRun(); if(!(snPz.solved || snPz.failed) && rr) rr.i = snPz.pos + 1; save(); snNext(); return; }
+    snPz = null; snStartPile("todo");
+  };
   if($("snRestart")) $("snRestart").onclick = () => { if(confirm("Start this list again from the first position?")){ snPz = null; snStartPile("todo", null, true); } };
 }
 function snNext(){
