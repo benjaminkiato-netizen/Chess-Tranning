@@ -4453,9 +4453,11 @@ function snCollectGame(g, A, onlyNew, onlyK){
     if(!bad(e) && e.judgment.name !== "Inaccuracy") continue;   // blunders, mistakes and inaccuracies
     const missed = false;
     if(onlyK != null && k !== onlyK) continue;
+    const before = snBefore(A, k, me);
+    if(before <= SN_LOST){ delete S.sn.items[`${g.id}:${k}`]; continue; }   // already lost before this move
     if(onlyNew && S.sn.items[`${g.id}:${k}`]) continue;
     const phase = snPhase(fen, k), prev = k >= 2 ? A.evals[k-2] : A.ev0, old = S.sn.items[`${g.id}:${k}`];
-    S.sn.items[`${g.id}:${k}`] = {solved: old?.solved || null, bestT: old?.bestT ?? null, tries: old?.tries || 0, id:`${g.id}:${k}`, fen, best:e.best, line:e.variation || "", played:sans[k-1],
+    S.sn.items[`${g.id}:${k}`] = {before, solved: old?.solved || null, bestT: old?.bestT ?? null, tries: old?.tries || 0, id:`${g.id}:${k}`, fen, best:e.best, line:e.variation || "", played:sans[k-1],
       kind: missed ? "missed" : e.judgment.name.toLowerCase(), type: snType(fen, e.best, sans[k-1], prev, me, phase, e, e.variation), phase,
       opening: g.opening?.name ? g.opening.name.split(":")[0] : "", gid:g.id, link: gameUrl(g, me, k),
       label: moveLabelOf(fen, sans[k-1]), date: g.createdAt || Date.now(), vs: playerName(opp), bot: opp?.user?.title === "BOT" || !!opp?.aiLevel};
@@ -4466,7 +4468,11 @@ function snCollectGame(g, A, onlyNew, onlyK){
 }
 function moveLabelOf(fen, san){ const [, t, , , , n] = fen.split(" "); return `${n}${t === "w" ? "." : "..."} ${san}`; }
 const SN_KINDS = {blunder: "Blunders", mistake: "Mistakes", inaccuracy: "Inaccuracies"};
-const snItems = () => Object.values(S.sn.items).filter(it => SN_KINDS[it.kind]);
+// "already completely lost": Stockfish had you at -3 or worse (or getting mated) before your move.
+// Those positions are left out; a move that took you from fine (or equal) to lost stays in.
+const SN_LOST = -300;
+function snBefore(A, k, me){ const prev = k >= 2 ? A.evals[k-2] : A.ev0; return cpOf(prev) * (me === "w" ? 1 : -1); }
+const snItems = () => Object.values(S.sn.items).filter(it => SN_KINDS[it.kind] && !(it.before <= SN_LOST));
 
 /* ---- "Your leaks": a per-game report built from every analysed game (like chessitup's checkup) ----
    Stats are kept per game in S.sn.games so they survive after the full analysis is trimmed. */
@@ -4802,7 +4808,7 @@ function snRenderSet(){
 function snNext(){
   const set = S.sn.set, r = set?.run; if(!r) return;
   if(r.i >= r.order.length){ snFinish(); return; }
-  const it = S.sn.items[r.order[r.i]]; if(!it){ r.i++; snNext(); return; }
+  const it = S.sn.items[r.order[r.i]]; if(!it || it.before <= SN_LOST){ r.i++; snNext(); return; }
   snPz = {it, pos: r.i, game: new Chess(it.fen), solved: false, failed: false, t0: performance.now(), lastMove: null};
   snRunCard(); snDraw(); snRenderSet(); snCg.setAutoShapes(snPlayedArrow(it));
   if(it.type === "mate"){
@@ -5141,10 +5147,30 @@ async function snAddInaccuracies(){
     }
     S.sn.v = 5; delete S.sn.v5done; save(); if(!snPz) snRenderSet(); snRenderSummary();
   }catch(e){}
-  snAdding = false;
+  snAdding = false; snFillBefore();
+}
+let snFilling = false;
+async function snFillBefore(){
+  if((S.sn.v || 0) >= 6 || snJob || snFilling || (S.sn.v || 0) < 5) return; snFilling = true;
+  try{
+    const need = Object.values(S.sn.items).filter(it => it.before === undefined);
+    if(need.length){
+      const {games} = await snLoadAll(), byId = Object.fromEntries(games.map(g => [g.id, g]));
+      let t = performance.now();
+      for(const it of need){
+        const g = byId[it.gid], A = g ? gAnalysis(g) : S.ganalysis[it.gid] && {evals: S.ganalysis[it.gid].evals, ev0: S.ganalysis[it.gid].ev0};
+        const k = +it.id.split(":").pop(), me = it.fen.split(" ")[1];
+        it.before = A && A.evals ? snBefore(A, k, me) : null;
+        if(performance.now() - t > 30){ await new Promise(r => setTimeout(r, 0)); t = performance.now(); }
+      }
+    }
+    S.sn.v = 6; save(); if(!snPz) snRenderSet(); snRenderSummary();
+  }catch(e){}
+  snFilling = false;
 }
 function snTab(){
   snAddInaccuracies();
+  snFillBefore();
   snPanel(snPz ? "drill" : (S.sn.panel || (S.sn.batches.length || Object.keys(S.sn.items).length ? "drill" : "batches")));
   snRenderProgress(); snRenderLeaks(); snRenderCollect(); snRenderSummary(); snRenderSet();
   if(snPz){ snRunCard(); snDraw(); } else snDrawIdle();
