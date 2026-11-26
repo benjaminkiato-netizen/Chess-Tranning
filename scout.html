@@ -114,12 +114,12 @@ tr.mvrow{cursor:pointer} tr.mvrow:hover td{background:var(--surface2)}
 
   <div class="card">
     <h1>Scout a player</h1>
-    <p class="muted" style="margin:0 0 12px">Type any Lichess or Chess.com username: an opponent you're about to play, or yourself. Everything is worked out from their public games.</p>
+    <p class="muted" style="margin:0 0 12px">Type a Lichess username, a Chess.com username, or both (the same person's two accounts) and the games are combined. Everything is worked out from public games.</p>
     <form id="form" class="row">
-      <div class="seg" id="siteSeg"><button type="button" data-s="lichess" class="on">Lichess</button><button type="button" data-s="chesscom">Chess.com</button></div>
-      <input id="user" placeholder="username" autocomplete="off" spellcheck="false" style="flex:1;min-width:160px">
+      <input id="liUser" placeholder="Lichess username" autocomplete="off" spellcheck="false" style="flex:1;min-width:150px">
+      <input id="ccUser" placeholder="Chess.com username" autocomplete="off" spellcheck="false" style="flex:1;min-width:150px">
       <select id="months" title="How far back"><option value="1">1 month</option><option value="3">3 months</option><option value="6" selected>6 months</option><option value="12">12 months</option></select>
-      <select id="max" title="Most games to load"><option value="500">500 games</option><option value="1000" selected>1000 games</option><option value="2500">2500 games</option><option value="5000">5000 games</option></select>
+      <select id="max" title="Most games to load"><option value="500">500 games each</option><option value="1000" selected>1000 games each</option><option value="2500">2500 games each</option><option value="5000">5000 games each</option></select>
       <button class="primary" id="go">Scout</button>
     </form>
     <div class="row small muted" id="recentUsers" style="margin-top:8px"></div>
@@ -128,12 +128,12 @@ tr.mvrow{cursor:pointer} tr.mvrow:hover td{background:var(--surface2)}
   </div>
 
   <div id="report" class="hidden">
+    <div class="card" id="filters" style="position:sticky;top:0;z-index:5;padding:12px 20px"></div>
     <div class="card" id="head"></div>
     <div class="card" id="check"></div>
     <div class="card">
       <div class="hd"><div><h2>How to beat them</h2><div class="sub">Their opening results with each colour. Steer into their weak lines and stay out of their strong ones.</div></div>
         <div class="seg sideSeg"><button data-side="white" class="on">They're White</button><button data-side="black">They're Black</button></div></div>
-      <div class="row" id="speedChips" style="margin-bottom:12px"></div>
       <div class="two"><div><h3 class="bad" style="margin:0 0 4px">Weaknesses <span class="sub">where they score worst</span></h3><div id="weak"></div></div>
         <div><h3 class="good" style="margin:0 0 4px">Strengths <span class="sub">where they score best</span></h3><div id="strong"></div></div></div>
     </div>
@@ -173,7 +173,12 @@ const agoLong = t => { const d = Math.floor((Date.now() - t) / 864e5); return d 
 const SPEEDS = ["bullet", "blitz", "rapid", "classical", "correspondence"];
 const SPEED_NAME = {ultraBullet: "UltraBullet", bullet: "Bullet", blitz: "Blitz", rapid: "Rapid", classical: "Classical", correspondence: "Daily"};
 
-let site = localStorage.getItem("scout.site") || "lichess", user = "", G = [], side = "white", speeds = null, timeSpeed = null, exPath = [], abort = null;
+let names = {lichess: "", chesscom: ""}, G = [], side = "white", timeSpeed = null, exPath = [], abort = null;
+// filters, applied to every section: which accounts, which speeds, and optionally one exact time control
+const F = {sites: new Set(), speeds: new Set(), tc: "all"};
+const SITE_NAME = {lichess: "Lichess", chesscom: "Chess.com"};
+// "3+2" style time control for a game (minutes + increment seconds), "Daily" for correspondence
+const tcOf = g => g.speed === "correspondence" ? "Daily" : g.init != null ? `${g.init % 60 ? (g.init / 60).toFixed(1).replace(/\.0$/, "") : g.init / 60}+${g.inc || 0}` : "?";
 let FAM = null;   // opening family names, to group Chess.com's opening names the same way as Lichess's
 
 /* ---------- loading ---------- */
@@ -222,10 +227,11 @@ async function loadChessCom(u, since, max){
   const sinceMonth = new Date(since); sinceMonth.setDate(1);
   const months = ((await r.json()).archives || []).filter(url => { const [y, m] = url.split("/").slice(-2).map(Number); return new Date(y, m - 1, 1) >= new Date(sinceMonth.getFullYear(), sinceMonth.getMonth(), 1); }).reverse();
   const fam = await families();
-  for(let k = 0; k < months.length && G.length < max; k++){
-    setStatus(`Loading month ${k + 1} of ${months.length} from Chess.com… (${G.length} games so far)`, k / months.length * 100);
+  let n = 0;
+  for(let k = 0; k < months.length && n < max; k++){
+    setStatus(`Loading month ${k + 1} of ${months.length} from Chess.com… (${n} games so far)`, k / months.length * 100);
     const m = await fetch(months[k], {signal: abort.signal}); if(!m.ok) continue;
-    for(const c of ((await m.json()).games || []).reverse()){ if((c.end_time || 0) * 1000 < since) continue; const g = fromChessCom(c, fam); if(g) G.push(g); if(G.length >= max) break; }
+    for(const c of ((await m.json()).games || []).reverse()){ if((c.end_time || 0) * 1000 < since) continue; const g = fromChessCom(c, fam); if(g){ G.push(g); n++; } if(n >= max) break; }
   }
 }
 function fromChessCom(c, fam){
@@ -251,32 +257,38 @@ function fromChessCom(c, fam){
 
 async function scout(e){
   e?.preventDefault();
-  const u = $("user").value.trim(); if(!u) return;
+  const li = $("liUser").value.trim(), cc = $("ccUser").value.trim(); if(!li && !cc) return;
   abort?.abort(); abort = new AbortController();
-  user = u; G = []; exPath = [];
+  G = []; exPath = []; names = {lichess: li, chesscom: cc};
   const months = +$("months").value, max = +$("max").value, since = Date.now() - months * 30.4 * 864e5;
   $("go").disabled = true; $("report").classList.add("hidden");
-  history.replaceState(null, "", `?site=${site}&u=${encodeURIComponent(u)}`);
-  try{
-    setStatus("Connecting…", 2);
-    if(site === "lichess") await loadLichess(u, since, max); else await loadChessCom(u, since, max);
+  const q = new URLSearchParams(); if(li) q.set("li", li); if(cc) q.set("cc", cc); history.replaceState(null, "", "?" + q);
+  const errs = [];
+  setStatus("Connecting…", 2);
+  // each account on its own: if one fails, the other still loads
+  for(const [st, u, load] of [["lichess", li, loadLichess], ["chesscom", cc, loadChessCom]]){
+    if(!u) continue;
+    const before = G.length;
+    try{ await load(u, since, max); }catch(err){ if(err.name === "AbortError"){ $("go").disabled = false; return; } errs.push(err.message); }
     const me = u.toLowerCase();
-    G = G.filter(g => g.white.name.toLowerCase() === me || g.black.name.toLowerCase() === me).sort((a, b) => a.date - b.date);
-    for(const g of G){ g.me = g.white.name.toLowerCase() === me ? "white" : "black"; g.opp = g.me === "white" ? "black" : "white"; g.res = !g.winner ? .5 : g.winner === g.me ? 1 : 0; }
-    if(!G.length) throw new Error(`No standard games found for "${esc(u)}" in the last ${months} month${months > 1 ? "s" : ""}.`);
-    user = G[G.length - 1][G[G.length - 1].me].name;
-    remember(user);
-    const sp = SPEEDS.filter(s => G.some(g => g.speed === s));
-    speeds = new Set(sp.filter(s => s !== "correspondence").length ? sp.filter(s => s !== "correspondence") : sp);
-    timeSpeed = ["blitz", "rapid", "bullet", "classical"].find(s => G.some(g => g.speed === s && g.clocks)) || null;
-    setStatus(`${G.length} games loaded.`, null);
-    render();
-  }catch(err){ if(err.name !== "AbortError") setStatus(`<span class="bad">${err.message}</span>`, null); }
+    for(const g of G.slice(before)){ g.me = g.white.name.toLowerCase() === me ? "white" : g.black.name.toLowerCase() === me ? "black" : null; }
+    const mine = G.slice(before).find(g => g.me); if(mine) names[st] = mine[mine.me].name;
+  }
+  G = G.filter(g => g.me).sort((a, b) => a.date - b.date);
+  for(const g of G){ g.opp = g.me === "white" ? "black" : "white"; g.res = !g.winner ? .5 : g.winner === g.me ? 1 : 0; g.tc = tcOf(g); }
+  if(!G.length){ setStatus(`<span class="bad">${errs.join(" ") || `No standard games found in the last ${months} month${months > 1 ? "s" : ""}.`}</span>`, null); $("go").disabled = false; return; }
+  remember(li ? names.lichess : "", cc ? names.chesscom : "");
+  F.sites = new Set(G.map(g => g.site));
+  const sp = SPEEDS.filter(s => G.some(g => g.speed === s));
+  F.speeds = new Set(sp.filter(s => s !== "correspondence").length ? sp.filter(s => s !== "correspondence") : sp);
+  F.tc = "all";
+  setStatus(`${G.length} games loaded${errs.length ? ` · <span class="bad">${errs.join(" ")}</span>` : ""}.`, null);
+  render();
   $("go").disabled = false;
 }
 
 /* ---------- maths ---------- */
-const view = () => G.filter(g => speeds.has(g.speed));
+const view = () => G.filter(g => F.sites.has(g.site) && F.speeds.has(g.speed) && (F.tc === "all" || g.tc === F.tc));
 function tally(gs){ const n = gs.length, w = gs.filter(g => g.res === 1).length, d = gs.filter(g => g.res === .5).length; return {n, w, d, l: n - w - d, score: n ? (w + d/2) / n * 100 : 0, last: gs.reduce((m, g) => Math.max(m, g.date), 0)}; }
 function wdl(t){
   const W = pct(t.w, t.n), D = pct(t.d, t.n), L = Math.max(0, 100 - W - D);
@@ -302,33 +314,48 @@ function typicalMoves(gs, maxPly = 10){
 /* ---------- render ---------- */
 function render(){
   $("report").classList.remove("hidden");
-  renderHead(); renderSpeedChips(); renderSide(); renderTime(); renderPsych(); renderRecent(); renderCheck();
+  if(!view().length){ F.tc = "all"; }
+  const V = view();
+  timeSpeed = ["blitz", "rapid", "bullet", "classical"].includes(timeSpeed) && V.some(g => g.speed === timeSpeed && g.clocks) ? timeSpeed : ["blitz", "rapid", "bullet", "classical"].find(s => V.some(g => g.speed === s && g.clocks)) || null;
+  renderFilters(); renderHead(); renderSide(); renderTime(); renderPsych(); renderRecent(); renderCheck();
 }
+function renderFilters(){
+  const sites = [...new Set(G.map(g => g.site))];
+  const inSites = G.filter(g => F.sites.has(g.site)), inSpeeds = inSites.filter(g => F.speeds.has(g.speed));
+  const tcs = {}; for(const g of inSpeeds) tcs[g.tc] = (tcs[g.tc] || 0) + 1;
+  const tcList = Object.entries(tcs).sort((a, b) => b[1] - a[1]);
+  $("filters").innerHTML = `<div class="row">
+    ${sites.length > 1 ? `<span class="sub">Accounts:</span>` + sites.map(st => `<button class="chip${F.sites.has(st) ? " on" : ""}" data-site="${st}">${SITE_NAME[st]} <span class="num">${G.filter(g => g.site === st).length}</span></button>`).join("") + `<span style="width:10px"></span>` : ""}
+    <span class="sub">Speed:</span>${SPEEDS.filter(sp => inSites.some(g => g.speed === sp)).map(sp => `<button class="chip${F.speeds.has(sp) ? " on" : ""}" data-sp="${sp}">${SPEED_NAME[sp]} <span class="num">${inSites.filter(g => g.speed === sp).length}</span></button>`).join("")}
+    <span style="width:10px"></span><span class="sub">Time control:</span>
+    <select id="tcSel" style="padding:5px 8px;font-size:13px"><option value="all">All (${inSpeeds.length})</option>${tcList.map(([t, n]) => `<option value="${esc(t)}"${F.tc === t ? " selected" : ""}>${esc(t)} (${n})</option>`).join("")}</select>
+    <span class="sub" style="margin-left:auto">${view().length} games</span></div>`;
+  $("tcSel").onchange = e => { F.tc = e.target.value; exPath = []; render(); };
+}
+$("filters").onclick = e => {
+  const s = e.target.closest("[data-site]"), sp = e.target.closest("[data-sp]");
+  if(s){ F.sites.has(s.dataset.site) ? F.sites.delete(s.dataset.site) : F.sites.add(s.dataset.site); if(!F.sites.size) F.sites.add(s.dataset.site); }
+  else if(sp){ F.speeds.has(sp.dataset.sp) ? F.speeds.delete(sp.dataset.sp) : F.speeds.add(sp.dataset.sp); if(!F.speeds.size) F.speeds.add(sp.dataset.sp); }
+  else return;
+  F.tc = "all"; exPath = []; render();
+};
 function renderSide(){
   document.querySelectorAll(".sideSeg button").forEach(b => b.classList.toggle("on", b.dataset.side === side));
   renderBeat(); renderFamilies(); exRender();
 }
 function renderHead(){
-  const t = tally(G), last10 = tally(G.slice(-10)), first = G[0].date;
-  const rating = s => { const g = [...G].reverse().find(x => x.speed === s && x.rated !== false); return g ? g[g.me].rating : null; };
-  const rs = ["bullet", "blitz", "rapid", "classical", "correspondence"].map(s => [s, rating(s), G.filter(g => g.speed === s).length]).filter(x => x[1]);
-  const prof = site === "lichess" ? `https://lichess.org/@/${encodeURIComponent(user)}` : `https://www.chess.com/member/${encodeURIComponent(user)}`;
-  $("head").innerHTML = `<div class="hd"><div><h1><a href="${prof}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(user)} ↗</a></h1>
-      <div class="sub">${site === "lichess" ? "Lichess" : "Chess.com"} · ${G.length} games since ${new Date(first).toLocaleDateString()}</div></div></div>
-    <div class="stats4">${rs.map(([s, r, n]) => `<div class="stat"><b>${r}</b><span>${SPEED_NAME[s]} · ${n} games</span></div>`).join("")}
+  const V = view(), t = tally(V), last10 = tally(V.slice(-10)), first = (V[0] || G[0]).date;
+  const rating = (st, sp) => { const g = [...G].reverse().find(x => x.site === st && x.speed === sp && x.rated !== false); return g ? g[g.me].rating : null; };
+  const rs = [];
+  for(const st of ["lichess", "chesscom"]) if(F.sites.has(st)) for(const sp of SPEEDS){ const r = rating(st, sp); { const n = V.filter(g => g.site === st && g.speed === sp).length; if(r && n) rs.push([st, sp, r, n]); } }
+  const prof = st => st === "lichess" ? `https://lichess.org/@/${encodeURIComponent(names.lichess)}` : `https://www.chess.com/member/${encodeURIComponent(names.chesscom)}`;
+  const accts = ["lichess", "chesscom"].filter(st => G.some(g => g.site === st));
+  $("head").innerHTML = `<div class="hd"><div><h1>${accts.map(st => `<a href="${prof(st)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none" title="${SITE_NAME[st]} profile">${esc(names[st])} <span class="sub">${SITE_NAME[st]} ↗</span></a>`).join(" <span class='muted'>+</span> ")}</h1>
+      <div class="sub">${V.length} games since ${new Date(first).toLocaleDateString()}${F.tc !== "all" ? ` · ${esc(F.tc)} only` : ""}</div></div></div>
+    <div class="stats4">${rs.map(([st, sp, r, n]) => `<div class="stat"><b>${r}</b><span>${SPEED_NAME[sp]}${accts.length > 1 ? ` · ${SITE_NAME[st]}` : ""} · ${n} games</span></div>`).join("")}
       <div class="stat"><b>${t.w}–${t.d}–${t.l}</b><span>Record (${Math.round(t.score)}%)</span></div>
       <div class="stat"><b>${last10.w}–${last10.d}–${last10.l}</b><span>Last 10</span></div></div>`;
 }
-function renderSpeedChips(){
-  const sp = SPEEDS.filter(s => G.some(g => g.speed === s));
-  $("speedChips").innerHTML = `<span class="sub">Time controls:</span>` + sp.map(s => `<button class="chip${speeds.has(s) ? " on" : ""}" data-sp="${s}">${SPEED_NAME[s]} <span class="num">${G.filter(g => g.speed === s).length}</span></button>`).join("");
-}
-$("speedChips").onclick = e => {
-  const b = e.target.closest("[data-sp]"); if(!b) return;
-  speeds.has(b.dataset.sp) ? speeds.delete(b.dataset.sp) : speeds.add(b.dataset.sp);
-  if(!speeds.size) speeds.add(b.dataset.sp);
-  renderSpeedChips(); renderSide(); renderCheck();
-};
 document.addEventListener("click", e => { const b = e.target.closest(".sideSeg button"); if(!b) return; side = b.dataset.side; exPath = []; renderSide(); });
 
 // lines (full opening names) for one colour, with at least `min` games
@@ -410,10 +437,10 @@ document.addEventListener("keydown", e => { if(!exCg || e.target.closest("input,
 /* ---------- time ---------- */
 function myClocks(g){ if(!g.clocks) return null; const off = g.me === "white" ? 0 : 1; return g.clocks.filter((_, i) => i % 2 === off); }
 function renderTime(){
-  const sps = ["bullet", "blitz", "rapid", "classical"].filter(s => G.some(g => g.speed === s && g.clocks));
+  const sps = ["bullet", "blitz", "rapid", "classical"].filter(s => view().some(g => g.speed === s && g.clocks));
   $("timeSeg").innerHTML = sps.map(s => `<button data-t="${s}" class="${s === timeSpeed ? "on" : ""}">${SPEED_NAME[s]}</button>`).join("");
   if(!timeSpeed){ $("time").innerHTML = `<p class="sub">No clock data in these games.</p>`; $("timeSub").textContent = ""; return; }
-  const gs = G.filter(g => g.speed === timeSpeed && g.clocks), low = timeSpeed === "bullet" ? 1000 : 3000;
+  const gs = view().filter(g => g.speed === timeSpeed && g.clocks), low = timeSpeed === "bullet" ? 1000 : 3000;
   const losses = gs.filter(g => g.res === 0), wins = gs.filter(g => g.res === 1);
   const lowGames = gs.filter(g => { const c = myClocks(g); return c?.length && Math.min(...c) < low; });
   const flagged = losses.filter(g => g.status === "outoftime" || g.status === "timeout");
@@ -437,7 +464,7 @@ $("timeSeg").onclick = e => { const b = e.target.closest("[data-t]"); if(b){ tim
 
 /* ---------- psychology ---------- */
 function psych(){
-  const gs = G, prevLoss = [], prevWin = [], sessionLate = [], sessionEarly = [];
+  const gs = view(), prevLoss = [], prevWin = [], sessionLate = [], sessionEarly = [];
   let streakL = 0, maxL = 0, streakW = 0, maxW = 0, pos = 0;
   for(let i = 0; i < gs.length; i++){
     const g = gs[i], p = gs[i-1], same = p && g.date - p.date < 30 * 60e3;
@@ -453,7 +480,8 @@ function psych(){
     resign: pct(losses.filter(g => g.status === "resign").length, losses.length), mated: pct(losses.filter(g => g.status === "mate").length, losses.length)};
 }
 function renderPsych(){
-  const P = psych(), lossRate = P.all.l / P.all.n * 100;
+  const P = psych(); if(!P.all.n){ $("psych").innerHTML = `<p class="sub">No games with these filters.</p>`; return; }
+  const lossRate = P.all.l / P.all.n * 100;
   const tilt = P.afterLoss.n ? P.afterLoss.l / P.afterLoss.n * 100 : null, rec = P.afterLoss.n ? P.afterLoss.w / P.afterLoss.n * 100 : null;
   const M = (name, val, lab, frac, note) => `<div class="meter"><span>${name}</span><div class="bar"><i style="width:${Math.min(100, Math.max(0, frac) * 100)}%"></i></div><b>${val}</b><span class="lab">${lab}</span></div>` + (note ? `<div class="sub" style="margin:-4px 0 6px">${note}</div>` : "");
   $("psych").innerHTML =
@@ -468,10 +496,10 @@ function renderPsych(){
 
 /* ---------- recent + checklist ---------- */
 function renderRecent(){
-  $("recent").innerHTML = `<table>` + G.slice(-12).reverse().map(g => {
+  $("recent").innerHTML = `<table>` + view().slice(-12).reverse().map(g => {
     const o = g[g.opp], col = g.res === 1 ? "good" : g.res === 0 ? "bad" : "muted";
     return `<tr><td>${g.me === "white" ? "⚪" : "⚫"} <a href="${g.url}" target="_blank" rel="noopener"><b>${esc(o.name)}</b></a> <span class="muted">(${o.rating ?? "?"})</span><div class="sub">${esc(g.opening?.name || "")}</div></td>
-      <td class="muted small">${SPEED_NAME[g.speed] || g.speed}</td><td class="muted small">${ago(g.date)}</td><td class="n res ${col}">${g.res === 1 ? "Won" : g.res === 0 ? "Lost" : "Draw"}</td></tr>`;
+      <td class="muted small">${esc(g.tc)} ${SPEED_NAME[g.speed] || g.speed}${G.some(x => x.site !== g.site) ? ` · ${SITE_NAME[g.site]}` : ""}</td><td class="muted small">${ago(g.date)}</td><td class="n res ${col}">${g.res === 1 ? "Won" : g.res === 0 ? "Lost" : "Draw"}</td></tr>`;
   }).join("") + `</table>`;
 }
 function renderCheck(){
@@ -492,9 +520,9 @@ function renderCheck(){
     const t = Object.entries(rep).sort((a, b) => b[1] - a[1])[0];
     if(t && vs.length >= 10) tips.push([`Against 1.${opp1}`, `they answer <b>1…${esc(t[0])}</b> ${Math.round(t[1] / vs.length * 100)}% of the time.`]);
   }
-  const P = psych(), lossRate = P.all.l / P.all.n * 100;
+  const P = psych(), lossRate = P.all.n ? P.all.l / P.all.n * 100 : 0;
   if(P.afterLoss.n >= 10 && P.afterLoss.l / P.afterLoss.n * 100 > lossRate + 8) tips.push(["Tilt", `after a loss they lose the next game ${Math.round(P.afterLoss.l / P.afterLoss.n * 100)}% of the time. Win one, then rematch.`]);
-  const gs = G.filter(g => g.clocks), losses = gs.filter(g => g.res === 0), flag = pct(losses.filter(g => g.status === "outoftime").length, losses.length);
+  const gs = view().filter(g => g.clocks), losses = gs.filter(g => g.res === 0), flag = pct(losses.filter(g => g.status === "outoftime").length, losses.length);
   if(losses.length >= 10 && flag >= 20) tips.push(["Clock", `${flag}% of their losses are on time. Keep positions complicated and play fast.`]);
   if(P.resign > 60) tips.push(["Resigns early", `${P.resign}% of their losses are resignations. Get an advantage and keep pressing.`]);
   $("check").innerHTML = `<div class="hd"><h2>Pre-game checklist</h2><span class="sub">from ${view().length} games</span></div>` +
@@ -502,22 +530,25 @@ function renderCheck(){
 }
 
 /* ---------- form ---------- */
-function setSite(s){ site = s; localStorage.setItem("scout.site", s); document.querySelectorAll("#siteSeg button").forEach(b => b.classList.toggle("on", b.dataset.s === s)); }
-$("siteSeg").onclick = e => { const b = e.target.closest("[data-s]"); if(b) setSite(b.dataset.s); };
 $("form").onsubmit = scout;
-function remember(u){
-  let r = []; try{ r = JSON.parse(localStorage.getItem("scout.recent") || "[]"); }catch(e){}
-  r = [{site, u}, ...r.filter(x => !(x.site === site && x.u.toLowerCase() === u.toLowerCase()))].slice(0, 8);
-  localStorage.setItem("scout.recent", JSON.stringify(r)); showRecent();
+function remember(li, cc){
+  let r = []; try{ r = JSON.parse(localStorage.getItem("scout.recent2") || "[]"); }catch(e){}
+  const k = x => (x.li || "").toLowerCase() + "|" + (x.cc || "").toLowerCase();
+  r = [{li, cc}, ...r.filter(x => k(x) !== k({li, cc}))].slice(0, 8);
+  localStorage.setItem("scout.recent2", JSON.stringify(r)); showRecent();
 }
 function showRecent(){
-  let r = []; try{ r = JSON.parse(localStorage.getItem("scout.recent") || "[]"); }catch(e){}
-  $("recentUsers").innerHTML = r.length ? "Recent: " + r.map(x => `<button class="chip" data-site="${x.site}" data-u="${esc(x.u)}">${esc(x.u)} <span class="muted">${x.site === "lichess" ? "Li" : "C"}</span></button>`).join("") : "";
+  let r = []; try{ r = JSON.parse(localStorage.getItem("scout.recent2") || "[]"); }catch(e){}
+  $("recentUsers").innerHTML = r.length ? "Recent: " + r.map((x, i) => `<button class="chip" data-i="${i}">${[x.li && esc(x.li) + ' <span class="muted">Li</span>', x.cc && esc(x.cc) + ' <span class="muted">C</span>'].filter(Boolean).join(" + ")}</button>`).join("") : "";
+  $("recentUsers").onclick = e => { const b = e.target.closest("[data-i]"); if(!b) return; const x = r[+b.dataset.i]; $("liUser").value = x.li || ""; $("ccUser").value = x.cc || ""; scout(); };
 }
-$("recentUsers").onclick = e => { const b = e.target.closest("[data-u]"); if(!b) return; setSite(b.dataset.site); $("user").value = b.dataset.u; scout(); };
-setSite(site); showRecent();
-const q = new URLSearchParams(location.search);
-if(q.get("u")){ setSite(q.get("site") === "chesscom" ? "chesscom" : "lichess"); $("user").value = q.get("u"); scout(); }
+showRecent();
+{
+  const q = new URLSearchParams(location.search);
+  // ?li=name&cc=name, or the older ?site=lichess&u=name
+  const li = q.get("li") || (q.get("site") !== "chesscom" && q.get("u")) || "", cc = q.get("cc") || (q.get("site") === "chesscom" && q.get("u")) || "";
+  if(li || cc){ $("liUser").value = li; $("ccUser").value = cc; scout(); }
+}
 </script>
 </body>
 </html>
