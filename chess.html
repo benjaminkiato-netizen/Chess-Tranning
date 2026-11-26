@@ -4315,7 +4315,7 @@ $("rtReset").onclick = () => {
       and keep every position where you made a mistake or blunder, plus the ones where your opponent blundered
       and you didn't punish it ("missed wins").
    2. Each position gets a rough type (missed mate, hung a piece, missed fork, ...) and a game phase.
-   3. Two piles: "Find the best move" (unsolved) and "Beat your time" (solved, raced against your best time). */
+   3. "Find the best move": solve each one; a solved position leaves the list. Your place is kept per filter. */
 S.sn ??= {items: {}, done: {}, missed: true, set: null};
 S.sn.skip ??= ["worstfish"];   // opponents whose games don't count (e.g. bots you were trying to lose to)
 // games against any Lichess BOT account, or against a name on the skip list, are left out
@@ -4327,7 +4327,7 @@ function snSkipped(g){
 function snPurge(){   // drop positions already collected from games that are now skipped
   const skip = S.sn.skip.map(x => x.toLowerCase());
   for(const [id, it] of Object.entries(S.sn.items)) if(it.bot || skip.includes((it.vs || "").toLowerCase())) delete S.sn.items[id];
-  if(S.sn.set?.run) S.sn.set.run.order = S.sn.set.run.order.filter(id => S.sn.items[id]);
+  for(const r of Object.values(S.sn.runs || {})) r.order = r.order.filter(id => S.sn.items[id]);
   for(const [id, x] of Object.entries(S.sn.games || {})) if(skip.includes((x.vs || "").toLowerCase())) delete S.sn.games[id];
   save();
 }
@@ -4348,6 +4348,11 @@ const SN_PHASE = {opening:"Opening", middlegame:"Middlegame", endgame:"Endgame"}
 let snJob = null, snCg = null, snPz = null;
 snPurge();
 if(S.sn.set && !S.sn.set.pile){ S.sn.set = null; save(); }   // a set from the old cycle version
+S.sn.runs ??= {};
+if(S.sn.set?.run){ if(S.sn.set.pile === "todo") S.sn.runs[S.sn.kind || "all"] = S.sn.set.run; S.sn.set = S.sn.set.pile === "todo" ? {key: S.sn.kind || "all"} : null; save(); }   // older format
+for(const it of Object.values(S.sn.items)) if(it.solved === undefined) it.solved = null;
+// the run you're in: where you are in "Find the best move" for the current filter (or a "drill these" list)
+const snRun = () => S.sn.set ? S.sn.runs[S.sn.set.key] || null : null;
 if((S.sn.v || 1) < 2){
   for(const it of Object.values(S.sn.items)){
     if(it.type !== "fork") continue;
@@ -4561,7 +4566,7 @@ function snRenderLeaks(){
   el.onclick = e => {
     const b = e.target.closest("[data-drill]"); if(!b) return;
     const L = SN_LEAKS.find(x => x.k === b.dataset.drill), ids = L.ids(G);
-    S.sn.kind = "all"; snPz = null; snStartPile(ids.some(id => !S.sn.items[id]?.solved) ? "todo" : "solved", ids);
+    snPz = null; snStartPile("todo", ids);
   };
 }
 
@@ -4730,7 +4735,7 @@ function snRenderProgress(){
   el.querySelectorAll("[data-bdrill]").forEach(btn => btn.onclick = () => {
     const b = S.sn.batches.find(x => x.n === +btn.dataset.bdrill), ids = snItems().filter(it => b.ids.includes(it.gid)).map(it => it.id);
     if(!ids.length){ alert("No positions to drill from this batch."); return; }
-    S.sn.kind = "all"; snPz = null; snStartPile(ids.some(id => !S.sn.items[id]?.solved) ? "todo" : "solved", ids);
+    snPz = null; snStartPile("todo", ids);
   });
 }
 
@@ -4749,10 +4754,9 @@ function snRenderSummary(){
     <p class="sn-note">Types are a best guess from the engine's move, so a few may be in the wrong group.</p>`;
 }
 
-/* ---- Learn from your mistakes: two piles ----
-   "Find the best move": every blunder, mistake and inaccuracy you haven't solved yet. Solve one and it moves to
-   "Beat your time", where you solve it again against your best time. Miss one there and it goes back. */
-const snMastered = it => !!it?.solved;   // "mastered" now just means: in the solved pile
+/* ---- Learn from your mistakes ----
+   "Find the best move": every blunder, mistake and inaccuracy you haven't solved yet. Solve one and it's done. */
+const snMastered = it => !!it?.solved;   // "mastered" now just means: solved
 S.sn.mlog ??= [];
 function snBatchMastery(b){ const it = snItems().filter(x => b.ids.includes(x.gid)); return [it.filter(snMastered).length, it.length]; }
 function snLogMastery(){
@@ -4769,46 +4773,46 @@ function snPile(pile, only){
   return snItems().filter(it => (pile === "solved") === !!it.solved && (kind === "all" || it.kind === kind) && (!only || only.includes(it.id)))
     .sort((a,b) => b.date - a.date || a.id.localeCompare(b.id));
 }
-function snStartPile(pile, only){
-  const order = snPile(pile, only).map(it => it.id);
-  if(!order.length){ snRenderSet(); $("snPrompt").innerHTML = pile === "todo" ? '<span class="ok">Nothing left to solve here.</span> Head to "Beat your time", or analyse more games.' : "Nothing in this pile yet."; return; }
-  if(pile === "solved") for(let i = order.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
-  S.sn.set = {pile, run: {order, i: 0, correct: 0, time: 0}};
+// start or carry on: your place in each list is kept (across reloads, other tabs, switching filters).
+// Positions added since are put at the end; a finished list starts again with whatever is left unsolved.
+function snStartPile(pile, only, fresh){
+  const key = only ? "custom" : (S.sn.kind || "all");
+  let r = S.sn.runs[key];
+  if(only || fresh || !r || r.i >= r.order.length){
+    const order = snPile("todo", only).map(it => it.id);
+    if(!order.length){ S.sn.set = null; snRenderSet(); $("snPrompt").innerHTML = '<span class="ok">Nothing left to solve here.</span> Analyse more games to get new positions.'; return; }
+    r = S.sn.runs[key] = {order, i: 0, correct: 0, time: 0};
+  } else {
+    const have = new Set(r.order);
+    for(const it of snPile("todo")) if(!have.has(it.id)) r.order.push(it.id);
+  }
+  S.sn.set = {key};
   save(); snRenderSet(); snPanel("drill"); snNext();
 }
 function snRenderSet(){
   const all = snItems(), kind = S.sn.kind || "all";
-  const cnt = k => all.filter(it => k === "all" || it.kind === k);
+  const cnt = k => all.filter(it => !it.solved && (k === "all" || it.kind === k));
   const chips = [["all", "All"], ...Object.entries(SN_KINDS)].map(([k, name]) =>
     `<button class="sn-chip${kind === k ? " on" : ""}" data-k="${k}">${esc(name)}<b>${cnt(k).length}</b></button>`).join("");
-  const todo = snPile("todo"), solved = snPile("solved"), r = S.sn.set?.run, pile = S.sn.set?.pile;
-  const times = solved.filter(it => it.bestT != null).map(it => it.bestT);
-  const avg = times.length ? times.reduce((a,b) => a+b, 0) / times.length : null;
+  const todo = snPile("todo"), solvedN = all.filter(it => it.solved && (kind === "all" || it.kind === kind)).length;
+  const r = S.sn.runs[kind], going = r && r.i < r.order.length && r.i > 0;
   $("snSet").innerHTML = `<div class="eyebrow">Learn from your mistakes</div>
-    <p class="sn-note">${all.length ? "Positions from your games where you made a blunder, mistake or inaccuracy. Find the move you should have played." : "Analyse some games first (Batches tab)."}</p>
+    <p class="sn-note">${all.length ? "Positions from your games where you made a blunder, mistake or inaccuracy. Find the move you should have played. Get it right and it's done." : "Analyse some games first (Batches tab)."}</p>
     <div class="sn-chips" id="snChips">${chips}</div>
-    <div class="sn-piles">
-      <div class="sn-pile${pile === "todo" && r ? " on" : ""}">
-        <div class="sn-pile-h">🎯 Find the best move</div>
-        <div class="sn-pile-n">${todo.length}</div>
-        <div class="sn-note">to solve. Get one right and it moves to your solved pile.</div>
-        <button class="primary" id="snGoTodo"${todo.length ? "" : " disabled"}>${pile === "todo" && r ? `Continue (${r.i}/${r.order.length})` : "Start"}</button>
-      </div>
-      <div class="sn-pile${pile === "solved" && r ? " on" : ""}">
-        <div class="sn-pile-h">⏱ Beat your time</div>
-        <div class="sn-pile-n">${solved.length}</div>
-        <div class="sn-note">solved${avg != null ? ` · best times average ${fmtS(avg)}` : ""}. Miss one here and it goes back to be solved again.</div>
-        <button id="snGoSolved"${solved.length ? "" : " disabled"}>${pile === "solved" && r ? `Continue (${r.i}/${r.order.length})` : "Start"}</button>
-      </div>
+    <div class="sn-pile${S.sn.set?.key === kind ? " on" : ""}">
+      <div class="sn-pile-h">🎯 Find the best move</div>
+      <div class="sn-row" style="align-items:baseline;gap:10px"><span class="sn-pile-n">${todo.length}</span><span class="sn-note">to solve · ${solvedN} solved</span></div>
+      ${going ? `<div class="sn-prog"><i style="width:${r.i / r.order.length * 100}%"></i></div><div class="sn-note">You're at ${r.i + 1} of ${r.order.length}.</div>` : ""}
+      <div class="sn-row"><button class="primary" id="snGoTodo"${todo.length ? "" : " disabled"}>${going ? "Continue" : "Start"}</button>${going ? '<button id="snRestart">Start over</button>' : ""}</div>
     </div>`;
   $("snChips").onclick = e => { const b = e.target.closest("[data-k]"); if(!b) return; S.sn.kind = b.dataset.k; if(!snPz) S.sn.set = null; save(); snRenderSet(); };
-  $("snGoTodo").onclick = () => (pile === "todo" && r && !snPz) ? snNext() : pile === "todo" && r ? null : snStartPile("todo");
-  $("snGoSolved").onclick = () => (pile === "solved" && r && !snPz) ? snNext() : pile === "solved" && r ? null : snStartPile("solved");
+  $("snGoTodo").onclick = () => { if(snPz && S.sn.set?.key === kind) return; snPz = null; snStartPile("todo"); };
+  if($("snRestart")) $("snRestart").onclick = () => { if(confirm("Start this list again from the first position?")){ snPz = null; snStartPile("todo", null, true); } };
 }
 function snNext(){
-  const set = S.sn.set, r = set?.run; if(!r) return;
+  const r = snRun(); if(!r) return;
   if(r.i >= r.order.length){ snFinish(); return; }
-  const it = S.sn.items[r.order[r.i]]; if(!it || it.before <= SN_LOST){ r.i++; snNext(); return; }
+  const it = S.sn.items[r.order[r.i]]; if(!it || it.before <= SN_LOST || it.solved){ r.i++; snNext(); return; }
   snPz = {it, pos: r.i, game: new Chess(it.fen), solved: false, failed: false, t0: performance.now(), lastMove: null};
   snRunCard(); snDraw(); snRenderSet(); snCg.setAutoShapes(snPlayedArrow(it));
   if(it.type === "mate"){
@@ -4817,19 +4821,19 @@ function snNext(){
     SFQ.eval(it.fen, 800).then(x => { if(snPz === z && !z.userMoves && x.mate > 0){ z.mateIn = x.mate; snMatePrompt(z, `In your game vs ${esc(it.vs)} you played <b class="bad">${esc(it.played)}</b> (red arrow). Play it all the way to checkmate.`); } }).catch(() => {});
     return;
   }
-  $("snPrompt").innerHTML = `<b>${it.fen.split(" ")[1] === "w" ? "White" : "Black"} to move.</b> Find the best move.${it.solved && it.bestT != null ? ` <b>Time to beat: ${fmtS(it.bestT)}</b>` : ""} <span class="sn-src">In your game vs ${esc(it.vs)} you played <b class="bad">${esc(it.played)}</b> (red arrow), ${esc(SN_KINDS[it.kind] ? (SN_KINDS[it.kind] === "Inaccuracies" ? "an inaccuracy" : "a " + SN_KINDS[it.kind].replace(/s$/, "").toLowerCase()) : "")}.</span>`;
+  $("snPrompt").innerHTML = `<b>${it.fen.split(" ")[1] === "w" ? "White" : "Black"} to move.</b> Find the best move. <span class="sn-src">In your game vs ${esc(it.vs)} you played <b class="bad">${esc(it.played)}</b> (red arrow), ${esc(SN_KINDS[it.kind] ? (SN_KINDS[it.kind] === "Inaccuracies" ? "an inaccuracy" : "a " + SN_KINDS[it.kind].replace(/s$/, "").toLowerCase()) : "")}.</span>`;
 }
 function snRunCard(){
-  const r = S.sn.set?.run, el = $("snRun");
+  const r = snRun(), el = $("snRun");
   if(!r || !snPz){ el.hidden = true; return; }
   const it = snPz.it; el.hidden = false;
-  el.innerHTML = `<div class="sn-row" style="justify-content:space-between"><b>${S.sn.set.pile === "solved" ? "⏱ Beat your time" : "🎯 Find the best move"} · ${snPz.pos + 1} of ${r.order.length}</b><span class="sn-note">${r.correct} right</span></div>
+  el.innerHTML = `<div class="sn-row" style="justify-content:space-between"><b>🎯 Find the best move · ${snPz.pos + 1} of ${r.order.length}</b><span class="sn-note">${r.correct} right</span></div>
     <div class="sn-prog"><i style="width:${r.i / r.order.length * 100}%"></i></div>
     <div class="sn-note">${esc(SN_TYPES[it.type]?.[0] || "")} · ${esc(SN_PHASE[it.phase] || "")}${it.opening ? " · " + esc(it.opening) : ""}</div>
     ${snPz.solved || snPz.failed ? `<div class="sn-row"><button class="primary" id="snNextBtn">Next →</button><a class="sn-src" href="${esc(it.link)}" target="_blank" rel="noopener">See the game ↗</a></div>` : ""}
     <div class="sn-row"><button id="snQuit">Pause</button></div>`;
   if($("snNextBtn")) $("snNextBtn").onclick = () => snNext();
-  $("snQuit").onclick = () => { snPz = null; el.hidden = true; snRenderSet(); snDrawIdle(); $("snPrompt").textContent = "Paused. Press Continue to pick up where you left off."; };
+  $("snQuit").onclick = () => { snPz = null; el.hidden = true; snRenderSet(); snDrawIdle(); S.sn.set = null; save(); snRenderSet(); $("snPrompt").textContent = "Paused. Press Continue to pick up where you left off."; };
 }
 function snDraw(bad){
   const b = $("snBoard");
@@ -4843,7 +4847,7 @@ function snDraw(bad){
 }
 function snDrawIdle(){
   const b = $("snBoard"); snCg ||= cgBoard(b, (o, d) => snTry(o, d));
-  const it = snPile("todo")[0] || snPile("solved")[0];
+  const it = snPile("todo")[0];
   snCg.set({fen: it ? it.fen.split(" ")[0] : "start", orientation: it ? cgColor(it.fen.split(" ")[1]) : "white", lastMove: undefined, check: false, movable: {color: undefined, dests: new Map()}});
 }
 // the move you actually played in the game, as a red arrow
@@ -4854,14 +4858,8 @@ function snPlayedArrow(it){
 function snPileResult(it, ok, dt){
   it.tries = (it.tries || 0) + 1;
   let note;
-  if(ok && !it.solved){ it.solved = Date.now(); it.bestT = dt; note = `<span class="sn-src">Solved in ${fmtS(dt)}: it moves to your <b>Beat your time</b> pile.</span>`; }
-  else if(ok){
-    const prev = it.bestT;
-    if(prev == null || dt < prev){ it.bestT = dt; note = `<b class="ok">⏱ New best: ${fmtS(dt)}</b>${prev != null ? ` <span class="sn-src">(was ${fmtS(prev)})</span>` : ""}`; }
-    else note = `<span class="sn-src">${fmtS(dt)} · your best is ${fmtS(prev)}.</span>`;
-  }
-  else if(it.solved){ it.solved = null; note = `<span class="sn-src">It goes back to <b>Find the best move</b>.</span>`; }
-  else note = `<span class="sn-src">It stays in your pile to try again later.</span>`;
+  if(ok){ it.solved = Date.now(); it.bestT = dt; note = `<span class="sn-src">Solved in ${fmtS(dt)}: it leaves your list.</span>`; }
+  else note = `<span class="sn-src">It stays in your list to try again.</span>`;
   snLogMastery(); save(); snRenderSet();
   return note;
 }
@@ -4872,7 +4870,7 @@ async function snTry(from, to){
   if(p?.type === "p" && (to[1] === "8" || to[1] === "1")) promo = "q";
   const m = g.move({from, to, promotion: promo}); if(!m){ snDraw(); return; }
   moveSound(m);
-  const uci = from + to + (m.promotion || ""), r = S.sn.set.run, it = z.it;
+  const uci = from + to + (m.promotion || ""), r = snRun(), it = z.it;
   const dt = performance.now() - z.t0;
   if(it.type === "mate") return snMateTry(z, m, uci, dt);
   const right = uci.slice(0,4) === it.best.slice(0,4) || g.in_checkmate();
@@ -5016,7 +5014,7 @@ function snMatePrompt(z, extra){
   $("snPrompt").innerHTML = `<b>${n}.</b> ${extra || "Play it all the way to checkmate."} <span class="sn-src">Move ${z.userMoves + 1}${z.mateIn ? ` of ${z.userMoves + z.mateIn}` : ""}.</span>`;
 }
 async function snMateTry(z, m, uci, dt){
-  const g = z.game, r = S.sn.set.run, it = z.it;
+  const g = z.game, r = snRun(), it = z.it;
   snCg.setAutoShapes([]);
   z.lastMove = [m.from, m.to]; r.time += dt; z.think = (z.think || 0) + dt; z.userMoves = (z.userMoves || 0) + 1;
   const finish = ok => {
@@ -5105,13 +5103,11 @@ document.addEventListener("keydown", e => {
 { let wt = 0;
   $("snBoard").addEventListener("wheel", e => { if(!snOver()) return; e.preventDefault(); const t = Date.now(); if(t - wt < 60) return; wt = t; snLook(snPz.view + (e.deltaY > 0 ? 1 : -1)); }, {passive: false}); }
 function snFinish(){
-  const set = S.sn.set, r = set.run, n = r.order.length, pile = set.pile;
-  S.sn.set = null; snPz = null; snLogMastery(); save();
+  const r = snRun(), n = r.order.length;
+  delete S.sn.runs[S.sn.set.key]; S.sn.set = null; snPz = null; snLogMastery(); save();
   $("snRun").hidden = true; snDrawIdle(); snRenderSet();
   const left = snPile("todo").length;
-  $("snPrompt").innerHTML = `<span class="ok">Done: ${r.correct} of ${n} right.</span> ` + (pile === "todo"
-    ? (left ? `${left} still to solve. Press Start to go again.` : "Every position is solved. Try beating your times!")
-    : "Press Start to race your times again.");
+  $("snPrompt").innerHTML = `<span class="ok">Done: ${r.correct} of ${n} right.</span> ` + (left ? `${left} still to solve. Press Start to go through them again.` : "Everything here is solved!");
   snRenderProgress();
 }
 function snPanel(p){
@@ -5173,7 +5169,7 @@ function snTab(){
   snFillBefore();
   snPanel(snPz ? "drill" : (S.sn.panel || (S.sn.batches.length || Object.keys(S.sn.items).length ? "drill" : "batches")));
   snRenderProgress(); snRenderLeaks(); snRenderCollect(); snRenderSummary(); snRenderSet();
-  if(snPz){ snRunCard(); snDraw(); } else snDrawIdle();
+  if(snPz){ snRunCard(); snDraw(); } else if(snRun() && snRun().i < snRun().order.length){ snNext(); } else snDrawIdle();
 }
 $("tabSN").onclick = () => goTo("sn");
 
