@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="sync.js"></script>
+<script src="board-theme.js?v=12"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scout · player report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<link rel="stylesheet" href="chess-lab/vendor/chessground.base.css">
+<link rel="stylesheet" href="chess-lab/pieces.css?v=8">
+<script src="chess-lab/vendor/chessground.iife.js"></script>
+<style>
+/* Scout: a report on any Lichess / Chess.com player, worked out from their public games. */
+:root{
+  --bg:#eef0ea; --surface:#fbfcf8; --surface2:#f1f3ed; --fg:#1d2420; --muted:#5d6a61; --line:#d3d9cf;
+  --accent:#2f6b4f; --accent-fg:#fff; --good:#2f7d4f; --bad:#b4442f; --warn:#a8741a;
+  --w:#3f7d5c; --d:#8a8f8b; --l:#b4513f;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141916; --surface:#1c231f; --surface2:#222a25; --fg:#e7ece5; --muted:#9aa89e; --line:#2e3832;
+  --accent:#6fbf93; --accent-fg:#0f1612; --good:#7fd19f; --bad:#ef8a73; --warn:#e3b45a;
+  --w:#3d7a5a; --d:#5c635e; --l:#a4473a; color-scheme:dark;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--body)}
+a{color:var(--accent)}
+.wrap{max-width:1100px;margin:0 auto;padding:18px 18px 80px}
+nav.tabs{display:flex;gap:6px;align-items:center;margin-bottom:18px;flex-wrap:wrap}
+nav.tabs a, nav.tabs button{font:600 14px var(--body);color:var(--muted);text-decoration:none;padding:7px 12px;border-radius:9px;border:1px solid transparent;background:none;cursor:pointer}
+nav.tabs a:hover{color:var(--fg)} nav.tabs .on{color:var(--fg);border-color:var(--line);background:var(--surface)}
+h1{font:700 32px/1.1 var(--display);margin:0 0 6px}
+h2{font:700 21px/1.2 var(--display);margin:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:14px}
+.muted{color:var(--muted)} .num{font-family:var(--mono)} .small{font-size:13px}
+.good{color:var(--good)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+input, select{font:15px var(--body);padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--surface2);color:var(--fg)}
+button{font:600 14px var(--body);padding:9px 14px;border-radius:9px;border:1px solid var(--line);background:var(--surface2);color:var(--fg);cursor:pointer}
+button:hover{border-color:var(--muted)}
+button.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:none;color:var(--muted);padding:8px 14px}
+.seg button.on{background:var(--surface2);color:var(--fg)}
+.chip{font:600 13px var(--body);padding:5px 10px;border-radius:99px;border:1px solid var(--line);background:none;color:var(--muted)}
+.chip.on{color:var(--fg);border-color:var(--accent);background:var(--surface2)}
+.hd{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.sub{font-size:13px;color:var(--muted)}
+/* header */
+.big{font:700 44px/1 var(--display)}
+.stats4{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:14px}
+.stat b{display:block;font:700 22px/1.1 var(--mono)} .stat span{font-size:13px;color:var(--muted)}
+/* lists of lines */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+@media (max-width:760px){ .two{grid-template-columns:1fr} }
+.line{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.line:last-child{border-bottom:0}
+.line .nm{font-weight:600} .line .mv{font-family:var(--mono);font-size:13px} .line .meta{font-size:12px;color:var(--muted)}
+.line .pct{text-align:right;white-space:nowrap} .line .pct b{display:block;font:700 19px var(--mono)}
+.line.click{cursor:pointer} .line.click:hover .nm{text-decoration:underline}
+/* tables */
+table{width:100%;border-collapse:collapse}
+th{font:600 12px var(--body);color:var(--muted);text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+td{padding:9px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.n, th.n{text-align:right;font-family:var(--mono)}
+tr.fam{cursor:pointer} tr.fam:hover td{background:var(--surface2)}
+tr.fam td:first-child::before{content:"› ";color:var(--muted)} tr.fam.open td:first-child::before{content:"⌄ "}
+tr.sub td{font-size:13px;background:var(--surface2)} tr.sub td:first-child{padding-left:26px}
+.wdl{display:flex;height:20px;border-radius:4px;overflow:hidden;min-width:160px;font:600 11px/20px var(--mono);color:#fff}
+.wdl i{font-style:normal;text-align:center;overflow:hidden;white-space:nowrap}
+.wdl .w{background:var(--w)} .wdl .d{background:var(--d)} .wdl .l{background:var(--l)}
+/* explorer */
+.ex{display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:20px;align-items:start}
+@media (max-width:860px){ .ex{grid-template-columns:1fr} }
+.board.cgb{width:100%;aspect-ratio:1;position:relative}
+.board.cgb cg-board{background-color:var(--sq-l,#eed5a4);background-image:conic-gradient(var(--sq-d,#355a31) 0 25%, transparent 0 50%, var(--sq-d,#355a31) 0 75%, transparent 0);background-size:25% 25%}
+.board.cgb cg-board square.last-move{background-color:rgba(233,196,106,.5)}
+.board.cgb coords.ranks coord:nth-child(2n+1),.board.cgb coords.files coord:nth-child(2n+1){color:var(--sq-l,#eed5a4)}
+.board.cgb coords.ranks coord:nth-child(2n),.board.cgb coords.files coord:nth-child(2n){color:var(--sq-d,#355a31)}
+.board.cgb .orientation-black coords.ranks coord:nth-child(2n+1),.board.cgb .orientation-black coords.files coord:nth-child(2n+1){color:var(--sq-d,#355a31)}
+.board.cgb .orientation-black coords.ranks coord:nth-child(2n),.board.cgb .orientation-black coords.files coord:nth-child(2n){color:var(--sq-l,#eed5a4)}
+.crumb{font-family:var(--mono);font-size:13px;display:flex;flex-wrap:wrap;gap:4px;margin:8px 0}
+.crumb button{padding:2px 6px;font:500 13px var(--mono);border-radius:6px}
+tr.mvrow{cursor:pointer} tr.mvrow:hover td{background:var(--surface2)}
+/* bars for psychology / time */
+.meter{display:grid;grid-template-columns:200px 1fr 70px 110px;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+.meter:last-child{border-bottom:0}
+@media (max-width:640px){ .meter{grid-template-columns:1fr 70px} .meter .bar, .meter .lab{display:none} }
+.meter .bar{height:8px;border-radius:9px;background:var(--surface2);overflow:hidden} .meter .bar i{display:block;height:100%;background:var(--accent)}
+.meter b{font:700 17px var(--mono);text-align:right} .meter .lab{font-size:13px;color:var(--muted);text-align:right}
+.tip{display:flex;gap:10px;padding:8px 0} .tip b{white-space:nowrap}
+.prog{height:6px;border-radius:9px;background:var(--surface2);overflow:hidden;margin-top:10px} .prog i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.recent a{color:var(--fg);text-decoration:none} .recent a:hover{text-decoration:underline}
+.res{font:700 14px var(--mono)}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="tabs">
+    <a href="index.html">← Home</a>
+    <a href="chess.html">Puzzles &amp; Games</a>
+    <a class="on" href="scout.html">Scout</a>
+    <button class="themebtn" style="margin-left:auto" title="Board colors" onclick="BoardTheme.open()">🎨</button>
+    <a href="chess-lab/">Spar &amp; Review →</a>
+  </nav>
+
+  <div class="card">
+    <h1>Scout a player</h1>
+    <p class="muted" style="margin:0 0 12px">Type any Lichess or Chess.com username: an opponent you're about to play, or yourself. Everything is worked out from their public games.</p>
+    <form id="form" class="row">
+      <div class="seg" id="siteSeg"><button type="button" data-s="lichess" class="on">Lichess</button><button type="button" data-s="chesscom">Chess.com</button></div>
+      <input id="user" placeholder="username" autocomplete="off" spellcheck="false" style="flex:1;min-width:160px">
+      <select id="months" title="How far back"><option value="1">1 month</option><option value="3">3 months</option><option value="6" selected>6 months</option><option value="12">12 months</option></select>
+      <select id="max" title="Most games to load"><option value="500">500 games</option><option value="1000" selected>1000 games</option><option value="2500">2500 games</option><option value="5000">5000 games</option></select>
+      <button class="primary" id="go">Scout</button>
+    </form>
+    <div class="row small muted" id="recentUsers" style="margin-top:8px"></div>
+    <div id="status" class="small muted" style="margin-top:8px"></div>
+    <div class="prog hidden" id="prog"><i></i></div>
+  </div>
+
+  <div id="report" class="hidden">
+    <div class="card" id="head"></div>
+    <div class="card" id="check"></div>
+    <div class="card">
+      <div class="hd"><div><h2>How to beat them</h2><div class="sub">Their opening results with each colour. Steer into their weak lines and stay out of their strong ones.</div></div>
+        <div class="seg sideSeg"><button data-side="white" class="on">They're White</button><button data-side="black">They're Black</button></div></div>
+      <div class="row" id="speedChips" style="margin-bottom:12px"></div>
+      <div class="two"><div><h3 class="bad" style="margin:0 0 4px">Weaknesses <span class="sub">where they score worst</span></h3><div id="weak"></div></div>
+        <div><h3 class="good" style="margin:0 0 4px">Strengths <span class="sub">where they score best</span></h3><div id="strong"></div></div></div>
+    </div>
+    <div class="card">
+      <div class="hd"><div><h2>By family</h2><div class="sub" id="famSub"></div></div>
+        <div class="row"><div class="seg sideSeg"><button data-side="white" class="on">White</button><button data-side="black">Black</button></div><button id="expandAll">Expand all</button></div></div>
+      <table><thead><tr><th>Opening</th><th>ECO</th><th class="n">Games</th><th>Last</th><th style="width:34%">Win · draw · loss</th><th class="n">Score</th><th class="n" id="vsAvgTh">vs avg</th></tr></thead><tbody id="famBody"></tbody></table>
+    </div>
+    <div class="card">
+      <div class="hd"><div><h2>Repertoire</h2><div class="sub">Click through the moves they play. Arrows show their most common choices.</div></div>
+        <div class="seg sideSeg"><button data-side="white" class="on">As White</button><button data-side="black">As Black</button></div></div>
+      <div class="ex">
+        <div><div class="board cgb" id="exBoard"></div>
+          <div class="row" style="margin-top:8px"><button id="exStart">⏮ Start</button><button id="exBack">◀ Back</button></div></div>
+        <div><div class="crumb" id="exCrumb"></div><div class="sub" id="exSum"></div>
+          <table><thead><tr><th>Move</th><th class="n">Games</th><th>Last</th><th style="width:44%">Win · draw · loss</th><th class="n">Score</th></tr></thead><tbody id="exBody"></tbody></table></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="hd"><div><h2>Time management</h2><div class="sub" id="timeSub"></div></div><div class="seg" id="timeSeg"></div></div>
+      <div id="time"></div>
+    </div>
+    <div class="card">
+      <div class="hd"><div><h2>Psychology</h2><div class="sub">How they handle wins, losses and long sessions (games less than 30 minutes apart count as one session).</div></div></div>
+      <div id="psych"></div>
+    </div>
+    <div class="card recent"><div class="hd"><h2>Recent games</h2></div><div id="recent"></div></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
+const pct = (a, b) => b ? Math.round(a / b * 1000) / 10 : 0;
+const ago = t => { const d = (Date.now() - t) / 864e5; return d < 1 ? "today" : d < 7 ? Math.floor(d) + "d" : d < 31 ? Math.floor(d/7) + "w" : d < 365 ? Math.floor(d/30.4) + "mo" : Math.floor(d/365) + "y"; };
+const agoLong = t => { const d = Math.floor((Date.now() - t) / 864e5); return d < 1 ? "today" : d === 1 ? "yesterday" : d < 7 ? d + " days ago" : d < 14 ? "last week" : d < 31 ? Math.floor(d/7) + " weeks ago" : d < 62 ? "last month" : Math.floor(d/30.4) + " months ago"; };
+const SPEEDS = ["bullet", "blitz", "rapid", "classical", "correspondence"];
+const SPEED_NAME = {ultraBullet: "UltraBullet", bullet: "Bullet", blitz: "Blitz", rapid: "Rapid", classical: "Classical", correspondence: "Daily"};
+
+let site = localStorage.getItem("scout.site") || "lichess", user = "", G = [], side = "white", speeds = null, timeSpeed = null, exPath = [], abort = null;
+let FAM = null;   // opening family names, to group Chess.com's opening names the same way as Lichess's
+
+/* ---------- loading ---------- */
+async function families(){
+  if(FAM) return FAM;
+  try{
+    const o = await (await fetch("chess-lab/openings.json")).json();
+    FAM = [...new Set(Object.values(o).map(v => famOf(v.split("|")[1])))].sort((a,b) => b.length - a.length);
+  }catch(e){ FAM = []; }
+  return FAM;
+}
+// "Sicilian Defense: Najdorf Variation" -> "Sicilian Defense"; gambits Accepted/Declined join their gambit
+function famOf(name){ return String(name || "Unknown").split(":")[0].replace(/ (Accepted|Declined)$/, "").trim(); }
+const norm = s => s.toLowerCase().replace(/[^a-z]/g, "");
+function setStatus(t, p){ $("status").innerHTML = t; $("prog").classList.toggle("hidden", p == null); if(p != null) $("prog").firstElementChild.style.width = Math.min(100, p) + "%"; }
+
+async function loadLichess(u, since, max){
+  const r = await fetch(`https://lichess.org/api/games/user/${encodeURIComponent(u)}?since=${since}&max=${max}&opening=true&clocks=true&moves=true`, {headers: {Accept: "application/x-ndjson"}, signal: abort.signal});
+  if(r.status === 404) throw new Error(`Lichess has no player called "${esc(u)}".`);
+  if(r.status === 429) throw new Error("Lichess is rate-limiting requests. Wait a minute and try again.");
+  if(!r.ok) throw new Error(`Lichess returned an error (${r.status}).`);
+  const rd = r.body.getReader(), dec = new TextDecoder(); let buf = "", n = 0;
+  for(;;){
+    const {done, value} = await rd.read(); if(done) break;
+    buf += dec.decode(value, {stream: true});
+    let i; while((i = buf.indexOf("\n")) >= 0){
+      const ln = buf.slice(0, i).trim(); buf = buf.slice(i + 1); if(!ln) continue;
+      const g = fromLichess(JSON.parse(ln)); if(g) G.push(g);
+      if(++n % 25 === 0) setStatus(`Loading ${n} games from Lichess… (Lichess sends about 20–30 a second)`, n / max * 100);
+    }
+  }
+}
+function fromLichess(g){
+  if(g.variant !== "standard" || g.initialFen) return null;
+  const P = c => { const p = g.players[c]; return {name: p.user?.name || (p.aiLevel ? `Stockfish level ${p.aiLevel}` : "Anonymous"), rating: p.rating, ai: !!p.aiLevel}; };
+  return {site: "lichess", url: `https://lichess.org/${g.id}`, date: g.lastMoveAt || g.createdAt, speed: g.speed === "ultraBullet" ? "bullet" : g.speed, rated: g.rated,
+    white: P("white"), black: P("black"), winner: g.winner || null, status: g.status, moves: (g.moves || "").split(" ").filter(Boolean),
+    clocks: g.clocks, init: g.clock?.initial, inc: g.clock?.increment, opening: g.opening ? {eco: g.opening.eco, name: g.opening.name} : null};
+}
+const CC_STATUS = {checkmated: "mate", resigned: "resign", timeout: "outoftime", abandoned: "timeout", stalemate: "stalemate", agreed: "draw", repetition: "draw", insufficient: "draw", "50move": "draw", timevsinsufficient: "draw"};
+async function loadChessCom(u, since, max){
+  const r = await fetch(`https://api.chess.com/pub/player/${encodeURIComponent(u.toLowerCase())}/games/archives`, {signal: abort.signal});
+  if(r.status === 404) throw new Error(`Chess.com has no player called "${esc(u)}".`);
+  if(r.status === 429) throw new Error("Chess.com is rate-limiting requests. Wait a minute and try again.");
+  if(!r.ok) throw new Error(`Chess.com returned an error (${r.status}).`);
+  const sinceMonth = new Date(since); sinceMonth.setDate(1);
+  const months = ((await r.json()).archives || []).filter(url => { const [y, m] = url.split("/").slice(-2).map(Number); return new Date(y, m - 1, 1) >= new Date(sinceMonth.getFullYear(), sinceMonth.getMonth(), 1); }).reverse();
+  const fam = await families();
+  for(let k = 0; k < months.length && G.length < max; k++){
+    setStatus(`Loading month ${k + 1} of ${months.length} from Chess.com… (${G.length} games so far)`, k / months.length * 100);
+    const m = await fetch(months[k], {signal: abort.signal}); if(!m.ok) continue;
+    for(const c of ((await m.json()).games || []).reverse()){ if((c.end_time || 0) * 1000 < since) continue; const g = fromChessCom(c, fam); if(g) G.push(g); if(G.length >= max) break; }
+  }
+}
+function fromChessCom(c, fam){
+  if(c.rules !== "chess" || !c.pgn || (c.initial_setup && !c.initial_setup.startsWith("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"))) return null;
+  const head = {}; c.pgn.replace(/\[(\w+) "([^"]*)"\]/g, (_, k, v) => { head[k] = v; });
+  const body = c.pgn.replace(/^\s*\[[^\]]*\]\s*$/gm, "");
+  const clocks = [...body.matchAll(/\[%clk (\d+):(\d+):(\d+(?:\.\d+)?)\]/g)].map(m => Math.round((+m[1] * 3600 + +m[2] * 60 + +m[3]) * 100));
+  const moves = body.replace(/\{[^}]*\}/g, " ").replace(/\$\d+/g, " ").replace(/\d+\.(\.\.)?/g, " ").replace(/(1-0|0-1|1\/2-1\/2|\*)\s*$/, " ").split(/\s+/).filter(t => t && /^[a-hKQRBNO]/.test(t)).map(t => t.replace(/[!?]+$/, ""));
+  if(moves.length < 2) return null;
+  let opening = null;
+  if(head.ECOUrl){
+    const nm = decodeURIComponent(head.ECOUrl.split("/").pop()).replace(/-\d+\..*$/, "").replace(/-/g, " ").replace(/\.\.\./g, "");
+    const f = fam.find(x => norm(nm).startsWith(norm(x)));
+    opening = {eco: head.ECO || "", name: f ? f + (norm(nm).length > norm(f).length + 2 ? ": " + nm.slice(f.length).trim() : "") : nm};
+  }
+  const w = c.white, b = c.black, winner = w.result === "win" ? "white" : b.result === "win" ? "black" : null;
+  const [ini, inc] = String(c.time_control || "").split("+");
+  return {site: "chesscom", url: c.url, date: (c.end_time || 0) * 1000, speed: c.time_class === "daily" ? "correspondence" : c.time_class, rated: c.rated,
+    white: {name: w.username, rating: w.rating}, black: {name: b.username, rating: b.rating}, winner,
+    status: CC_STATUS[winner === "white" ? b.result : winner === "black" ? w.result : w.result] || "draw",
+    moves, clocks: clocks.length === moves.length ? clocks : null, init: ini && !ini.includes("/") ? +ini : null, inc: +(inc || 0), opening};
+}
+
+async function scout(e){
+  e?.preventDefault();
+  const u = $("user").value.trim(); if(!u) return;
+  abort?.abort(); abort = new AbortController();
+  user = u; G = []; exPath = [];
+  const months = +$("months").value, max = +$("max").value, since = Date.now() - months * 30.4 * 864e5;
+  $("go").disabled = true; $("report").classList.add("hidden");
+  history.replaceState(null, "", `?site=${site}&u=${encodeURIComponent(u)}`);
+  try{
+    setStatus("Connecting…", 2);
+    if(site === "lichess") await loadLichess(u, since, max); else await loadChessCom(u, since, max);
+    const me = u.toLowerCase();
+    G = G.filter(g => g.white.name.toLowerCase() === me || g.black.name.toLowerCase() === me).sort((a, b) => a.date - b.date);
+    for(const g of G){ g.me = g.white.name.toLowerCase() === me ? "white" : "black"; g.opp = g.me === "white" ? "black" : "white"; g.res = !g.winner ? .5 : g.winner === g.me ? 1 : 0; }
+    if(!G.length) throw new Error(`No standard games found for "${esc(u)}" in the last ${months} month${months > 1 ? "s" : ""}.`);
+    user = G[G.length - 1][G[G.length - 1].me].name;
+    remember(user);
+    const sp = SPEEDS.filter(s => G.some(g => g.speed === s));
+    speeds = new Set(sp.filter(s => s !== "correspondence").length ? sp.filter(s => s !== "correspondence") : sp);
+    timeSpeed = ["blitz", "rapid", "bullet", "classical"].find(s => G.some(g => g.speed === s && g.clocks)) || null;
+    setStatus(`${G.length} games loaded.`, null);
+    render();
+  }catch(err){ if(err.name !== "AbortError") setStatus(`<span class="bad">${err.message}</span>`, null); }
+  $("go").disabled = false;
+}
+
+/* ---------- maths ---------- */
+const view = () => G.filter(g => speeds.has(g.speed));
+function tally(gs){ const n = gs.length, w = gs.filter(g => g.res === 1).length, d = gs.filter(g => g.res === .5).length; return {n, w, d, l: n - w - d, score: n ? (w + d/2) / n * 100 : 0, last: gs.reduce((m, g) => Math.max(m, g.date), 0)}; }
+function wdl(t){
+  const W = pct(t.w, t.n), D = pct(t.d, t.n), L = Math.max(0, 100 - W - D);
+  const lab = v => v >= 9 ? Math.round(v) + "%" : "";
+  return `<div class="wdl" title="${t.w} wins · ${t.d} draws · ${t.l} losses"><i class="w" style="width:${W}%">${lab(W)}</i><i class="d" style="width:${D}%">${D >= 9 ? Math.round(D) : ""}</i><i class="l" style="width:${L}%">${lab(L)}</i></div>`;
+}
+// a few opening moves in book style: 1.e4 e5 2.Nf3 ...
+function fmtLine(moves, from = 0){
+  return moves.map((m, i) => { const k = from + i; return k % 2 === 0 ? `${k/2 + 1}.${m}` : i === 0 ? `${Math.floor(k/2) + 1}…${m}` : m; }).join(" ");
+}
+// the moves that usually lead to an opening name: the most common first moves among those games
+function typicalMoves(gs, maxPly = 10){
+  const out = [];
+  for(let k = 0; k < maxPly; k++){
+    const c = {}; for(const g of gs) if(g.moves[k] && out.every((m, j) => g.moves[j] === m)) c[g.moves[k]] = (c[g.moves[k]] || 0) + 1;
+    const best = Object.entries(c).sort((a, b) => b[1] - a[1])[0];
+    if(!best || best[1] < gs.length * .5) break;
+    out.push(best[0]);
+  }
+  return out;
+}
+
+/* ---------- render ---------- */
+function render(){
+  $("report").classList.remove("hidden");
+  renderHead(); renderSpeedChips(); renderSide(); renderTime(); renderPsych(); renderRecent(); renderCheck();
+}
+function renderSide(){
+  document.querySelectorAll(".sideSeg button").forEach(b => b.classList.toggle("on", b.dataset.side === side));
+  renderBeat(); renderFamilies(); exRender();
+}
+function renderHead(){
+  const t = tally(G), last10 = tally(G.slice(-10)), first = G[0].date;
+  const rating = s => { const g = [...G].reverse().find(x => x.speed === s && x.rated !== false); return g ? g[g.me].rating : null; };
+  const rs = ["bullet", "blitz", "rapid", "classical", "correspondence"].map(s => [s, rating(s), G.filter(g => g.speed === s).length]).filter(x => x[1]);
+  const prof = site === "lichess" ? `https://lichess.org/@/${encodeURIComponent(user)}` : `https://www.chess.com/member/${encodeURIComponent(user)}`;
+  $("head").innerHTML = `<div class="hd"><div><h1><a href="${prof}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(user)} ↗</a></h1>
+      <div class="sub">${site === "lichess" ? "Lichess" : "Chess.com"} · ${G.length} games since ${new Date(first).toLocaleDateString()}</div></div></div>
+    <div class="stats4">${rs.map(([s, r, n]) => `<div class="stat"><b>${r}</b><span>${SPEED_NAME[s]} · ${n} games</span></div>`).join("")}
+      <div class="stat"><b>${t.w}–${t.d}–${t.l}</b><span>Record (${Math.round(t.score)}%)</span></div>
+      <div class="stat"><b>${last10.w}–${last10.d}–${last10.l}</b><span>Last 10</span></div></div>`;
+}
+function renderSpeedChips(){
+  const sp = SPEEDS.filter(s => G.some(g => g.speed === s));
+  $("speedChips").innerHTML = `<span class="sub">Time controls:</span>` + sp.map(s => `<button class="chip${speeds.has(s) ? " on" : ""}" data-sp="${s}">${SPEED_NAME[s]} <span class="num">${G.filter(g => g.speed === s).length}</span></button>`).join("");
+}
+$("speedChips").onclick = e => {
+  const b = e.target.closest("[data-sp]"); if(!b) return;
+  speeds.has(b.dataset.sp) ? speeds.delete(b.dataset.sp) : speeds.add(b.dataset.sp);
+  if(!speeds.size) speeds.add(b.dataset.sp);
+  renderSpeedChips(); renderSide(); renderCheck();
+};
+document.addEventListener("click", e => { const b = e.target.closest(".sideSeg button"); if(!b) return; side = b.dataset.side; exPath = []; renderSide(); });
+
+// lines (full opening names) for one colour, with at least `min` games
+function lines(color, min = 5){
+  const by = {};
+  for(const g of view()) if(g.me === color && g.opening) (by[g.opening.name] ||= []).push(g);
+  return Object.entries(by).filter(([, gs]) => gs.length >= min).map(([name, gs]) => ({name, eco: gs[0].opening.eco, gs, t: tally(gs)}));
+}
+function renderBeat(){
+  const L = lines(side), avg = tally(view().filter(g => g.me === side)).score;
+  const weak = L.filter(x => x.t.score < Math.min(45, avg - 5)).sort((a, b) => a.t.score - b.t.score).slice(0, 4);
+  const strong = L.filter(x => x.t.score > Math.max(55, avg + 5)).sort((a, b) => b.t.score - a.t.score).slice(0, 4);
+  const item = (x, bad) => { const mv = typicalMoves(x.gs); return `<div class="line click" data-moves="${esc(mv.join(" "))}">
+    <div><div class="nm">${esc(x.name)}</div><div class="mv">${esc(fmtLine(mv))}</div><div class="meta">${esc(x.eco)} · ${x.t.n} games, last played ${agoLong(x.t.last)}</div></div>
+    <div class="pct ${bad ? "bad" : "good"}"><b>${Math.round(bad ? x.t.l / x.t.n * 100 : x.t.w / x.t.n * 100)}%</b>${bad ? "losses" : "wins"}</div></div>`; };
+  $("weak").innerHTML = weak.map(x => item(x, true)).join("") || `<p class="sub">No opening where they clearly struggle as ${side} (needs 5+ games).</p>`;
+  $("strong").innerHTML = strong.map(x => item(x, false)).join("") || `<p class="sub">No opening where they clearly do well as ${side} (needs 5+ games).</p>`;
+}
+// clicking a line opens it in the repertoire explorer
+for(const id of ["weak", "strong"]) $(id).onclick = e => { const l = e.target.closest(".line[data-moves]"); if(!l) return; exPath = l.dataset.moves ? l.dataset.moves.split(" ") : []; exRender(); $("exBoard").scrollIntoView({behavior: "smooth", block: "center"}); };
+
+function renderFamilies(){
+  const mine = view().filter(g => g.me === side), all = tally(mine), by = {};
+  for(const g of mine) (by[famOf(g.opening?.name)] ||= []).push(g);
+  const rows = Object.entries(by).map(([f, gs]) => ({f, gs, t: tally(gs)})).sort((a, b) => b.t.n - a.t.n);
+  $("famSub").textContent = `${all.n} games as ${side} · scores ${all.score.toFixed(1)}%`;
+  $("vsAvgTh").textContent = `vs ${all.score.toFixed(1)}%`;
+  const ecoRange = gs => { const e = [...new Set(gs.map(g => g.opening?.eco).filter(Boolean))].sort(); return e.length ? e[0] + (e.length > 1 ? "–" + e[e.length - 1] : "") : ""; };
+  const diff = t => { const d = t.score - all.score; return t.n >= 10 && Math.abs(d) >= 3 ? `<span class="${d > 0 ? "good" : "bad"}">${d > 0 ? "+" : ""}${d.toFixed(1)}</span>` : `<span class="muted">–</span>`; };
+  $("famBody").innerHTML = rows.map((r, i) => {
+    const subs = {}; for(const g of r.gs) (subs[g.opening?.name || "Unknown"] ||= []).push(g);
+    const sub = Object.entries(subs).map(([n, gs]) => ({n, gs, t: tally(gs)})).sort((a, b) => b.t.n - a.t.n);
+    return `<tr class="fam" data-i="${i}"><td><b>${esc(r.f)}</b></td><td class="muted small">${ecoRange(r.gs)}</td><td class="n">${r.t.n}</td><td class="muted small">${ago(r.t.last)}</td><td>${wdl(r.t)}</td><td class="n">${r.t.score.toFixed(1)}%</td><td class="n">${diff(r.t)}</td></tr>`
+      + sub.map(s => `<tr class="sub hidden" data-p="${i}" data-moves="${esc(typicalMoves(s.gs, 12).join(" "))}" style="cursor:pointer"><td>${esc(s.n.includes(":") ? s.n.split(":").slice(1).join(":").trim() : s.n)}</td><td class="muted small">${esc(s.gs[0].opening?.eco || "")}</td><td class="n">${s.t.n}</td><td class="muted small">${ago(s.t.last)}</td><td>${wdl(s.t)}</td><td class="n">${s.t.score.toFixed(1)}%</td><td class="n">${diff(s.t)}</td></tr>`).join("");
+  }).join("");
+}
+$("famBody").onclick = e => {
+  const f = e.target.closest("tr.fam");
+  if(f){ f.classList.toggle("open"); document.querySelectorAll(`#famBody tr.sub[data-p="${f.dataset.i}"]`).forEach(r => r.classList.toggle("hidden", !f.classList.contains("open"))); return; }
+  const s = e.target.closest("tr.sub[data-moves]");
+  if(s){ exPath = s.dataset.moves ? s.dataset.moves.split(" ") : []; exRender(); $("exBoard").scrollIntoView({behavior: "smooth", block: "center"}); }
+};
+$("expandAll").onclick = () => {
+  const open = !document.querySelector("#famBody tr.fam.open");
+  document.querySelectorAll("#famBody tr.fam").forEach(r => r.classList.toggle("open", open));
+  document.querySelectorAll("#famBody tr.sub").forEach(r => r.classList.toggle("hidden", !open));
+  $("expandAll").textContent = open ? "Collapse all" : "Expand all";
+};
+
+/* ---------- repertoire explorer ---------- */
+let exCg = null;
+function exRender(){
+  if(!exCg) exCg = CG.Chessground($("exBoard"), {coordinates: true, viewOnly: true, drawable: {enabled: false, visible: true}, animation: {duration: 180}});
+  const mine = view().filter(g => g.me === side);
+  // the games that followed this path, and what came next
+  const at = mine.filter(g => exPath.every((m, i) => g.moves[i] === m));
+  const next = {};
+  for(const g of at){ const m = g.moves[exPath.length]; if(m) (next[m] ||= []).push(g); }
+  const rows = Object.entries(next).map(([m, gs]) => ({m, gs, t: tally(gs)})).sort((a, b) => b.t.n - a.t.n);
+  const ch = new Chess(); let last = null;
+  for(const m of exPath){ last = ch.move(m, {sloppy: true}); if(!last) break; }
+  const theirTurn = (exPath.length % 2 === 0) === (side === "white");
+  const total = rows.reduce((s, r) => s + r.t.n, 0);
+  const shapes = rows.slice(0, 4).map((r, i) => { const c = new Chess(ch.fen()), mv = c.move(r.m, {sloppy: true}); return mv && {orig: mv.from, dest: mv.to, brush: theirTurn ? (i ? "paleGreen" : "green") : (i ? "paleBlue" : "blue"), modifiers: {lineWidth: Math.max(4, Math.round(16 * r.t.n / total))}}; }).filter(Boolean);
+  exCg.set({fen: ch.fen(), orientation: side, lastMove: last ? [last.from, last.to] : undefined, turnColor: ch.turn() === "w" ? "white" : "black"});
+  exCg.setAutoShapes(shapes);
+  $("exCrumb").innerHTML = `<button data-k="0">Start</button>` + exPath.map((m, i) => `<button data-k="${i + 1}">${esc(fmtLine([m], i))}</button>`).join("");
+  const t = tally(at);
+  $("exSum").innerHTML = at.length ? `<b>${t.n}</b> games reached this position · ${theirTurn ? "their move" : "their opponents' move"} · they scored ${t.score.toFixed(1)}%` : "No games reached this position.";
+  $("exBody").innerHTML = rows.slice(0, 18).map(r => `<tr class="mvrow" data-m="${esc(r.m)}"><td class="num"><b>${esc(fmtLine([r.m], exPath.length))}</b> <span class="muted small">${Math.round(r.t.n / total * 100)}%</span></td><td class="n">${r.t.n}</td><td class="muted small">${ago(r.t.last)}</td><td>${wdl(r.t)}</td><td class="n">${r.t.score.toFixed(1)}%</td></tr>`).join("")
+    || `<tr><td colspan="5" class="sub">No more moves in their games from here.</td></tr>`;
+}
+$("exBody").onclick = e => { const r = e.target.closest("tr[data-m]"); if(r){ exPath = [...exPath, r.dataset.m]; exRender(); } };
+$("exCrumb").onclick = e => { const b = e.target.closest("[data-k]"); if(b){ exPath = exPath.slice(0, +b.dataset.k); exRender(); } };
+$("exStart").onclick = () => { exPath = []; exRender(); };
+$("exBack").onclick = () => { exPath = exPath.slice(0, -1); exRender(); };
+document.addEventListener("keydown", e => { if(!exCg || e.target.closest("input,select")) return; if(e.key === "ArrowLeft"){ exPath = exPath.slice(0, -1); exRender(); } });
+
+/* ---------- time ---------- */
+function myClocks(g){ if(!g.clocks) return null; const off = g.me === "white" ? 0 : 1; return g.clocks.filter((_, i) => i % 2 === off); }
+function renderTime(){
+  const sps = ["bullet", "blitz", "rapid", "classical"].filter(s => G.some(g => g.speed === s && g.clocks));
+  $("timeSeg").innerHTML = sps.map(s => `<button data-t="${s}" class="${s === timeSpeed ? "on" : ""}">${SPEED_NAME[s]}</button>`).join("");
+  if(!timeSpeed){ $("time").innerHTML = `<p class="sub">No clock data in these games.</p>`; $("timeSub").textContent = ""; return; }
+  const gs = G.filter(g => g.speed === timeSpeed && g.clocks), low = timeSpeed === "bullet" ? 1000 : 3000;
+  const losses = gs.filter(g => g.res === 0), wins = gs.filter(g => g.res === 1);
+  const lowGames = gs.filter(g => { const c = myClocks(g); return c?.length && Math.min(...c) < low; });
+  const flagged = losses.filter(g => g.status === "outoftime" || g.status === "timeout");
+  const theyFlag = wins.filter(g => g.status === "outoftime");
+  const lowScore = tally(lowGames).score, okScore = tally(gs.filter(g => !lowGames.includes(g))).score;
+  // average time spent per move over moves 1-10 and 11-30, as a share of the starting clock
+  const spend = (a, b) => { let s = 0, n = 0; for(const g of gs){ const c = myClocks(g); if(!c || !g.init) continue; for(let i = Math.max(1, a); i < Math.min(b, c.length); i++){ s += (c[i-1] - c[i]) / 100 + (g.inc || 0); n++; } } return n ? s / n : null; };
+  const early = spend(1, 10), mid = spend(10, 30);
+  $("timeSub").textContent = `${gs.length} ${SPEED_NAME[timeSpeed].toLowerCase()} games with clock data`;
+  const M = (name, val, txt, lab, frac) => `<div class="meter"><span>${name}</span><div class="bar"><i style="width:${Math.min(100, frac * 100)}%"></i></div><b>${val}</b><span class="lab">${lab}</span></div>` + (txt ? `<div class="sub" style="margin:-4px 0 6px">${txt}</div>` : "");
+  const flagPct = pct(flagged.length, losses.length), lowPct = pct(lowGames.length, gs.length);
+  $("time").innerHTML =
+    M("Losses on time", flagPct + "%", "", flagPct >= 25 ? "Flags a lot" : flagPct >= 12 ? "Sometimes" : "Rarely", flagPct / 50) +
+    M(`Games under ${low/100}s`, lowPct + "%", "", lowPct >= 35 ? "Often short" : lowPct >= 15 ? "Sometimes" : "Rarely", lowPct / 60) +
+    M("Score when short of time", lowGames.length >= 5 ? Math.round(lowScore) + "%" : "–", lowGames.length >= 5 ? `vs ${Math.round(okScore)}% when they aren't` : "", lowGames.length < 5 ? "" : lowScore < okScore - 10 ? "Cracks under time" : "Holds up", lowScore / 100) +
+    M("Wins on time", pct(theyFlag.length, wins.length) + "%", "", "of their wins", pct(theyFlag.length, wins.length) / 50) +
+    (early != null ? M("Time per move, moves 1–10", early.toFixed(1) + "s", "", early < 2 ? "Plays openings fast" : "Thinks early", Math.min(1, early / 15)) : "") +
+    (mid != null ? M("Time per move, moves 10–30", mid.toFixed(1) + "s", "", "", Math.min(1, mid / 20)) : "");
+}
+$("timeSeg").onclick = e => { const b = e.target.closest("[data-t]"); if(b){ timeSpeed = b.dataset.t; renderTime(); } };
+
+/* ---------- psychology ---------- */
+function psych(){
+  const gs = G, prevLoss = [], prevWin = [], sessionLate = [], sessionEarly = [];
+  let streakL = 0, maxL = 0, streakW = 0, maxW = 0, pos = 0;
+  for(let i = 0; i < gs.length; i++){
+    const g = gs[i], p = gs[i-1], same = p && g.date - p.date < 30 * 60e3;
+    pos = same ? pos + 1 : 0;
+    if(same && p.res === 0) prevLoss.push(g);
+    if(same && p.res === 1) prevWin.push(g);
+    (pos >= 5 ? sessionLate : sessionEarly).push(g);
+    if(g.res === 0){ streakL++; streakW = 0; } else if(g.res === 1){ streakW++; streakL = 0; } else { streakL = 0; streakW = 0; }
+    maxL = Math.max(maxL, streakL); maxW = Math.max(maxW, streakW);
+  }
+  const all = tally(gs), losses = gs.filter(g => g.res === 0);
+  return {all, afterLoss: tally(prevLoss), afterWin: tally(prevWin), late: tally(sessionLate), early: tally(sessionEarly), maxL, maxW,
+    resign: pct(losses.filter(g => g.status === "resign").length, losses.length), mated: pct(losses.filter(g => g.status === "mate").length, losses.length)};
+}
+function renderPsych(){
+  const P = psych(), lossRate = P.all.l / P.all.n * 100;
+  const tilt = P.afterLoss.n ? P.afterLoss.l / P.afterLoss.n * 100 : null, rec = P.afterLoss.n ? P.afterLoss.w / P.afterLoss.n * 100 : null;
+  const M = (name, val, lab, frac, note) => `<div class="meter"><span>${name}</span><div class="bar"><i style="width:${Math.min(100, Math.max(0, frac) * 100)}%"></i></div><b>${val}</b><span class="lab">${lab}</span></div>` + (note ? `<div class="sub" style="margin:-4px 0 6px">${note}</div>` : "");
+  $("psych").innerHTML =
+    (tilt != null ? M("Tilt: loses again after a loss", Math.round(tilt) + "%", tilt > lossRate + 8 ? "Tilts" : tilt > lossRate + 3 ? "A little" : "Steady", tilt / 100, `Normal loss rate ${Math.round(lossRate)}% · ${P.afterLoss.n} games played straight after a loss`) : "") +
+    (rec != null ? M("Recovery: wins after a loss", Math.round(rec) + "%", rec >= 50 ? "Bounces back" : "Average", rec / 100) : "") +
+    (P.afterWin.n ? M("Wins again after a win", Math.round(P.afterWin.w / P.afterWin.n * 100) + "%", "", P.afterWin.w / P.afterWin.n) : "") +
+    (P.late.n >= 10 ? M("Score late in long sessions", Math.round(P.late.score) + "%", P.late.score < P.early.score - 5 ? "Fades" : "Holds up", P.late.score / 100, `Games 6+ of a session, vs ${Math.round(P.early.score)}% in the first five`) : "") +
+    M("Longest losing streak", P.maxL, P.maxL >= 8 ? "Long streaks" : P.maxL >= 5 ? "Some" : "Short", P.maxL / 15) +
+    M("Longest winning streak", P.maxW, "", P.maxW / 15) +
+    M("Losses by resignation", P.resign + "%", P.resign < 25 ? "Fighter" : P.resign > 60 ? "Resigns early" : "Average", P.resign / 100, `${P.mated}% of their losses end in checkmate`);
+}
+
+/* ---------- recent + checklist ---------- */
+function renderRecent(){
+  $("recent").innerHTML = `<table>` + G.slice(-12).reverse().map(g => {
+    const o = g[g.opp], col = g.res === 1 ? "good" : g.res === 0 ? "bad" : "muted";
+    return `<tr><td>${g.me === "white" ? "⚪" : "⚫"} <a href="${g.url}" target="_blank" rel="noopener"><b>${esc(o.name)}</b></a> <span class="muted">(${o.rating ?? "?"})</span><div class="sub">${esc(g.opening?.name || "")}</div></td>
+      <td class="muted small">${SPEED_NAME[g.speed] || g.speed}</td><td class="muted small">${ago(g.date)}</td><td class="n res ${col}">${g.res === 1 ? "Won" : g.res === 0 ? "Lost" : "Draw"}</td></tr>`;
+  }).join("") + `</table>`;
+}
+function renderCheck(){
+  const tips = [];
+  for(const c of ["white", "black"]){
+    const L = lines(c), avg = tally(view().filter(g => g.me === c)).score;
+    const w = L.filter(x => x.t.score < Math.min(45, avg - 5)).sort((a, b) => a.t.score - b.t.score)[0];
+    if(w) tips.push([`When they're ${c}`, `steer for the <b>${esc(w.name)}</b> (${fmtLine(typicalMoves(w.gs, 8))}): they lose ${Math.round(w.t.l / w.t.n * 100)}% of ${w.t.n} games there.`]);
+  }
+  const W = view().filter(g => g.me === "white"), first = {};
+  for(const g of W) if(g.moves[0]) first[g.moves[0]] = (first[g.moves[0]] || 0) + 1;
+  const top = Object.entries(first).sort((a, b) => b[1] - a[1])[0];
+  if(top && W.length >= 10) tips.push(["Expect", `<b>1.${esc(top[0])}</b> when they're White (${Math.round(top[1] / W.length * 100)}% of their games).`]);
+  const B = view().filter(g => g.me === "black");
+  for(const opp1 of ["e4", "d4"]){
+    const vs = B.filter(g => g.moves[0] === opp1), rep = {};
+    for(const g of vs) if(g.moves[1]) rep[g.moves[1]] = (rep[g.moves[1]] || 0) + 1;
+    const t = Object.entries(rep).sort((a, b) => b[1] - a[1])[0];
+    if(t && vs.length >= 10) tips.push([`Against 1.${opp1}`, `they answer <b>1…${esc(t[0])}</b> ${Math.round(t[1] / vs.length * 100)}% of the time.`]);
+  }
+  const P = psych(), lossRate = P.all.l / P.all.n * 100;
+  if(P.afterLoss.n >= 10 && P.afterLoss.l / P.afterLoss.n * 100 > lossRate + 8) tips.push(["Tilt", `after a loss they lose the next game ${Math.round(P.afterLoss.l / P.afterLoss.n * 100)}% of the time. Win one, then rematch.`]);
+  const gs = G.filter(g => g.clocks), losses = gs.filter(g => g.res === 0), flag = pct(losses.filter(g => g.status === "outoftime").length, losses.length);
+  if(losses.length >= 10 && flag >= 20) tips.push(["Clock", `${flag}% of their losses are on time. Keep positions complicated and play fast.`]);
+  if(P.resign > 60) tips.push(["Resigns early", `${P.resign}% of their losses are resignations. Get an advantage and keep pressing.`]);
+  $("check").innerHTML = `<div class="hd"><h2>Pre-game checklist</h2><span class="sub">from ${view().length} games</span></div>` +
+    (tips.length ? tips.map(([a, b]) => `<div class="tip"><b>${a}</b><span>${b}</span></div>`).join("") : `<p class="sub">Not enough games for clear patterns yet.</p>`);
+}
+
+/* ---------- form ---------- */
+function setSite(s){ site = s; localStorage.setItem("scout.site", s); document.querySelectorAll("#siteSeg button").forEach(b => b.classList.toggle("on", b.dataset.s === s)); }
+$("siteSeg").onclick = e => { const b = e.target.closest("[data-s]"); if(b) setSite(b.dataset.s); };
+$("form").onsubmit = scout;
+function remember(u){
+  let r = []; try{ r = JSON.parse(localStorage.getItem("scout.recent") || "[]"); }catch(e){}
+  r = [{site, u}, ...r.filter(x => !(x.site === site && x.u.toLowerCase() === u.toLowerCase()))].slice(0, 8);
+  localStorage.setItem("scout.recent", JSON.stringify(r)); showRecent();
+}
+function showRecent(){
+  let r = []; try{ r = JSON.parse(localStorage.getItem("scout.recent") || "[]"); }catch(e){}
+  $("recentUsers").innerHTML = r.length ? "Recent: " + r.map(x => `<button class="chip" data-site="${x.site}" data-u="${esc(x.u)}">${esc(x.u)} <span class="muted">${x.site === "lichess" ? "Li" : "C"}</span></button>`).join("") : "";
+}
+$("recentUsers").onclick = e => { const b = e.target.closest("[data-u]"); if(!b) return; setSite(b.dataset.site); $("user").value = b.dataset.u; scout(); };
+setSite(site); showRecent();
+const q = new URLSearchParams(location.search);
+if(q.get("u")){ setSite(q.get("site") === "chesscom" ? "chesscom" : "lichess"); $("user").value = q.get("u"); scout(); }
+</script>
+</body>
+</html>
