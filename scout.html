@@ -77,6 +77,7 @@ tr.sub td{font-size:13px;background:var(--surface2)} tr.sub td:first-child{paddi
 .wdl i{font-style:normal;text-align:center;overflow:hidden;white-space:nowrap}
 .wdl .w{background:var(--w)} .wdl .d{background:var(--d)} .wdl .l{background:var(--l)}
 /* explorer */
+html{overflow-anchor:none}
 .ex{display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:20px;align-items:start}
 @media (max-width:860px){ .ex{grid-template-columns:1fr} }
 .board.cgb{width:100%;aspect-ratio:1;position:relative}
@@ -356,7 +357,14 @@ function renderHead(){
       <div class="stat"><b>${t.w}–${t.d}–${t.l}</b><span>Record (${Math.round(t.score)}%)</span></div>
       <div class="stat"><b>${last10.w}–${last10.d}–${last10.l}</b><span>Last 10</span></div></div>`;
 }
-document.addEventListener("click", e => { const b = e.target.closest(".sideSeg button"); if(!b) return; side = b.dataset.side; exPath = []; renderSide(); });
+// switching White/Black redraws every section, and the ones above change height: keep the button you
+// clicked exactly where it was on screen, so the page doesn't jump
+function keepInPlace(el, fn){
+  const card = el.closest(".card"), top = card.getBoundingClientRect().top;
+  fn();
+  window.scrollBy(0, card.getBoundingClientRect().top - top);
+}
+document.addEventListener("click", e => { const b = e.target.closest(".sideSeg button"); if(!b) return; keepInPlace(b, () => { side = b.dataset.side; exPath = []; renderSide(); }); });
 
 // lines (full opening names) for one colour, with at least `min` games
 function lines(color, min = 5){
@@ -460,7 +468,7 @@ function renderTime(){
     (early != null ? M("Time per move, moves 1–10", early.toFixed(1) + "s", "", early < 2 ? "Plays openings fast" : "Thinks early", Math.min(1, early / 15)) : "") +
     (mid != null ? M("Time per move, moves 10–30", mid.toFixed(1) + "s", "", "", Math.min(1, mid / 20)) : "");
 }
-$("timeSeg").onclick = e => { const b = e.target.closest("[data-t]"); if(b){ timeSpeed = b.dataset.t; renderTime(); } };
+$("timeSeg").onclick = e => { const b = e.target.closest("[data-t]"); if(b) keepInPlace(b, () => { timeSpeed = b.dataset.t; renderTime(); }); };
 
 /* ---------- psychology ---------- */
 function psych(){
