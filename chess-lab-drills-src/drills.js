@@ -39,21 +39,47 @@ const fenAfter = (moves) => { const c = new Chess(); for (const u of moves) { tr
 const lineText = (sans, from = 0) => sans.map((s, k) => ((k % 2 === 0) ? `${k / 2 + 1}.${s}` : s)).slice(from).join(' ');
 
 // ---------- adding lines (from Study) ----------
+// A line "continues" another when it starts with exactly the same moves and goes further. Then the longer
+// line replaces the shorter one (keeping its practice history) instead of both being drilled. Moves are
+// compared in one standard spelling, so castling written king-to-rook (e1h1) matches king-to-g1 (e1g1).
+const canon = (moves) => { const c = new Chess(); const out = []; for (const u of moves) { let m; try { m = c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] }); } catch { m = null; }
+  if (!m && /^e[18][ah][18]$/.test(u)) { try { m = c.move(u[2] === 'h' ? 'O-O' : 'O-O-O'); } catch { m = null; } }
+  if (!m) break; out.push(m.from + m.to + (m.promotion || '')); } return out; };
+const covers = (long, short) => { const L = canon(long), S = canon(short); return S.length <= L.length && S.every((u, k) => u === L[k]); };
+function absorb(into, from) {   // keep the better practice record of the two
+  into.tries = Math.max(into.tries || 0, from.tries || 0); into.clean = Math.max(into.clean || 0, from.clean || 0);
+  into.lastAt = Math.max(into.lastAt || 0, from.lastAt || 0); into.added = Math.min(into.added || Date.now(), from.added || Date.now());
+}
 async function addLine(moves, color) {
   await loadOpenings();
-  const same = (a, b) => a.length <= b.length && a.every((u, k) => u === b[k]);
-  for (const l of D.lines) {
-    if (l.color !== color) continue;
-    if (same(moves, l.moves)) return { status: 'covered', line: l };                  // already drilled (same or longer line)
-    if (same(l.moves, moves)) {                                                        // longer version of an existing line
-      Object.assign(l, { moves, sans: sanList(moves), ...openingOf(moves) });
-      save(); return { status: 'extended', line: l };
-    }
+  moves = canon(moves);
+  const mine = D.lines.filter((l) => l.color === color);
+  const have = mine.find((l) => covers(l.moves, moves));
+  if (have) return { status: 'covered', line: have };                                  // already drilled (same or longer line)
+  const shorter = mine.filter((l) => covers(moves, l.moves));                          // lines this one continues
+  if (shorter.length) {
+    const keep = shorter[0];
+    for (const l of shorter.slice(1)) absorb(keep, l);
+    D.lines = D.lines.filter((l) => !shorter.includes(l) || l === keep);
+    Object.assign(keep, { moves, sans: sanList(moves), ...openingOf(moves) });
+    save(); return { status: 'extended', line: keep };
   }
   const line = { id: Math.random().toString(36).slice(2, 10), moves, sans: sanList(moves), color, ...openingOf(moves),
     added: Date.now(), tries: 0, clean: 0, lastAt: 0, due: 0, ivl: 0 };
   D.lines.push(line); save();
   return { status: 'added', line };
+}
+// one time: lines saved before this rule that a longer line of the same colour already continues get merged into it
+function mergeCovered() {
+  if (D.merged2) return;
+  const out = [];
+  for (const l of [...D.lines].sort((a, b) => b.moves.length - a.moves.length)) {
+    const long = out.find((o) => o.color === l.color && covers(o.moves, l.moves));
+    if (long) absorb(long, l); else out.push(l);
+  }
+  const n = D.lines.length - out.length;
+  D.lines = D.lines.filter((l) => out.includes(l)); D.merged2 = 1; save();
+  return n;
 }
 function toast(msg) {
   let t = $('drill-toast');
@@ -62,6 +88,7 @@ function toast(msg) {
   clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 3200);
 }
 function hookStudy() {
+  try { mergeCovered(); } catch { /* keep going */ }
   const btn = $('st-to-drills'); if (!btn) return;
   btn.addEventListener('click', async () => {
     const L = window.__studyLine?.();
