@@ -63,6 +63,25 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--lib)}
 button.pri{font:600 14px var(--body);color:#0b0d10;background:var(--lib);border:0;border-radius:10px;padding:10px 16px;cursor:pointer}
 button.ghost{font:600 14px var(--body);color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 14px;cursor:pointer}
 .list{display:flex;flex-direction:column;gap:10px}
+/* poster grid: one card per item, poster on top, status buttons at the bottom */
+.list.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;align-items:stretch}
+.list.grid .item, .list.grid .item.has-p{display:flex;flex-direction:column;padding:0;gap:0;overflow:hidden;position:relative;
+  border-left:1px solid var(--line);border-top:4px solid var(--todo)}
+.list.grid .item[data-s="doing"]{border-top-color:var(--doing)} .list.grid .item[data-s="done"]{border-top-color:var(--done)} .list.grid .item[data-s="dropped"]{border-top-color:var(--drop)}
+.list.grid .item .poster, .list.grid .item.has-p .poster{width:100%;border:0;border-radius:0;font-size:42px;order:0}
+.list.grid .t{order:1;padding:10px 12px 0;font-size:15px;line-height:1.25}
+.list.grid .by{order:2;padding:6px 12px 0;font-size:13px}
+.list.grid .note, .list.grid .review{order:3;padding:6px 12px 0;font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.list.grid .review{order:4}
+.list.grid .side{order:10;margin-top:auto;padding:10px 12px 12px;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-start}
+.list.grid .side .seg{display:grid;grid-template-columns:1fr 1fr;width:100%}
+.list.grid .side .seg button{font-size:11.5px;padding:6px 4px}
+.list.grid .side .rate{width:100%}
+.list.grid .side .icon{position:absolute;top:8px;background:rgba(0,0,0,.55);color:#fff;border-radius:8px;padding:4px 7px;opacity:0;transition:opacity .15s}
+.list.grid .side .icon[data-act="edit"]{right:44px} .list.grid .side .icon[data-act="del"]{right:8px}
+.list.grid .item:hover .side .icon, .list.grid .item:focus-within .side .icon{opacity:1}
+@media (hover:none){ .list.grid .side .icon{opacity:1} }
+@media (max-width:520px){ .list.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px} }
 .item{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--todo);border-radius:12px;padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px}
 .item[data-s="doing"]{border-left-color:var(--doing)}
 .item[data-s="done"]{border-left-color:var(--done)}
@@ -148,6 +167,7 @@ dialog .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
       <option value="rating">Sort: top rated</option>
     </select>
     <button class="pri" id="addBtn">+ Add</button>
+    <button class="ghost" id="layoutBtn" title="Switch between a poster grid and a list"></button>
     <button class="ghost" id="tmdbBtn" title="The Movie Database: posters and genres for movies that aren't on Wikipedia">🎬 TMDB key</button>
   </div>
 
@@ -275,6 +295,8 @@ let S = load();
 const save = () => { persist(S); render(); };
 
 let view = { type:"all", status:"all", q:"", sort:"status" };
+// poster grid (default) or the older list, remembered on this device
+let layout = localStorage.getItem("library.layout") || "grid";
 try{ Object.assign(view, JSON.parse(sessionStorage.getItem("library.view"))||{}); }catch(e){}
 const $ = id => document.getElementById(id);
 const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
@@ -326,6 +348,8 @@ function render(){
     status:(a,b)=>STATUS_ORDER.indexOf(a.status)-STATUS_ORDER.indexOf(b.status) || b.added-a.added,
     added:(a,b)=>b.added-a.added, title:byTitle, rating:(a,b)=>(b.rating||0)-(a.rating||0) || STATUS_ORDER.indexOf(a.status)-STATUS_ORDER.indexOf(b.status) || byTitle(a,b)
   }[view.sort]);
+  $("list").classList.toggle("grid", layout === "grid");
+  $("layoutBtn").textContent = layout === "grid" ? "☰ List" : "▦ Grid";
   $("list").innerHTML = items.length ? items.map(i => `
     <div class="item has-p" data-id="${i.id}" data-s="${i.status}">
       ${posterHTML(i)}
@@ -634,6 +658,7 @@ window.addEventListener("storage", e => { if(e.key===KEY){ S = load(); render();
 // tidy genres saved before the clean-up ("Horror anime and manga" -> "Horror")
 { let ch = false; for(const i of S.items) if(i.genre){ const g = cleanGenres(i.genre); if(g !== i.genre){ i.genre = g; ch = true; } } if(ch) persist(S); }
 render();
+$("layoutBtn").onclick = () => { layout = layout === "grid" ? "list" : "grid"; localStorage.setItem("library.layout", layout); render(); };
 </script>
 </body>
 </html>
