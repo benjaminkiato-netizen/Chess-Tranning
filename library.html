@@ -687,7 +687,12 @@ $("list").addEventListener("mouseout", e => { const r = e.target.closest(".rate"
 
 // where clicking a poster goes: the item's own link, or a search on the site you watch that kind of thing on
 const WATCH_WORD = {anime: "naruto", movie: "inception"}, WATCH_YEAR = {anime: "2002", movie: "2010"};   // the test titles' years
-function watchTpl(type){ S.watch ||= {}; if(S.watchTpl){ S.watch.anime ||= S.watchTpl; delete S.watchTpl; } return S.watch[type] || ""; }
+function watchTpl(type){
+  S.watch ||= {}; if(S.watchTpl){ S.watch.anime ||= S.watchTpl; delete S.watchTpl; }
+  // links saved before years were understood still have the test title's year written in (…/{q}-2010-…): fix them
+  for(const k of Object.keys(WATCH_YEAR)) if(S.watch[k] && !S.watch[k].includes("{year}")) S.watch[k] = S.watch[k].replace(new RegExp("(\\{q\\}[-_ ]?)" + WATCH_YEAR[k]), "$1{year}");
+  return S.watch[type] || "";
+}
 function watchLink(i){
   if(i.watch) return i.watch;
   const t = watchTpl(i.type); if(!t) return null;
