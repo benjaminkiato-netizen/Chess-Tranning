@@ -172,6 +172,7 @@ dialog .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
     </select>
     <button class="pri" id="addBtn">+ Add</button>
     <button class="ghost" id="watchBtn" title="The site you watch anime on: clicking an anime's poster searches for it there"></button>
+    <button class="ghost" id="watchMovieBtn" title="The site you watch movies on: clicking a movie's poster searches for it there"></button>
     <button class="ghost" id="layoutBtn" title="Switch between a poster grid and a list"></button>
     <button class="ghost" id="tmdbBtn" title="The Movie Database: posters and genres for movies that aren't on Wikipedia">🎬 TMDB key</button>
   </div>
@@ -358,7 +359,10 @@ function render(){
   }[view.sort]);
   $("list").classList.toggle("grid", layout === "grid");
   $("layoutBtn").textContent = layout === "grid" ? "☰ List" : "▦ Grid";
-  $("watchBtn").textContent = S.watchTpl ? `▶ ${new URL(S.watchTpl.replace("{q}", "x")).hostname.replace(/^www\./, "")}` : "▶ Watch on…";
+  $("watchBtn").textContent = watchTpl("anime") ? `▶ Anime: ${siteName(watchTpl("anime"))}` : "▶ Watch anime on…";
+  $("watchMovieBtn").textContent = watchTpl("movie") ? `▶ Movies: ${siteName(watchTpl("movie"))}` : "▶ Watch movies on…";
+  $("watchBtn").hidden = view.type === "book" || view.type === "movie";
+  $("watchMovieBtn").hidden = view.type === "book" || view.type === "anime";
   $("list").innerHTML = items.length ? items.map(i => `
     <div class="item has-p" data-id="${i.id}" data-s="${i.status}">
       ${posterHTML(i)}
@@ -411,7 +415,7 @@ function metaHTML(i){
 }
 function posterHTML(i){
   const url = i.poster || PC[pKey(i)]?.url;
-  const lk = watchLink(i) ? ` link" title="Open ${i.watch ? "your link" : "on " + new URL(S.watchTpl.replace("{q}", "x")).hostname.replace(/^www\./, "")}` : "";
+  const lk = watchLink(i) ? ` link" title="Open ${i.watch ? "your link" : "on " + siteName(watchTpl(i.type))}` : "";
   if(url) return `<div class="poster${lk}"><img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.textContent='${ICON[i.type]||"🎞"}'"></div>`;
   const looking = !PC[pKey(i)] || noCoverExpired(PC[pKey(i)]), retry = pFail[pKey(i)];
   if(lk) return `<div class="poster${lk}">${ICON[i.type]||"🎞"}</div>`;
@@ -666,7 +670,7 @@ $("list").onclick = e => {
   if(e.target.closest(".poster") && !act){
     const link = watchLink(it);
     if(link) window.open(link, "_blank", "noopener");
-    else if(it.type === "anime") setWatchSite();
+    else if(it.type === "anime" || it.type === "movie") setWatchSite(it.type);
     return;
   }
   if(seg){ it.status = seg.dataset.v; save(); }
@@ -681,23 +685,31 @@ $("list").onclick = e => {
 $("list").addEventListener("mouseover", e => { const b = e.target.closest(".star button"); if(b) paint(b.closest(".rate"), +b.dataset.r); });
 $("list").addEventListener("mouseout", e => { const r = e.target.closest(".rate"); if(r && !r.contains(e.relatedTarget)) paint(r, +r.dataset.r); });
 
-// where clicking a poster goes: the item's own link, or (anime) a search on the site you watch on
+// where clicking a poster goes: the item's own link, or a search on the site you watch that kind of thing on
+const WATCH_WORD = {anime: "naruto", movie: "inception"};
+function watchTpl(type){ S.watch ||= {}; if(S.watchTpl){ S.watch.anime ||= S.watchTpl; delete S.watchTpl; } return S.watch[type] || ""; }
 function watchLink(i){
   if(i.watch) return i.watch;
-  if(i.type === "anime" && S.watchTpl) return S.watchTpl.replace("{q}", encodeURIComponent(i.title.replace(/\s*\(.*?\)\s*/g, " ").trim()));
-  return null;
+  const t = watchTpl(i.type); if(!t) return null;
+  const title = i.title.replace(/\s*\(.*?\)\s*/g, " ").trim();
+  // a search word in the address path (…/search/inception) is usually written with dashes; in ?q=… it's encoded
+  const inPath = t.indexOf("{q}") < (t.indexOf("?") < 0 ? Infinity : t.indexOf("?"));
+  return t.replace("{q}", inPath ? encodeURIComponent(title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")) : encodeURIComponent(title));
 }
-// set the site: search it for "naruto", paste the results page's address, and "naruto" becomes the show's name
-function setWatchSite(){
-  const v = prompt(`Where do you watch anime?\n\n1. Open the site and search for: naruto\n2. Copy the address of the results page and paste it here.\n\n(Leave empty to turn this off.)`, S.watchTpl ? S.watchTpl.replace("{q}", "naruto") : "");
+const siteName = t => { try{ return new URL(t.replace("{q}", "x")).hostname.replace(/^www\./, ""); }catch(e){ return "site"; } };
+// set the site: search it for a test title, paste the results page's address, and that title becomes the item's name
+function setWatchSite(type){
+  const w = WATCH_WORD[type], what = type === "movie" ? "movies" : "anime";
+  const v = prompt(`Where do you watch ${what}?\n\n1. Open the site and search for: ${w}\n2. Copy the address of the results page and paste it here.\n\n(Leave empty to turn this off.)`, watchTpl(type) ? watchTpl(type).replace("{q}", w) : "");
   if(v === null) return;
   const u = v.trim();
-  if(!u){ delete S.watchTpl; save(); return; }
+  if(!u){ delete S.watch[type]; save(); return; }
   if(!/^https?:\/\//i.test(u)){ alert("That doesn't look like a link. Copy the whole address, starting with https://"); return; }
-  if(!/naruto|\{q\}/i.test(u)){ alert("That link doesn't contain \"naruto\". Search the site for naruto first, then copy the results page's address."); return; }
-  S.watchTpl = u.replace(/naruto/i, "{q}"); save();
+  if(!new RegExp(w + "|\\{q\\}", "i").test(u)){ alert(`That link doesn't contain "${w}". Search the site for ${w} first, then copy the results page's address.`); return; }
+  S.watch[type] = u.replace(new RegExp(w, "i"), "{q}"); save();
 }
-$("watchBtn").onclick = setWatchSite;
+$("watchBtn").onclick = () => setWatchSite("anime");
+$("watchMovieBtn").onclick = () => setWatchSite("movie");
 // add / edit dialog
 let editing = null;
 function fillRating(cur){ $("fRating").innerHTML = `<option value="0">Not rated</option>` + [10,9,8,7,6,5,4,3,2,1].map(r => `<option value="${r}" ${r===cur?"selected":""}>${"★".repeat(Math.floor(r/2))}${r%2?"½":""}  ${r}/10 · ${RATE_WORDS[r]}</option>`).join(""); }
