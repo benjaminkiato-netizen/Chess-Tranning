@@ -379,9 +379,12 @@ if(!PC){   // first run of v2: keep the book and anime covers, look movies up ag
     localStorage.removeItem("library.posters.v1"); localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){} }
 const pFail = {};   // lookups that failed (site busy), and when to try them again
 // one-time: anime remembered as "no cover" get another try with the backup sources
+if(!PC.__anime4){ for(const k of Object.keys(PC)) if(k.startsWith("anime|") && !PC[k]?.url) delete PC[k]; PC.__anime4 = 1; try{ localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){} }
 if(!PC.__anime3){ for(const k of Object.keys(PC)) if(k.startsWith("anime|") && !PC[k]?.url) delete PC[k]; PC.__anime3 = 1; try{ localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){} }
 if(!PC.__anime2){ for(const k of Object.keys(PC)) if(k.startsWith("anime|") && !PC[k]?.url) delete PC[k]; PC.__anime2 = 1; try{ localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){} }
 const pKey = i => `${i.type}|${i.title.toLowerCase()}|${(i.by||"").toLowerCase()}`;
+// "no cover found" is only remembered for 3 days: the sources get new entries, so look again after that
+const noCoverExpired = e => e && !e.url && (!e.t || Date.now() - e.t > 3 * 864e5);
 const ICON = {book:"📖", movie:"🎬", anime:"📺"};
 function metaHTML(i){
   if(!i.by && !i.genre) return "";
@@ -391,7 +394,7 @@ function metaHTML(i){
 function posterHTML(i){
   const url = i.poster || PC[pKey(i)]?.url;
   if(url) return `<div class="poster"><img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.textContent='${ICON[i.type]||"🎞"}'"></div>`;
-  const looking = !PC[pKey(i)], retry = pFail[pKey(i)];
+  const looking = !PC[pKey(i)] || noCoverExpired(PC[pKey(i)]), retry = pFail[pKey(i)];
   return `<div class="poster${looking && !retry ? " loading" : ""}" title="${retry ? "The cover site was busy. Trying again shortly…" : looking ? "Looking for a cover…" : "No cover found. Edit to paste an image link."}">${ICON[i.type]||"🎞"}</div>`;
 }
 const BOOK_GENRES = [["Science fiction",/science fiction|sci-fi/],["Fantasy",/\bfantasy\b/],["Horror",/\bhorror\b/],["Mystery",/\bmystery|detective/],
@@ -400,6 +403,19 @@ const BOOK_GENRES = [["Science fiction",/science fiction|sci-fi/],["Fantasy",/\b
   ["Philosophy",/philosophy/],["Self-help",/self-help|self help/],["Short stories",/short stories/],["Young adult",/young adult/],["Nonfiction",/nonfiction|non-fiction/]];
 const yearOf = by => (String(by||"").match(/\b(19|20)\d{2}\b/)||[])[0] || "";
 async function getJSON(u){ const r = await fetch(u); if(!r.ok) throw new Error(r.status); return r.json(); }   // busy / rate-limited: try again later
+// AniList: a free anime database (no key needed). Its search copes with odd spellings and alternative titles.
+async function aniList(t){
+  const query = `query($s:String){Page(perPage:6){media(search:$s,type:ANIME){title{romaji english native} synonyms isAdult
+    coverImage{extraLarge large} genres seasonYear startDate{year} studios(isMain:true){nodes{name}}}}}`;
+  const r = await fetch("https://graphql.anilist.co", {method: "POST", headers: {"Content-Type": "application/json", Accept: "application/json"},
+    body: JSON.stringify({query, variables: {s: loose(t)}})});
+  if(!r.ok) throw new Error(r.status);
+  const list = ((await r.json()).data?.Page?.media || []).filter(m => !m.isAdult);
+  const names = m => [m.title?.romaji, m.title?.english, m.title?.native, ...(m.synonyms || [])].filter(Boolean);
+  const m = list.find(x => names(x).some(n => sq(n) === sq(t))) || list.find(x => names(x).some(n => sq(n).includes(sq(t)) || sq(t).includes(sq(n)))) || list[0];
+  const url = m?.coverImage?.extraLarge || m?.coverImage?.large;
+  return url ? {url, genre: (m.genres || []).slice(0, 3).join(", "), year: m.seasonYear || m.startDate?.year || "", studio: m.studios?.nodes?.[0]?.name || ""} : null;
+}
 async function findPoster(i){
   const t = i.title.replace(/\s*\(.*?\)\s*/g, " ").trim();
   if(i.type === "book"){
@@ -427,6 +443,8 @@ async function findPoster(i){
       }catch(e){ jikanErr = e; }
       if(q === t && loose(t) !== t) await new Promise(r => setTimeout(r, 1100));   // Jikan allows about one request a second
     }
+    // MyAnimeList's own match, or AniList (better at fuzzy titles), before settling for MAL's first guess
+    if(!a){ try{ const al = await aniList(t); if(al) return al; }catch(e){} }
     a ||= first;
     const url = a?.images?.jpg?.large_image_url || a?.images?.jpg?.image_url;
     if(url) return {url, genre: (a.genres || []).map(g => g.name).slice(0, 3).join(", "),
@@ -561,7 +579,7 @@ let pBusy = false; const pQueue = [];
 function queuePosters(items){
   // look up items with no cover yet, and items never checked for a genre
   const now = Date.now();
-  for(const i of items) if(((!i.poster && !PC[pKey(i)]) || (!i.genre && !i.looked)) && !(pFail[pKey(i)]?.until > now) && !pQueue.some(x => x.id === i.id)) pQueue.push(i);
+  for(const i of items) if(((!i.poster && (!PC[pKey(i)] || noCoverExpired(PC[pKey(i)]))) || (!i.genre && !i.looked)) && !(pFail[pKey(i)]?.until > now) && !pQueue.some(x => x.id === i.id)) pQueue.push(i);
   if(!pBusy) pumpPosters();
 }
 async function pumpPosters(){
