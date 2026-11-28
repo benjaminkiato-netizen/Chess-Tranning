@@ -396,7 +396,7 @@ function coverHint(){
 }
 
 /* ---------- posters & covers (free sources that allow it, looked up once and remembered on this device) ----------
-   books: Open Library covers · movies: Wikipedia's article image (the poster) · anime: MyAnimeList via Jikan */
+   books: Open Library covers · movies: Wikipedia's article image (the poster) · anime: MyAnimeList via Jikan · TV: TVmaze */
 const PKEY = "library.posters.v2";
 let PC = {}; try{ PC = JSON.parse(localStorage.getItem(PKEY)) || null; }catch(e){ PC = null; }
 if(!PC){   // first run of v2: keep the book and anime covers, look movies up again
@@ -405,6 +405,7 @@ if(!PC){   // first run of v2: keep the book and anime covers, look movies up ag
     localStorage.removeItem("library.posters.v1"); localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){} }
 const pFail = {};   // lookups that failed (site busy), and when to try them again
 // one-time: anime remembered as "no cover" get another try with the backup sources
+if(!PC.__tv1){ for(const k of Object.keys(PC)) if(k.startsWith("tv|") && !PC[k]?.url) delete PC[k]; PC.__tv1 = 1; try{ localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){} }   // TVmaze added: look TV shows up again
 if(!PC.__anime4){ for(const k of Object.keys(PC)) if(k.startsWith("anime|") && !PC[k]?.url) delete PC[k]; PC.__anime4 = 1; try{ localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){} }
 if(!PC.__anime3){ for(const k of Object.keys(PC)) if(k.startsWith("anime|") && !PC[k]?.url) delete PC[k]; PC.__anime3 = 1; try{ localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){} }
 if(!PC.__anime2){ for(const k of Object.keys(PC)) if(k.startsWith("anime|") && !PC[k]?.url) delete PC[k]; PC.__anime2 = 1; try{ localStorage.setItem(PKEY, JSON.stringify(PC)); }catch(e){} }
@@ -469,6 +470,15 @@ async function findPoster(i){
     return {url: d?.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : null, genre};
   }
   if(i.type === "tv"){
+    // TVmaze: a free TV database (no key), with a poster, genres and premiere year for nearly every show
+    try{
+      const r = await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(t)}`);
+      if(r.ok){
+        const list = (await r.json()).map(x => x.show).filter(x => x?.image), y = yearOf(i.by);
+        const sh = list.find(x => sq(x.name) === sq(t) && (!y || (x.premiered || "").startsWith(y))) || list.find(x => sq(x.name) === sq(t)) || list[0];
+        if(sh) return {url: sh.image.original || sh.image.medium, genre: (sh.genres || []).slice(0, 3).join(", "), year: (sh.premiered || "").slice(0, 4)};
+      }
+    }catch(e){}
     const KIND = /\b(tv series|television series|miniseries|tv program|sitcom|series)\b/;
     const w = await wikiImage(t, KIND, yearOf(i.by));
     if(w) return w;
