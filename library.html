@@ -77,6 +77,10 @@ button.ghost{font:600 14px var(--body);color:var(--fg);background:var(--panel);b
 .list.grid .side .seg{display:grid;grid-template-columns:1fr 1fr;width:100%}
 .list.grid .side .seg button{font-size:11.5px;padding:6px 4px}
 .list.grid .side .rate{width:100%}
+.item .poster.link{cursor:pointer;position:relative}
+.item .poster.link::after{content:"▶";position:absolute;inset:auto 8px 8px auto;width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;
+  display:grid;place-items:center;font-size:14px;opacity:0;transition:opacity .15s}
+.item .poster.link:hover::after{opacity:1}
 .list.grid .side .icon{position:absolute;top:8px;background:rgba(0,0,0,.55);color:#fff;border-radius:8px;padding:4px 7px;opacity:0;transition:opacity .15s}
 .list.grid .side .icon[data-act="edit"]{right:44px} .list.grid .side .icon[data-act="del"]{right:8px}
 .list.grid .item:hover .side .icon, .list.grid .item:focus-within .side .icon{opacity:1}
@@ -167,6 +171,7 @@ dialog .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
       <option value="rating">Sort: top rated</option>
     </select>
     <button class="pri" id="addBtn">+ Add</button>
+    <button class="ghost" id="watchBtn" title="The site you watch anime on: clicking an anime's poster searches for it there"></button>
     <button class="ghost" id="layoutBtn" title="Switch between a poster grid and a list"></button>
     <button class="ghost" id="tmdbBtn" title="The Movie Database: posters and genres for movies that aren't on Wikipedia">🎬 TMDB key</button>
   </div>
@@ -188,6 +193,8 @@ dialog .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
   <input id="fGenre" autocomplete="off" placeholder="e.g. Comedy, Romance">
   <label for="fNote">Note</label>
   <textarea id="fNote" rows="3"></textarea>
+  <label for="fWatch">Watch / read link <small style="color:var(--muted)">(optional: where clicking the poster takes you, e.g. the show's page on your site)</small></label>
+  <input id="fWatch" autocomplete="off" placeholder="https://…">
   <label for="fPoster">Poster / cover image <small style="color:var(--muted)">(optional: paste an image link if the automatic one is wrong)</small></label>
   <input id="fPoster" autocomplete="off" placeholder="https://…">
   <label for="fStatus">Status</label>
@@ -351,6 +358,7 @@ function render(){
   }[view.sort]);
   $("list").classList.toggle("grid", layout === "grid");
   $("layoutBtn").textContent = layout === "grid" ? "☰ List" : "▦ Grid";
+  $("watchBtn").textContent = S.watchTpl ? `▶ ${new URL(S.watchTpl.replace("{q}", "x")).hostname.replace(/^www\./, "")}` : "▶ Watch on…";
   $("list").innerHTML = items.length ? items.map(i => `
     <div class="item has-p" data-id="${i.id}" data-s="${i.status}">
       ${posterHTML(i)}
@@ -403,8 +411,10 @@ function metaHTML(i){
 }
 function posterHTML(i){
   const url = i.poster || PC[pKey(i)]?.url;
-  if(url) return `<div class="poster"><img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.textContent='${ICON[i.type]||"🎞"}'"></div>`;
+  const lk = watchLink(i) ? ` link" title="Open ${i.watch ? "your link" : "on " + new URL(S.watchTpl.replace("{q}", "x")).hostname.replace(/^www\./, "")}` : "";
+  if(url) return `<div class="poster${lk}"><img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.textContent='${ICON[i.type]||"🎞"}'"></div>`;
   const looking = !PC[pKey(i)] || noCoverExpired(PC[pKey(i)]), retry = pFail[pKey(i)];
+  if(lk) return `<div class="poster${lk}">${ICON[i.type]||"🎞"}</div>`;
   return `<div class="poster${looking && !retry ? " loading" : ""}" title="${retry ? `Couldn't reach the cover sites (${esc(retry.why || "busy")}). Trying again shortly…` : looking ? "Looking for a cover…" : "No cover found. Edit to paste an image link."}">${ICON[i.type]||"🎞"}</div>`;
 }
 const BOOK_GENRES = [["Science fiction",/science fiction|sci-fi/],["Fantasy",/\bfantasy\b/],["Horror",/\bhorror\b/],["Mystery",/\bmystery|detective/],
@@ -653,6 +663,12 @@ $("list").onclick = e => {
   const card = e.target.closest(".item"); if(!card) return;
   const it = S.items.find(x => x.id===card.dataset.id); if(!it) return;
   const seg = e.target.closest(".seg button"), star = e.target.closest(".star button"), act = e.target.closest("[data-act]");
+  if(e.target.closest(".poster") && !act){
+    const link = watchLink(it);
+    if(link) window.open(link, "_blank", "noopener");
+    else if(it.type === "anime") setWatchSite();
+    return;
+  }
   if(seg){ it.status = seg.dataset.v; save(); }
   else if(star){ const n = +star.dataset.r; it.rating = it.rating===n ? 0 : n; save(); }
   else if(act?.dataset.act==="del"){
@@ -665,6 +681,23 @@ $("list").onclick = e => {
 $("list").addEventListener("mouseover", e => { const b = e.target.closest(".star button"); if(b) paint(b.closest(".rate"), +b.dataset.r); });
 $("list").addEventListener("mouseout", e => { const r = e.target.closest(".rate"); if(r && !r.contains(e.relatedTarget)) paint(r, +r.dataset.r); });
 
+// where clicking a poster goes: the item's own link, or (anime) a search on the site you watch on
+function watchLink(i){
+  if(i.watch) return i.watch;
+  if(i.type === "anime" && S.watchTpl) return S.watchTpl.replace("{q}", encodeURIComponent(i.title.replace(/\s*\(.*?\)\s*/g, " ").trim()));
+  return null;
+}
+// set the site: search it for "naruto", paste the results page's address, and "naruto" becomes the show's name
+function setWatchSite(){
+  const v = prompt(`Where do you watch anime?\n\n1. Open the site and search for: naruto\n2. Copy the address of the results page and paste it here.\n\n(Leave empty to turn this off.)`, S.watchTpl ? S.watchTpl.replace("{q}", "naruto") : "");
+  if(v === null) return;
+  const u = v.trim();
+  if(!u){ delete S.watchTpl; save(); return; }
+  if(!/^https?:\/\//i.test(u)){ alert("That doesn't look like a link. Copy the whole address, starting with https://"); return; }
+  if(!/naruto|\{q\}/i.test(u)){ alert("That link doesn't contain \"naruto\". Search the site for naruto first, then copy the results page's address."); return; }
+  S.watchTpl = u.replace(/naruto/i, "{q}"); save();
+}
+$("watchBtn").onclick = setWatchSite;
 // add / edit dialog
 let editing = null;
 function fillRating(cur){ $("fRating").innerHTML = `<option value="0">Not rated</option>` + [10,9,8,7,6,5,4,3,2,1].map(r => `<option value="${r}" ${r===cur?"selected":""}>${"★".repeat(Math.floor(r/2))}${r%2?"½":""}  ${r}/10 · ${RATE_WORDS[r]}</option>`).join(""); }
@@ -674,7 +707,7 @@ function openDlg(it){
   editing = it || null;
   const type = it?.type || (view.type==="all" ? "book" : view.type);
   $("dlgTitle").textContent = it ? "Edit" : "Add to library";
-  $("fType").value = type; $("fTitle").value = it?.title||""; $("fBy").value = it?.by||""; $("fNote").value = it?.note||""; $("fPoster").value = it?.poster||""; $("fGenre").value = it?.genre||"";
+  $("fType").value = type; $("fTitle").value = it?.title||""; $("fBy").value = it?.by||""; $("fNote").value = it?.note||""; $("fPoster").value = it?.poster||""; $("fWatch").value = it?.watch||""; $("fGenre").value = it?.genre||"";
   $("fByLabel").textContent = TYPES[type].by; fillStatus(type, it?.status||"todo");
   fillRating(it?.rating||0); $("fReview").value = it?.review||""; showRate();
   $("dlg").showModal(); $("fTitle").focus();
@@ -685,7 +718,8 @@ $("addBtn").onclick = () => openDlg(null);
 $("dlgCancel").onclick = () => $("dlg").close();
 $("dlgSave").onclick = () => {
   const title = $("fTitle").value.trim(); if(!title){ $("fTitle").focus(); return; }
-  const data = { type:$("fType").value, title, by:$("fBy").value.trim(), note:$("fNote").value.trim(), status:$("fStatus").value, rating:+$("fRating").value, review:$("fReview").value.trim(), poster:$("fPoster").value.trim(), genre:$("fGenre").value.trim() };
+  const data = { type:$("fType").value, title, by:$("fBy").value.trim(), note:$("fNote").value.trim(), status:$("fStatus").value, rating:+$("fRating").value, review:$("fReview").value.trim(), poster:$("fPoster").value.trim(), genre:$("fGenre").value.trim(), watch:$("fWatch").value.trim() };
+  if(!data.watch){ delete data.watch; if(editing) delete editing.watch; }
   if(!data.genre) delete data.genre;
   if(!data.poster) delete data.poster;
   if(!["done","dropped"].includes(data.status)){ delete data.rating; delete data.review; }
