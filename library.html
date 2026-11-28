@@ -30,7 +30,8 @@ a{color:inherit}
 .syncbtn.on{border-color:#2f7d4f}
 h1{font-family:var(--display);font-size:clamp(30px,5vw,44px);line-height:1.05;margin:0}
 .sub{color:var(--muted);margin:4px 0 0}
-.progress{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.progress{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:760px){ .progress{grid-template-columns:repeat(2,minmax(0,1fr))} }
 @media (max-width:560px){.progress{gap:8px}.pcard{padding:12px;min-height:0}.pcard .row{flex-direction:column;gap:0}.pcard .big{flex-direction:column;align-items:flex-start;gap:4px}.pcard .big b{font-size:17px}.pcard .big em{margin-left:0}.pcard .ico{font-size:26px}.pcard span{font-size:12px}}
 .pcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 20px 16px;display:flex;flex-direction:column;gap:10px;
   color:var(--fg);font:inherit;text-align:left;cursor:pointer;min-height:150px;transition:border-color .15s,transform .15s,background .15s}
@@ -154,7 +155,7 @@ dialog .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
   </div>
   <div>
     <h1>Library</h1>
-    <p class="sub">Books, movies and anime to get through.</p>
+    <p class="sub">Books, movies, anime and TV shows to get through.</p>
   </div>
 
   <div class="progress" id="progress"></div>
@@ -172,6 +173,7 @@ dialog .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
     </select>
     <button class="pri" id="addBtn">+ Add</button>
     <button class="ghost" id="watchBtn" title="The site you watch anime on: clicking an anime's poster searches for it there"></button>
+    <button class="ghost" id="watchTvBtn" title="The site you watch TV shows on: clicking a show's poster searches for it there"></button>
     <button class="ghost" id="watchMovieBtn" title="The site you watch movies on: clicking a movie's poster searches for it there"></button>
     <button class="ghost" id="layoutBtn" title="Switch between a poster grid and a list"></button>
     <button class="ghost" id="tmdbBtn" title="The Movie Database: posters and genres for movies that aren't on Wikipedia">🎬 TMDB key</button>
@@ -185,7 +187,7 @@ dialog .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
 <dialog id="dlg">
   <h2 id="dlgTitle">Add</h2>
   <label for="fType">Type</label>
-  <select id="fType"><option value="book">Book</option><option value="movie">Movie</option><option value="anime">Anime</option></select>
+  <select id="fType"><option value="book">Book</option><option value="movie">Movie</option><option value="anime">Anime</option><option value="tv">TV show</option></select>
   <label for="fTitle">Title</label>
   <input id="fTitle" autocomplete="off">
   <label for="fBy" id="fByLabel">Author</label>
@@ -213,7 +215,7 @@ dialog .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
 
 <script>
 const KEY = "library.v1";
-const TYPES = { book:{label:"Books", one:"Book", by:"Author"}, movie:{label:"Movies", one:"Movie", by:"Year"}, anime:{label:"Anime", one:"Anime", by:"Year / studio"} };
+const TYPES = { book:{label:"Books", one:"Book", by:"Author"}, movie:{label:"Movies", one:"Movie", by:"Year"}, anime:{label:"Anime", one:"Anime", by:"Year / studio"}, tv:{label:"TV Shows", one:"TV show", by:"Year"} };
 const STATUS_ORDER = ["doing","todo","done","dropped"];
 const statusLabel = (s, type) => ({
   todo:"Not started",
@@ -341,7 +343,7 @@ function render(){
   // tabs
   const count = t => S.items.filter(i => t==="all" || i.type===t).length;
   $("tabs").innerHTML = view.type === "all"
-    ? `<div class="viewing"><b>Everything</b><span>${count("all")}</span><span style="margin-left:auto">Click Books, Movies or Anime above to see just those</span></div>`
+    ? `<div class="viewing"><b>Everything</b><span>${count("all")}</span><span style="margin-left:auto">Click Books, Movies, Anime or TV Shows above to see just those</span></div>`
     : `<div class="viewing"><b>${ICON[view.type]||""} ${TYPES[view.type].label}</b><span>${count(view.type)}</span><button data-t="all">Show all (${count("all")}) ✕</button></div>`;
   // status chips
   const tt = view.type==="all" ? null : view.type;
@@ -361,8 +363,10 @@ function render(){
   $("layoutBtn").textContent = layout === "grid" ? "☰ List" : "▦ Grid";
   $("watchBtn").textContent = watchTpl("anime") ? `▶ Anime: ${siteName(watchTpl("anime"))}` : "▶ Watch anime on…";
   $("watchMovieBtn").textContent = watchTpl("movie") ? `▶ Movies: ${siteName(watchTpl("movie"))}` : "▶ Watch movies on…";
-  $("watchBtn").hidden = view.type === "book" || view.type === "movie";
-  $("watchMovieBtn").hidden = view.type === "book" || view.type === "anime";
+  $("watchTvBtn").textContent = watchTpl("tv") ? `▶ TV: ${siteName(watchTpl("tv"))}` : "▶ Watch TV on…";
+  $("watchBtn").hidden = !["all", "anime"].includes(view.type);
+  $("watchMovieBtn").hidden = !["all", "movie"].includes(view.type);
+  $("watchTvBtn").hidden = !["all", "tv"].includes(view.type);
   $("list").innerHTML = items.length ? items.map(i => `
     <div class="item has-p" data-id="${i.id}" data-s="${i.status}">
       ${posterHTML(i)}
@@ -407,7 +411,7 @@ if(!PC.__anime2){ for(const k of Object.keys(PC)) if(k.startsWith("anime|") && !
 const pKey = i => `${i.type}|${i.title.toLowerCase()}|${(i.by||"").toLowerCase()}`;
 // "no cover found" is only remembered for 3 days: the sources get new entries, so look again after that
 const noCoverExpired = e => e && !e.url && (!e.t || Date.now() - e.t > 3 * 864e5);
-const ICON = {book:"📖", movie:"🎬", anime:"📺"};
+const ICON = {book:"📖", movie:"🎬", anime:"📺", tv:"🖥️"};
 function metaHTML(i){
   if(!i.by && !i.genre) return "";
   const g = (i.genre || "").split(",").map(x => x.trim()).filter(Boolean).map(x => `<span class="genre">${esc(x)}</span>`).join("");
@@ -463,6 +467,13 @@ async function findPoster(i){
     const subj = (j.docs||[]).flatMap(x => x.subject || []).map(x => x.toLowerCase());
     const genre = BOOK_GENRES.filter(([g, re]) => subj.some(x => re.test(x))).map(([g]) => g).slice(0, 3).join(", ");
     return {url: d?.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : null, genre};
+  }
+  if(i.type === "tv"){
+    const KIND = /\b(tv series|television series|miniseries|tv program|sitcom|series)\b/;
+    const w = await wikiImage(t, KIND, yearOf(i.by));
+    if(w) return w;
+    if(tmdbKey()){ try{ const m = await tmdbFind(i, "tv"); if(m.url) return m; }catch(e){ if(e.badKey) tmdbBad(); else throw e; } }
+    return {url: null};
   }
   if(i.type === "anime"){
     let jikanErr = null, a = null, first = null;
@@ -535,9 +546,10 @@ async function tmdbGenres(){
   TMDB_GENRES = new Map([...(m?.genres || []), ...(t?.genres || [])].map(g => [g.id, g.name]));
   return TMDB_GENRES;
 }
-async function tmdbFind(i){
+async function tmdbFind(i, kind = "movie"){
   const t = i.title.replace(/\s*\(.*?\)\s*/g, " ").trim(), y = yearOf(i.by);
-  let j = await tmdb("search/movie", {query: t, include_adult: "false", ...(y ? {year: y} : {})});
+  let j = kind === "tv" ? await tmdb("search/tv", {query: t, include_adult: "false", ...(y ? {first_air_date_year: y} : {})})
+                        : await tmdb("search/movie", {query: t, include_adult: "false", ...(y ? {year: y} : {})});
   let hit = (j?.results || []).find(x => x.poster_path) || null;
   if(!hit){   // TV films and episodes (e.g. "Into the Dark" entries) are often filed as TV
     j = await tmdb("search/multi", {query: t, include_adult: "false"});
@@ -670,7 +682,7 @@ $("list").onclick = e => {
   if(e.target.closest(".poster") && !act){
     const link = watchLink(it);
     if(link) window.open(link, "_blank", "noopener");
-    else if(it.type === "anime" || it.type === "movie") setWatchSite(it.type);
+    else if(WATCH_WORD[it.type]) setWatchSite(it.type);
     return;
   }
   if(seg){ it.status = seg.dataset.v; save(); }
@@ -686,7 +698,7 @@ $("list").addEventListener("mouseover", e => { const b = e.target.closest(".star
 $("list").addEventListener("mouseout", e => { const r = e.target.closest(".rate"); if(r && !r.contains(e.relatedTarget)) paint(r, +r.dataset.r); });
 
 // where clicking a poster goes: the item's own link, or a search on the site you watch that kind of thing on
-const WATCH_WORD = {anime: "naruto", movie: "inception"}, WATCH_YEAR = {anime: "2002", movie: "2010"};   // the test titles' years
+const WATCH_WORD = {anime: "naruto", movie: "inception", tv: "breaking bad"}, WATCH_YEAR = {anime: "2002", movie: "2010", tv: "2008"};   // the test titles' years
 function watchTpl(type){
   S.watch ||= {}; if(S.watchTpl){ S.watch.anime ||= S.watchTpl; delete S.watchTpl; }
   // links saved before years were understood still have the test title's year written in (…/{q}-2010-…): fix them
@@ -707,17 +719,19 @@ function watchLink(i){
 const siteName = t => { try{ return new URL(t.replace("{q}", "x")).hostname.replace(/^www\./, ""); }catch(e){ return "site"; } };
 // set the site: search it for a test title, paste the results page's address, and that title becomes the item's name
 function setWatchSite(type){
-  const w = WATCH_WORD[type], what = type === "movie" ? "movies" : "anime";
+  const w = WATCH_WORD[type], what = {movie: "movies", tv: "TV shows"}[type] || "anime";
   const v = prompt(`Where do you watch ${what}?\n\n1. Open the site and search for: ${w}\n2. Copy the address of the results page and paste it here.\n\n(Leave empty to turn this off.)`, watchTpl(type) ? watchTpl(type).replace("{q}", w) : "");
   if(v === null) return;
   const u = v.trim();
   if(!u){ delete S.watch[type]; save(); return; }
   if(!/^https?:\/\//i.test(u)){ alert("That doesn't look like a link. Copy the whole address, starting with https://"); return; }
-  if(!new RegExp(w + "|\\{q\\}", "i").test(u)){ alert(`That link doesn't contain "${w}". Search the site for ${w} first, then copy the results page's address.`); return; }
-  S.watch[type] = u.replace(new RegExp(w, "i"), "{q}").replace(new RegExp("(\\{q\\}[-_ ]?)" + WATCH_YEAR[type]), "$1{year}"); save();
+  const wRe = w.replace(/ /g, "(?:[-_+ ]|%20)");
+  if(!new RegExp(wRe + "|\\{q\\}", "i").test(u)){ alert(`That link doesn't contain "${w}". Search the site for ${w} first, then copy the results page's address.`); return; }
+  S.watch[type] = u.replace(new RegExp(wRe, "i"), "{q}").replace(new RegExp("(\\{q\\}[-_ ]?)" + WATCH_YEAR[type]), "$1{year}"); save();
 }
 $("watchBtn").onclick = () => setWatchSite("anime");
 $("watchMovieBtn").onclick = () => setWatchSite("movie");
+$("watchTvBtn").onclick = () => setWatchSite("tv");
 // add / edit dialog
 let editing = null;
 function fillRating(cur){ $("fRating").innerHTML = `<option value="0">Not rated</option>` + [10,9,8,7,6,5,4,3,2,1].map(r => `<option value="${r}" ${r===cur?"selected":""}>${"★".repeat(Math.floor(r/2))}${r%2?"½":""}  ${r}/10 · ${RATE_WORDS[r]}</option>`).join(""); }
