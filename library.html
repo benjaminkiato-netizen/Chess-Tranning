@@ -686,7 +686,7 @@ $("list").addEventListener("mouseover", e => { const b = e.target.closest(".star
 $("list").addEventListener("mouseout", e => { const r = e.target.closest(".rate"); if(r && !r.contains(e.relatedTarget)) paint(r, +r.dataset.r); });
 
 // where clicking a poster goes: the item's own link, or a search on the site you watch that kind of thing on
-const WATCH_WORD = {anime: "naruto", movie: "inception"};
+const WATCH_WORD = {anime: "naruto", movie: "inception"}, WATCH_YEAR = {anime: "2002", movie: "2010"};   // the test titles' years
 function watchTpl(type){ S.watch ||= {}; if(S.watchTpl){ S.watch.anime ||= S.watchTpl; delete S.watchTpl; } return S.watch[type] || ""; }
 function watchLink(i){
   if(i.watch) return i.watch;
@@ -694,7 +694,10 @@ function watchLink(i){
   const title = i.title.replace(/\s*\(.*?\)\s*/g, " ").trim();
   // a search word in the address path (…/search/inception) is usually written with dashes; in ?q=… it's encoded
   const inPath = t.indexOf("{q}") < (t.indexOf("?") < 0 ? Infinity : t.indexOf("?"));
-  return t.replace("{q}", inPath ? encodeURIComponent(title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")) : encodeURIComponent(title));
+  // some sites go straight to the title's own page, named with its year (…/inception-2010-watch-online/): use this item's year
+  if(t.includes("{year}") && !yearOf(i.by)){ try{ return new URL(t.replace(/\{q\}|\{year\}/g, "x")).origin; }catch(e){ return null; } }   // no year: the site's home page
+  return t.replace("{q}", inPath ? encodeURIComponent(title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")) : encodeURIComponent(title))
+          .replace("{year}", yearOf(i.by));
 }
 const siteName = t => { try{ return new URL(t.replace("{q}", "x")).hostname.replace(/^www\./, ""); }catch(e){ return "site"; } };
 // set the site: search it for a test title, paste the results page's address, and that title becomes the item's name
@@ -706,7 +709,7 @@ function setWatchSite(type){
   if(!u){ delete S.watch[type]; save(); return; }
   if(!/^https?:\/\//i.test(u)){ alert("That doesn't look like a link. Copy the whole address, starting with https://"); return; }
   if(!new RegExp(w + "|\\{q\\}", "i").test(u)){ alert(`That link doesn't contain "${w}". Search the site for ${w} first, then copy the results page's address.`); return; }
-  S.watch[type] = u.replace(new RegExp(w, "i"), "{q}"); save();
+  S.watch[type] = u.replace(new RegExp(w, "i"), "{q}").replace(new RegExp("(\\{q\\}[-_ ]?)" + WATCH_YEAR[type]), "$1{year}"); save();
 }
 $("watchBtn").onclick = () => setWatchSite("anime");
 $("watchMovieBtn").onclick = () => setWatchSite("movie");
