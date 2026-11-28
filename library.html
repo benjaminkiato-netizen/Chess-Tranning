@@ -172,6 +172,7 @@ dialog .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
   </div>
 
   <div class="tmdb-hint" id="tmdbHint" hidden></div>
+  <div class="tmdb-hint" id="coverHint" hidden></div>
 <div class="list" id="list"></div>
 </div>
 
@@ -367,6 +368,15 @@ function render(){
     </div>`).join("") : `<div class="empty">Nothing here${q?" for that search":""}.</div>`;
   const b = $("syncBtn"); if (window.HubSync && HubSync.connected()) { b.textContent = "☁ Sync on"; b.classList.add("on"); }
   queuePosters(items);
+  coverHint();
+}
+// when several cover lookups keep failing, say which sites can't be reached instead of failing silently
+function coverHint(){
+  const f = Object.values(pFail).filter(x => x.why);
+  const h = $("coverHint"); if(!h) return;
+  if(f.length < 2){ h.hidden = true; return; }
+  h.hidden = false;
+  h.innerHTML = `${f.length} covers couldn't be fetched: <b>${esc(f[f.length - 1].why)}</b>. If you're using a VPN or an ad / tracker blocker, it may be blocking these sites; turning it off for this page usually fixes it. It keeps retrying by itself.`;
 }
 
 /* ---------- posters & covers (free sources that allow it, looked up once and remembered on this device) ----------
@@ -395,7 +405,7 @@ function posterHTML(i){
   const url = i.poster || PC[pKey(i)]?.url;
   if(url) return `<div class="poster"><img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.textContent='${ICON[i.type]||"🎞"}'"></div>`;
   const looking = !PC[pKey(i)] || noCoverExpired(PC[pKey(i)]), retry = pFail[pKey(i)];
-  return `<div class="poster${looking && !retry ? " loading" : ""}" title="${retry ? "The cover site was busy. Trying again shortly…" : looking ? "Looking for a cover…" : "No cover found. Edit to paste an image link."}">${ICON[i.type]||"🎞"}</div>`;
+  return `<div class="poster${looking && !retry ? " loading" : ""}" title="${retry ? `Couldn't reach the cover sites (${esc(retry.why || "busy")}). Trying again shortly…` : looking ? "Looking for a cover…" : "No cover found. Edit to paste an image link."}">${ICON[i.type]||"🎞"}</div>`;
 }
 const BOOK_GENRES = [["Science fiction",/science fiction|sci-fi/],["Fantasy",/\bfantasy\b/],["Horror",/\bhorror\b/],["Mystery",/\bmystery|detective/],
   ["Thriller",/thriller|suspense/],["Romance",/\bromance\b|love stories/],["Humor",/humou?r|comic|satire/],["Historical fiction",/historical fiction/],
@@ -415,6 +425,16 @@ async function aniList(t){
   const m = list.find(x => names(x).some(n => sq(n) === sq(t))) || list.find(x => names(x).some(n => sq(n).includes(sq(t)) || sq(t).includes(sq(n)))) || list[0];
   const url = m?.coverImage?.extraLarge || m?.coverImage?.large;
   return url ? {url, genre: (m.genres || []).slice(0, 3).join(", "), year: m.seasonYear || m.startDate?.year || "", studio: m.studios?.nodes?.[0]?.name || ""} : null;
+}
+// Kitsu: another free anime database (no key), used when MyAnimeList and AniList can't be reached
+async function kitsu(t){
+  const r = await fetch(`https://kitsu.io/api/edge/anime?filter[text]=${encodeURIComponent(loose(t))}&page[limit]=6`, {headers: {Accept: "application/vnd.api+json"}});
+  if(!r.ok) throw new Error(r.status);
+  const list = ((await r.json()).data || []).map(d => d.attributes).filter(a => a && a.ageRating !== "R18");
+  const names = a => [a.canonicalTitle, ...Object.values(a.titles || {}), ...(a.abbreviatedTitles || [])].filter(Boolean);
+  const a = list.find(x => names(x).some(n => sq(n) === sq(t))) || list.find(x => names(x).some(n => sq(n).includes(sq(t)) || sq(t).includes(sq(n)))) || list[0];
+  const url = a?.posterImage?.large || a?.posterImage?.original;
+  return url ? {url, genre: "", year: (a.startDate || "").slice(0, 4), studio: ""} : null;
 }
 async function findPoster(i){
   const t = i.title.replace(/\s*\(.*?\)\s*/g, " ").trim();
@@ -444,16 +464,20 @@ async function findPoster(i){
       if(q === t && loose(t) !== t) await new Promise(r => setTimeout(r, 1100));   // Jikan allows about one request a second
     }
     // MyAnimeList's own match, or AniList (better at fuzzy titles), before settling for MAL's first guess
-    if(!a){ try{ const al = await aniList(t); if(al) return al; }catch(e){} }
+    const why = jikanErr ? [`MyAnimeList ${jikanErr.message === "Failed to fetch" ? "unreachable" : jikanErr.message}`] : [];
+    if(!a){ try{ const al = await aniList(t); if(al) return al; }catch(e){ why.push(`AniList ${e.message === "Failed to fetch" ? "unreachable" : e.message}`); } }
     a ||= first;
     const url = a?.images?.jpg?.large_image_url || a?.images?.jpg?.image_url;
     if(url) return {url, genre: (a.genres || []).map(g => g.name).slice(0, 3).join(", "),
       year: a.year || a.aired?.prop?.from?.year || "", studio: a.studios?.[0]?.name || ""};
     // MyAnimeList busy or no match: the show's own Wikipedia article, then TMDB if you've added a key
-    const w = await wikiImage(t, /\b(tv series|anime|manga|film)\b/, yearOf(i.by)) || (loose(t) !== t ? await wikiImage(loose(t), /\b(tv series|anime|manga|film)\b/, yearOf(i.by)) : null);
+    if(!url && !first){ try{ const k = await kitsu(t); if(k) return k; }catch(e){ why.push(`Kitsu ${e.message === "Failed to fetch" ? "unreachable" : e.message}`); } }
+    // Wikipedia: the show's article, or the manga / light novel it's based on
+    const KIND = /\b(tv series|television series|anime|manga|light novel|novel series|film)\b/;
+    const w = await wikiImage(t, KIND, yearOf(i.by)) || (loose(t) !== t ? await wikiImage(loose(t), KIND, yearOf(i.by)) : null);
     if(w) return w;
     if(tmdbKey()){ try{ const m = await tmdbFind(i); if(m.url) return m; }catch(e){ if(e.badKey) tmdbBad(); } }
-    if(jikanErr) throw jikanErr;   // try again later rather than remembering "no cover"
+    if(why.length){ const e = new Error(why.join(" · ")); throw e; }   // try again later rather than remembering "no cover"
     return {url: null};
   }
   // movie: the lead image of the film's own Wikipedia article is the poster. Posters aren't freely licensed,
@@ -591,7 +615,7 @@ async function pumpPosters(){
     catch(e){   // busy / rate-limited / offline: wait 30 s, then 1, 2, 4 … up to 10 minutes before retrying this one
       failed = true;
       const n = (pFail[k]?.n || 0) + 1, wait = Math.min(600e3, 30e3 * 2 ** (n - 1));
-      pFail[k] = {n, until: Date.now() + wait};
+      pFail[k] = {n, until: Date.now() + wait, why: /failed to fetch|networkerror|load failed/i.test(e.message) ? "the cover sites can't be reached" : e.message};
       setTimeout(() => queuePosters(S.items), wait + 200);
     }
     if(!failed){
